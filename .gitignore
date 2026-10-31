@@ -14,3 +14,7 @@ src-tauri/gen/android/app/src/main/assets/
 *.apk
 *.aab
 *.keystore
+
+# 临时调试产物（截图、adb 转发脚本）
+.demo/
+.tools/
