@@ -756,6 +756,8 @@ body { overflow-x: hidden; overflow-y: auto; }
 /* 弹层里的选项 / 分区 */
 .sect { font-size: 12px; color: var(--dim2); padding: 12px 20px 7px; }
 .opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.fsect { font-size: 12px; color: var(--dim2); padding: 14px 0 8px; }
+.fnote { font-size: 12px; color: var(--dim2); padding: 6px 2px; }
 .opt {
   height: 34px; padding: 0 13px; border-radius: 10px;
   border: 1px solid var(--line2); background: var(--surface2);
@@ -763,6 +765,8 @@ body { overflow-x: hidden; overflow-y: auto; }
   display: inline-flex; align-items: center; gap: 6px;
 }
 .opt.on { background: rgba(110,168,254,.16); border-color: var(--accent); color: var(--accent); }
+.opt em { font-style: normal; font-size: 11px; color: var(--dim); }
+.opt.on em { color: var(--accent); opacity: .8; }
 .sheet-body { max-height: 62vh; overflow-y: auto; padding-bottom: calc(18px + var(--safe-bottom)); }
 
 /* ---------- 回收站 ---------- */

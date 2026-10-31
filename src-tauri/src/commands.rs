@@ -156,6 +156,8 @@ fn sort_assets(mut list: Vec<Asset>, sort: &str, limit: Option<usize>) -> Vec<As
                 .then(b.added_at.cmp(&a.added_at))
         }),
         "added" => list.sort_by(|a, b| b.added_at.cmp(&a.added_at)),
+        "oldest" => list.sort_by(|a, b| a.added_at.cmp(&b.added_at)),
+        "size" => list.sort_by(|a, b| b.bytes.cmp(&a.bytes)),
         "used" | "recent" => {
             list.sort_by(|a, b| b.used_at.cmp(&a.used_at).then(b.added_at.cmp(&a.added_at)))
         }

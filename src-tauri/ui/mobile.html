@@ -159,6 +159,41 @@
       </div>
     </div>
 
+    <!-- 筛选面板 -->
+    <div class="sheetmask" id="filtermask" hidden>
+      <div class="sheet" id="filtersheet">
+        <div class="sheet-h">筛选</div>
+        <div class="fsect">分组</div>
+        <div class="opts" id="f-groups"></div>
+        <div class="fsect">类型</div>
+        <div class="opts" id="f-type">
+          <button class="opt" data-type="">全部</button>
+          <button class="opt" data-type="gif">GIF</button>
+          <button class="opt" data-type="static">静态图</button>
+        </div>
+        <div class="fsect">时间</div>
+        <div class="opts" id="f-days">
+          <button class="opt" data-days="0">全部</button>
+          <button class="opt" data-days="1">今天</button>
+          <button class="opt" data-days="7">7 天</button>
+          <button class="opt" data-days="30">30 天</button>
+        </div>
+        <div class="fsect">标签</div>
+        <div class="opts" id="f-tags"></div>
+        <div class="fsect">排序</div>
+        <div class="opts" id="f-sort">
+          <button class="opt" data-sort="">最新</button>
+          <button class="opt" data-sort="oldest">最旧</button>
+          <button class="opt" data-sort="size">最大</button>
+          <button class="opt" data-sort="name">名称</button>
+        </div>
+        <div class="sheet-actions" style="margin-top:20px">
+          <button id="f-reset">重置</button>
+          <button class="primary" id="f-apply">查看 0 张</button>
+        </div>
+      </div>
+    </div>
+
     <div class="sheetmask" id="sheetmask" hidden>
       <div class="sheet" id="sheet">
         <div class="sheet-h" id="sheet-title"></div>

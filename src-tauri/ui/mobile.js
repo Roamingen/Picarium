@@ -20,6 +20,8 @@ const S = {
   gq: "",
   gview: null,
   sharedPaths: [],
+  tags: [],
+  filters: { type: "", days: 0, tags: [], sort: "" },
   loading: false,
 };
 
@@ -130,16 +132,18 @@ async function refresh() {
   $("grid").innerHTML = '<div class="spinner">正在读取图库…</div>';
 
   try {
-    const [items, gs, lib, gl] = await Promise.all([
-      invokeRetry("list_assets", { q: S.q, group: groupParam(), limit: 500 }),
+    const [items, gs, lib, gl, ts] = await Promise.all([
+      invokeRetry("list_assets", { q: S.q, group: groupParam(), limit: 500, sort: sortParam(), filters: filterJson() }),
       invokeRetry("group_stats"),
       invokeRetry("library_stats"),
       invokeRetry("group_list"),
+      invokeRetry("tag_stats"),
     ]);
     S.items = items || [];
     S.groups = (gs && gs.groups) || [];
     S.groupList = (gl && gl.groups) || [];
     S.pinned = (gl && gl.pinned) || [];
+    S.tags = ts || [];
     S.stats = { ...gs, ...lib };
     renderHeader();
     renderChips();
@@ -189,10 +193,49 @@ function renderChips() {
   if (S.q) {
     html += `<button class="chip fch" data-qclear="1">搜：${escapeHtml(S.q)} <span class="x">✕</span></button>`;
   }
+  if (S.filters.type) {
+    const t = S.filters.type === "gif" ? "GIF" : "静态图";
+    html += `<button class="chip fch" data-fclear="type">${t} <span class="x">✕</span></button>`;
+  }
+  for (const t of S.filters.tags) {
+    html += `<button class="chip fch" data-fclear="tag:${escapeHtml(t)}">标签：${escapeHtml(t)} <span class="x">✕</span></button>`;
+  }
+  if (S.filters.days) {
+    const d = S.filters.days === 1 ? "今天" : `${S.filters.days} 天`;
+    html += `<button class="chip fch" data-fclear="days">${d} <span class="x">✕</span></button>`;
+  }
+  if (S.filters.sort) {
+    const m = { oldest: "最旧", size: "最大", name: "名称" };
+    html += `<button class="chip fch" data-fclear="sort">排序：${m[S.filters.sort] || S.filters.sort} <span class="x">✕</span></button>`;
+  }
+  if (hasFilters()) {
+    html += `<button class="chip fch" data-fclearall="1">清空筛选 <span class="x">✕</span></button>`;
+  }
   chips.innerHTML = html;
   // 分组/搜索的过滤 chip 排在最后，自动滚到右端让用户看见
-  const hasFilter = S.q || !["all", "star", "ungrouped", "recent"].includes(S.view);
+  const hasFilter = S.q || hasFilters() || !["all", "star", "ungrouped", "recent"].includes(S.view);
   chips.scrollLeft = hasFilter ? chips.scrollWidth : 0;
+}
+
+function filterJson() {
+  const f = {};
+  if (S.filters.type === "gif") f.exts = ["gif"];
+  else if (S.filters.type === "static") f.exts = ["png", "jpg", "jpeg", "webp", "bmp"];
+  if (S.filters.tags.length) f.tags = S.filters.tags.slice();
+  if (S.filters.days) {
+    const d = new Date();
+    d.setDate(d.getDate() - (S.filters.days - 1));
+    f.from = d.toISOString().slice(0, 10);
+  }
+  return Object.keys(f).length ? JSON.stringify(f) : null;
+}
+
+function sortParam() {
+  return S.filters.sort || "added";
+}
+
+function hasFilters() {
+  return !!(S.filters.type || S.filters.days || S.filters.tags.length || S.filters.sort);
 }
 
 function pinNames() {
@@ -238,7 +281,7 @@ function renderGrid() {
   const grid = $("grid");
   if (!S.items.length) {
     const hint =
-      S.q || S.view !== "all"
+      S.q || S.view !== "all" || hasFilters()
         ? "这里还没有匹配的表情。"
         : "这里还没有表情。点右下角「+」，或把图片分享到手机上的 StickerBox。";
     grid.innerHTML = `<div class="empty">${hint}</div>`;
@@ -1090,6 +1133,35 @@ function renderMe() {
   for (const b of document.querySelectorAll("#seg-cols button")) b.classList.toggle("on", b.dataset.cols === cols);
 }
 
+function renderFilterSheet() {
+  const gs = S.groupList || [];
+  $("f-groups").innerHTML =
+    `<button class="opt${S.view === "all" ? " on" : ""}" data-g="">全部分组</button>` +
+    `<button class="opt${S.view === "ungrouped" ? " on" : ""}" data-g="__none__">未分组</button>` +
+    `<button class="opt${S.view === "star" ? " on" : ""}" data-g="__star__">收藏</button>` +
+    gs.map((g) => `<button class="opt${S.view === g.name ? " on" : ""}" data-g="${escapeHtml(g.name)}">${escapeHtml(g.name)}</button>`).join("");
+  [...$("f-type").children].forEach((el) => el.classList.toggle("on", (el.dataset.type || "") === S.filters.type));
+  [...$("f-days").children].forEach((el) => el.classList.toggle("on", Number(el.dataset.days || 0) === S.filters.days));
+  [...$("f-sort").children].forEach((el) => el.classList.toggle("on", (el.dataset.sort || "") === S.filters.sort));
+  $("f-tags").innerHTML = S.tags.length
+    ? S.tags
+        .map((t) => `<button class="opt${S.filters.tags.includes(t.name) ? " on" : ""}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)} <em>${t.count}</em></button>`)
+        .join("")
+    : `<span class="fnote">还没有标签</span>`;
+}
+
+function openFilters() {
+  renderFilterSheet();
+  $("filtermask").hidden = false;
+  updateFilterCount();
+}
+
+function updateFilterCount() {
+  invokeRetry("list_assets", { q: S.q, group: groupParam(), limit: 2000, sort: sortParam(), filters: filterJson() })
+    .then((items) => { $("f-apply").textContent = `查看 ${items.length} 张`; })
+    .catch(() => {});
+}
+
 function setTab(tab) {
   if (tab !== "groups") S.gview = null;
   S.tab = tab;
@@ -1157,6 +1229,16 @@ function wire() {
     } else if (b.dataset.qclear) {
       S.q = "";
       q.value = "";
+      refresh();
+    } else if (b.dataset.fclearall) {
+      S.filters = { type: "", days: 0, tags: [], sort: "" };
+      refresh();
+    } else if (b.dataset.fclear) {
+      const k = b.dataset.fclear;
+      if (k === "type") S.filters.type = "";
+      else if (k === "days") S.filters.days = 0;
+      else if (k === "sort") S.filters.sort = "";
+      else if (k.startsWith("tag:")) S.filters.tags = S.filters.tags.filter((t) => t !== k.slice(4));
       refresh();
     }
   });
@@ -1296,7 +1378,7 @@ function wire() {
   });
 
   $("fab").addEventListener("click", () => toast("相册导入在后续批次"));
-  $("btn-filter").addEventListener("click", () => toast("筛选面板下一批"));
+  $("btn-filter").addEventListener("click", openFilters);
   $("btn-settings").addEventListener("click", () => setTab("me"));
   $("pins-manage").addEventListener("click", openPinManager);
   $("inbox-undo").addEventListener("click", () => {
@@ -1349,6 +1431,7 @@ $("seg-theme").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-theme]");
   if (!b) return;
   localStorage.setItem("sb.theme", b.dataset.theme);
+
   applyPrefs();
   renderMe();
 });
@@ -1533,6 +1616,42 @@ $("v-more").addEventListener("click", () => {
   });
   stage.addEventListener("pointercancel", () => { down = false; });
 })();
+
+// 筛选面板
+$("filtersheet").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.g !== undefined) {
+    const g = b.dataset.g;
+    S.view = g === "" ? "all" : g === "__none__" ? "ungrouped" : g === "__star__" ? "star" : g;
+  } else if (b.dataset.type !== undefined) {
+    S.filters.type = b.dataset.type;
+  } else if (b.dataset.days !== undefined) {
+    S.filters.days = Number(b.dataset.days) || 0;
+  } else if (b.dataset.sort !== undefined) {
+    S.filters.sort = b.dataset.sort;
+  } else if (b.dataset.tag) {
+    const t = b.dataset.tag;
+    S.filters.tags = S.filters.tags.includes(t) ? S.filters.tags.filter((x) => x !== t) : [...S.filters.tags, t];
+  } else {
+    return;
+  }
+  renderFilterSheet();
+  updateFilterCount();
+});
+$("f-reset").addEventListener("click", () => {
+  S.view = "all";
+  S.filters = { type: "", days: 0, tags: [], sort: "" };
+  renderFilterSheet();
+  updateFilterCount();
+});
+$("f-apply").addEventListener("click", () => {
+  $("filtermask").hidden = true;
+  refresh();
+});
+$("filtermask").addEventListener("click", (e) => {
+  if (e.target === $("filtermask")) $("filtermask").hidden = true;
+});
 
 applyPrefs();
 loadTrashDays();
