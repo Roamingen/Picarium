@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>StickerBox 图库页：v2 元素并入 v4</title>
+<style>
+  :root{
+    --bg:#14161a; --bg2:#1b1e24; --surface:#0f1115; --surface2:#232833; --surface3:#1c212a;
+    --line:#2a2f38; --line2:#333a47; --fg:#e8eaed; --dim:#8b93a1; --dim2:#5d6573;
+    --accent:#6ea8fe; --onAccent:#0d1420; --danger:#ff9aa2; --chip:#27303f; --btn:#222833;
+    --grad1:linear-gradient(150deg,#3b6ea8,#1d3550);
+    --grad2:linear-gradient(150deg,#7a4a86,#2c1f3b);
+    --grad3:linear-gradient(150deg,#3f6b5e,#1a2f2b);
+    --grad4:linear-gradient(150deg,#8a5a3a,#33231a);
+    --grad5:linear-gradient(150deg,#37566f,#182430);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#08090b;color:var(--fg);
+    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .canvas{padding:40px 44px 36px}
+  .head{text-align:center;margin-bottom:24px}
+  .head h1{margin:0;font-size:25px;font-weight:650}
+  .head p{margin:8px 0 0;font-size:13.5px;color:var(--dim)}
+  .row{display:flex;gap:44px;justify-content:center;align-items:flex-start}
+  .item{width:390px}
+  .phone{width:390px;height:844px;border-radius:46px;background:var(--bg);
+    border:9px solid #23272f;box-shadow:0 0 0 1px #343943,0 30px 60px rgba(0,0,0,.55);
+    overflow:hidden;position:relative;display:flex;flex-direction:column}
+  .cap{margin-top:16px;text-align:center}
+  .cap b{display:block;font-size:15px;font-weight:600}
+  .cap span{display:block;margin-top:5px;font-size:12.5px;color:var(--dim);line-height:1.5}
+  .status{height:54px;display:flex;align-items:flex-end;justify-content:space-between;
+    padding:0 28px 6px;font-size:13px;font-weight:600;color:#cfd5df;flex:0 0 auto}
+  .status .icons{display:flex;gap:5px}
+  .bar{width:18px;height:9px;border-radius:3px;background:#cfd5df;opacity:.9}
+  .appbar{display:flex;align-items:center;gap:10px;padding:6px 18px 8px;flex:0 0 auto}
+  .brand{font-size:20px;font-weight:700}
+  .brand small{display:block;font-size:11px;font-weight:400;color:var(--dim);margin-top:2px}
+  .spacer{flex:1}
+  .iconbtn{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    background:var(--surface2);color:#cfd5df;flex:0 0 auto}
+  .iconbtn.ghost{background:transparent}
+  .iconbtn svg{width:21px;height:21px}
+  .search{margin:2px 18px 10px;height:46px;border-radius:14px;background:var(--surface3);
+    border:1px solid var(--line);display:flex;align-items:center;gap:9px;padding:0 8px 0 14px;color:var(--dim);font-size:14px;flex:0 0 auto}
+  .search svg{width:18px;height:18px;flex:0 0 auto}
+  .search .fbtn{margin-left:auto;width:36px;height:36px;border-radius:10px;background:var(--surface2);
+    display:flex;align-items:center;justify-content:center;color:#cfd5df}
+  .search .fbtn.on{background:#2b3d5c;color:#cfe0f5}
+  .chips{display:flex;gap:9px;padding:0 18px 10px;overflow:hidden;flex:0 0 auto}
+  .chip{height:34px;border-radius:999px;background:var(--btn);border:1px solid var(--line);
+    display:flex;align-items:center;gap:8px;padding:0 14px;font-size:13.5px;color:var(--fg);white-space:nowrap}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:var(--onAccent);font-weight:650}
+  .chip em{font-style:normal;font-size:12px;color:var(--dim)}
+  .chip.on em{color:#233a5c}
+  .chip.fch{background:#1b2a3d;border-color:#2f4a6b;color:#cfe0f5;font-size:12.5px;height:30px;padding:0 11px}
+  .chip.fch b{font-weight:700;color:#e8f1ff}
+  .chip.fch span{color:#7f93ad}
+  .inbox{margin:0 18px 10px;height:40px;border-radius:12px;background:#1b2a3d;border:1px solid #2f4a6b;
+    display:flex;align-items:center;gap:8px;padding:0 12px;font-size:12.5px;color:#cfe0f5;flex:0 0 auto}
+  .inbox svg{width:17px;height:17px;color:var(--accent);flex:0 0 auto}
+  .inbox .undo{margin-left:auto;color:var(--accent);font-size:12.5px;font-weight:600}
+  .pinlbl{display:flex;align-items:center;padding:0 18px 6px;font-size:11.5px;color:var(--dim2);letter-spacing:.3px;flex:0 0 auto}
+  .pinlbl .mgt{margin-left:auto;color:var(--accent);font-size:11.5px;font-weight:600}
+  .pinrow{display:flex;gap:8px;padding:0 18px 10px;overflow:hidden;flex:0 0 auto}
+  .pin{width:62px;flex:0 0 auto;text-align:center}
+  .pc{height:58px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:25px;
+    border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden}
+  .pc .gb{position:absolute;left:5px;bottom:5px;font-size:8px;font-weight:700;padding:2px 4px;border-radius:4px;
+    background:rgba(8,10,14,.66);color:#dfe6f2;letter-spacing:.4px}
+  .pn{font-size:11px;color:#c6cfdb;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pin.more .pc{background:transparent;border:1px dashed var(--line2);color:var(--dim);font-size:22px}
+  .pin.more .pn{color:var(--dim2)}
+  .grid{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 18px;align-content:start;overflow:hidden}
+  .card{position:relative;aspect-ratio:1/1;border-radius:16px;overflow:hidden;display:flex;
+    align-items:center;justify-content:center;font-size:44px;border:1px solid rgba(255,255,255,.05)}
+  .card .badge{position:absolute;left:8px;bottom:8px;font-size:9.5px;font-weight:700;letter-spacing:.6px;
+    padding:3px 6px;border-radius:6px;background:rgba(8,10,14,.62);color:#dfe6f2}
+  .card .star{position:absolute;right:8px;top:7px;font-size:12px;color:#ffd479}
+  .g1{background:var(--grad1)} .g2{background:var(--grad2)} .g3{background:var(--grad3)}
+  .g4{background:var(--grad4)} .g5{background:var(--grad5)}
+  .nav{height:74px;display:flex;border-top:1px solid var(--line);background:rgba(15,17,21,.96);padding-bottom:6px;flex:0 0 auto}
+  .nav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;color:var(--dim2)}
+  .nav div svg{width:22px;height:22px}
+  .nav div.on{color:var(--accent);font-weight:600}
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="head">
+    <h1>图库页 · 把 v2 的「智能分类 + 收到提示」并进 v4</h1>
+    <p>左：刚收到分享时的状态；右：平时的状态。置顶分组仍在，只是往下让了一行</p>
+  </div>
+  <div class="row">
+
+    <!-- 刚收到分享 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><div class="icons"><div class="bar"></div><div class="bar"></div></div></div>
+        <div class="appbar">
+          <div class="brand">StickerBox<small>161 张 · 2.4 GB</small></div>
+          <div class="spacer"></div>
+          <div class="iconbtn" title="搜索"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+          <div class="iconbtn ghost" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1z"/></svg></div>
+        </div>
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜名字 / 拼音 / 首字母
+          <div class="fbtn on" title="筛选"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div>
+        </div>
+        <div class="chips">
+          <div class="chip on">全部 <em>161</em></div>
+          <div class="chip">收藏 <em>24</em></div>
+          <div class="chip">未分组 <em>148</em></div>
+          <div class="chip">最近</div>
+        </div>
+        <div class="inbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/></svg>已从微信收到 <b>3 张</b>，导入完成<span class="undo">撤销</span></div>
+        <div class="pinlbl">置顶分组 <span class="mgt">管理</span></div>
+        <div class="pinrow">
+          <div class="pin"><div class="pc g1"><span class="gb">GIF</span>🐟</div><div class="pn">蓝色大肥鱼</div></div>
+          <div class="pin"><div class="pc g2">🐱</div><div class="pn">猫猫</div></div>
+          <div class="pin"><div class="pc g3">🍵</div><div class="pn">摸鱼</div></div>
+          <div class="pin"><div class="pc g4">🎀</div><div class="pn">礼物</div></div>
+          <div class="pin more"><div class="pc">+</div><div class="pn">全部</div></div>
+        </div>
+        <div class="grid">
+          <div class="card g1"><span class="star">★</span><span class="badge">GIF</span>🐟</div>
+          <div class="card g2"><span class="badge">GIF</span>🐱</div>
+          <div class="card g3">🫧</div>
+          <div class="card g4">🍵</div>
+          <div class="card g5"><span class="badge">GIF</span>💢</div>
+          <div class="card g2"><span class="badge">GIF</span>😰</div>
+          <div class="card g3"><span class="badge">GIF</span>💤</div>
+          <div class="card g1"><span class="badge">GIF</span>🎀</div>
+          <div class="card g5">🐟</div>
+        </div>
+        <div class="nav">
+          <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>图库</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>分组</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>回收站</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b>① 收到分享时</b><span>智能分类 chips + 收到横幅 + 置顶分组 + 网格<br>横幅点「撤销」可撤回这次导入</span></div>
+    </div>
+
+    <!-- 平时 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><div class="icons"><div class="bar"></div><div class="bar"></div></div></div>
+        <div class="appbar">
+          <div class="brand">StickerBox<small>161 张 · 2.4 GB</small></div>
+          <div class="spacer"></div>
+          <div class="iconbtn" title="搜索"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+          <div class="iconbtn ghost" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1z"/></svg></div>
+        </div>
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜名字 / 拼音 / 首字母
+          <div class="fbtn" title="筛选"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div>
+        </div>
+        <div class="chips">
+          <div class="chip on">全部 <em>161</em></div>
+          <div class="chip">收藏 <em>24</em></div>
+          <div class="chip">未分组 <em>148</em></div>
+          <div class="chip">最近</div>
+        </div>
+        <div class="pinlbl">置顶分组 <span class="mgt">管理</span></div>
+        <div class="pinrow">
+          <div class="pin"><div class="pc g1"><span class="gb">GIF</span>🐟</div><div class="pn">蓝色大肥鱼</div></div>
+          <div class="pin"><div class="pc g2">🐱</div><div class="pn">猫猫</div></div>
+          <div class="pin"><div class="pc g3">🍵</div><div class="pn">摸鱼</div></div>
+          <div class="pin"><div class="pc g4">🎀</div><div class="pn">礼物</div></div>
+          <div class="pin more"><div class="pc">+</div><div class="pn">全部</div></div>
+        </div>
+        <div class="grid">
+          <div class="card g1"><span class="star">★</span><span class="badge">GIF</span>🐟</div>
+          <div class="card g2"><span class="badge">GIF</span>🐱</div>
+          <div class="card g3">🫧</div>
+          <div class="card g4">🍵</div>
+          <div class="card g5"><span class="badge">GIF</span>💢</div>
+          <div class="card g2"><span class="badge">GIF</span>😰</div>
+          <div class="card g3"><span class="badge">GIF</span>💤</div>
+          <div class="card g1"><span class="badge">GIF</span>🎀</div>
+          <div class="card g5">🐟</div>
+          <div class="card g4">☕</div>
+          <div class="card g3"><span class="badge">GIF</span>🌈</div>
+          <div class="card g1"><span class="badge">GIF</span>🔥</div>
+        </div>
+        <div class="nav">
+          <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>图库</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>分组</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>回收站</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b>② 平时</b><span>智能分类 + 置顶分组 + 网格<br>没有横幅、没有筛选行，网格多两行</span></div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
