@@ -8,7 +8,7 @@ use stickerbox_core::{Library, ScanStats};
 use stickerbox_lib::commands::{read_settings_value, settings_file};
 use stickerbox_lib::platform::{Opener, ShareOut};
 use stickerbox_lib::state::{autostart_apply, candidate_roots, AppState};
-use stickerbox_lib::{clipboard, platform, recycle, thumb};
+use stickerbox_lib::{clipboard, platform, thumb};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
@@ -557,48 +557,8 @@ fn mark_ungrouped_seen(state: State<'_, AppState>) -> Result<(), String> {
     lib.mark_ungrouped_seen().map_err(|e| format!("{e:#}"))
 }
 
-#[tauri::command]
-fn trash_restore(state: State<'_, AppState>, sha: String) -> Result<(), String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.restore(&sha).map_err(|e| format!("{e:#}"))
-}
 
-#[tauri::command]
-fn trash_delete(
-    state: State<'_, AppState>,
-    sha: String,
-    permanent: Option<bool>,
-) -> Result<(), String> {
-    let path = {
-        let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-        lib.delete_forever(&sha).map_err(|e| format!("{e:#}"))?
-    };
-    if let Some(p) = path {
-        if permanent.unwrap_or(false) {
-            let _ = std::fs::remove_file(&p);
-        } else if let Err(e) = recycle::move_to_recycle_bin(&[p]) {
-            eprintln!("[trash] {e}");
-        }
-    }
-    Ok(())
-}
 
-#[tauri::command]
-fn trash_purge(state: State<'_, AppState>, permanent: Option<bool>) -> Result<usize, String> {
-    let paths = {
-        let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-        lib.purge_trash().map_err(|e| format!("{e:#}"))?
-    };
-    let n = paths.len();
-    if permanent.unwrap_or(false) {
-        for p in &paths {
-            let _ = std::fs::remove_file(p);
-        }
-    } else if let Err(e) = recycle::move_to_recycle_bin(&paths) {
-        eprintln!("[trash] {e}");
-    }
-    Ok(n)
-}
 
 fn merge_json(base: &mut serde_json::Value, patch: &serde_json::Value) {
     match (base, patch) {
@@ -899,9 +859,9 @@ fn main() {
             mark_ungrouped_seen,
             stickerbox_lib::commands::tag_stats,
             stickerbox_lib::commands::trash_list,
-            trash_restore,
-            trash_delete,
-            trash_purge,
+            stickerbox_lib::commands::trash_restore,
+            stickerbox_lib::commands::trash_delete,
+            stickerbox_lib::commands::trash_purge,
             stickerbox_lib::commands::get_settings,
             set_clipboard_enabled,
             set_autostart,

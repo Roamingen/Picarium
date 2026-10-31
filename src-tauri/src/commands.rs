@@ -573,3 +573,69 @@ pub fn remove_group(
     lib.remove_group(&name, delete_assets)
         .map_err(|e| format!("{e:#}"))
 }
+
+// ---- 回收站：恢复 / 删除 / 清空 ----
+
+#[tauri::command]
+pub fn trash_restore(state: tauri::State<'_, AppState>, sha: String) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.restore(&sha).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn trash_delete(
+    state: tauri::State<'_, AppState>,
+    sha: String,
+    permanent: Option<bool>,
+) -> Result<(), String> {
+    let path = {
+        let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.delete_forever(&sha).map_err(|e| format!("{e:#}"))?
+    };
+    if let Some(p) = path {
+        #[cfg(windows)]
+        {
+            if permanent.unwrap_or(false) {
+                let _ = std::fs::remove_file(&p);
+            } else if let Err(e) = crate::recycle::move_to_recycle_bin(&[p]) {
+                eprintln!("[trash] {e}");
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = permanent;
+            let _ = std::fs::remove_file(&p);
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn trash_purge(
+    state: tauri::State<'_, AppState>,
+    permanent: Option<bool>,
+) -> Result<usize, String> {
+    let paths = {
+        let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.purge_trash().map_err(|e| format!("{e:#}"))?
+    };
+    let n = paths.len();
+    #[cfg(windows)]
+    {
+        if permanent.unwrap_or(false) {
+            for p in &paths {
+                let _ = std::fs::remove_file(p);
+            }
+        } else if let Err(e) = crate::recycle::move_to_recycle_bin(&paths) {
+            eprintln!("[trash] {e}");
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = permanent;
+        for p in &paths {
+            let _ = std::fs::remove_file(p);
+        }
+    }
+    Ok(n)
+}

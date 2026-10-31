@@ -349,6 +349,29 @@ function closeSheet() {
   $("sheetmask").hidden = true;
   $("sheet-body").innerHTML = "";
 }
+let sheetResolve = null;
+
+function confirmSheet(text) {
+  return new Promise((resolve) => {
+    sheetResolve = resolve;
+    openSheet(
+      "确认",
+      `<div class="snote">${escapeHtml(text)}</div>${sheetActions("确定", "sheet-ok")}`
+    );
+    $("sheet-body").onclick = (e) => {
+      if (e.target.id === "sheet-cancel") {
+        sheetResolve = null;
+        closeSheet();
+        resolve(false);
+      } else if (e.target.id === "sheet-ok") {
+        sheetResolve = null;
+        closeSheet();
+        resolve(true);
+      }
+    };
+  });
+}
+
 function sheetActions(okText, okId) {
   return `<div class="sheet-actions"><button id="sheet-cancel">取消</button><button class="primary" id="${okId}">${okText}</button></div>`;
 }
@@ -864,6 +887,108 @@ function openPinManager() {
 
 /* ---------- tab ---------- */
 
+// ---- 回收站 ----
+const TRASH_DAYS = 30;
+
+function daysLeft(item) {
+  const t = item.deleted_at ? new Date(item.deleted_at).getTime() : Date.now();
+  return Math.max(0, TRASH_DAYS - Math.floor((Date.now() - t) / 86400000));
+}
+
+async function loadTrash() {
+  const grid = $("trash-grid");
+  grid.innerHTML = `<div class="empty">正在读取…</div>`;
+  let items = [];
+  try {
+    items = await invokeRetry("trash_list");
+  } catch (e) {
+    grid.innerHTML = `<div class="empty">读取失败：${escapeHtml(String(e))}</div>`;
+    return;
+  }
+  S.trashItems = items;
+  $("tcount").textContent = items.length ? ` ${items.length} 张` : "";
+  if (!items.length) {
+    grid.innerHTML = `<div class="empty">回收站是空的。<br><small>删除的表情会先放这里，30 天后自动清理。</small></div>`;
+    return;
+  }
+  grid.innerHTML = items
+    .map(
+      (it) => `<button class="titem" data-sha="${escapeAttr(it.sha)}">
+        <span class="tthumb"><img src="${thumbUrl(it.sha)}" alt="" loading="lazy" onerror="this.remove()"></span>
+        <span class="tname">${escapeHtml(it.name || "未命名")}</span>
+        <span class="tsub">${daysLeft(it)} 天后清理</span>
+      </button>`
+    )
+    .join("");
+}
+
+function openTrashItem(sha) {
+  const it = (S.trashItems || []).find((x) => x.sha === sha);
+  if (!it) return;
+  openSheet(
+    it.name || "未命名",
+    `<div class="menu">
+      <button data-act="restore">恢复这张</button>
+      <button data-act="purge" class="danger">彻底删除</button>
+    </div>`
+  );
+  $("sheet-body").onclick = async (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    const act = b.dataset.act;
+    closeSheet();
+    try {
+      if (act === "restore") {
+        await invoke("trash_restore", { sha });
+        toast("已恢复");
+      } else if (act === "purge") {
+        if (!(await confirmSheet("彻底删除这张？文件会被删掉，不能恢复。"))) return;
+        await invoke("trash_delete", { sha, permanent: true });
+        toast("已彻底删除");
+      }
+      await loadTrash();
+      await refresh();
+    } catch (err) {
+      toast("操作失败：" + err);
+    }
+  };
+}
+
+async function purgeTrash() {
+  if (!(S.trashItems || []).length) return toast("回收站已经是空的");
+  if (!(await confirmSheet("清空回收站？所有文件都会被彻底删除，不能恢复。"))) return;
+  try {
+    const n = await invoke("trash_purge", { permanent: true });
+    toast(`已清空 ${n} 张`);
+    await loadTrash();
+    await refresh();
+  } catch (e) {
+    toast("清空失败：" + e);
+  }
+}
+
+// ---- 我的 ----
+function resolveTheme() {
+  const v = localStorage.getItem("sb.theme") || "auto";
+  if (v !== "auto") return v;
+  return matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function applyPrefs() {
+  const theme = resolveTheme();
+  document.documentElement.dataset.theme = theme;
+  const cols = Number(localStorage.getItem("sb.cols")) || 3;
+  document.documentElement.style.setProperty("--cols", String(cols));
+}
+
+function renderMe() {
+  $("me-home").textContent = (S.stats && S.stats.root) || "—";
+  const theme = localStorage.getItem("sb.theme") || "auto";
+  for (const b of document.querySelectorAll("#seg-theme button")) b.classList.toggle("on", b.dataset.theme === theme);
+  const cols = String(Number(localStorage.getItem("sb.cols")) || 3);
+  for (const b of document.querySelectorAll("#seg-cols button")) b.classList.toggle("on", b.dataset.cols === cols);
+}
+
 function setTab(tab) {
   if (tab !== "groups") S.gview = null;
   S.tab = tab;
@@ -879,21 +1004,18 @@ function setTab(tab) {
   $("fab").hidden = !isGallery;
   $("inbox").hidden = true;
   $("pins-wrap").hidden = !isGallery || pinNames().length === 0;
-  $("tabpage").hidden = isGallery || isGroups;
   $("groupsview").hidden = !isGroups || !!S.gview;
   $("groupdetail").hidden = !isGroups || !S.gview;
+  $("trashview").hidden = tab !== "trash";
+  $("meview").hidden = tab !== "me";
 
   if (isGallery) renderPins();
   if (isGroups) {
     if (S.gview) $("gd-title").textContent = S.gview;
     else renderFolders();
   }
-  if (tab === "trash" || tab === "me") {
-    const info = TAB_INFO[tab];
-    $("tp-icon").innerHTML = info.icon;
-    $("tp-title").textContent = info.title;
-    $("tp-text").textContent = info.text;
-  }
+  if (tab === "trash") loadTrash();
+  if (tab === "me") renderMe();
 }
 
 /* ---------- 事件 ---------- */
@@ -1013,7 +1135,10 @@ function wire() {
 
   // 点遮罩关掉弹层
   $("sheetmask").addEventListener("click", (e) => {
-    if (e.target === $("sheetmask")) closeSheet();
+    if (e.target === $("sheetmask")) {
+      if (sheetResolve) { sheetResolve(false); sheetResolve = null; }
+      closeSheet();
+    }
   });
 
   $("grid").addEventListener("click", (e) => {
@@ -1043,3 +1168,27 @@ function wire() {
 
 wire();
 refresh();
+
+$("seg-theme").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-theme]");
+  if (!b) return;
+  localStorage.setItem("sb.theme", b.dataset.theme);
+  applyPrefs();
+  renderMe();
+});
+$("seg-cols").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-cols]");
+  if (!b) return;
+  localStorage.setItem("sb.cols", b.dataset.cols);
+  applyPrefs();
+  renderMe();
+});
+$("btn-purge").addEventListener("click", purgeTrash);
+$("trash-grid").addEventListener("click", (e) => {
+  const b = e.target.closest(".titem");
+  if (b) openTrashItem(b.dataset.sha);
+});
+$("me-gallery").addEventListener("click", () => toast("相册导入在下一批接上"));
+$("me-inbox").addEventListener("click", () => toast("分享收件箱在下一批接上"));
+applyPrefs();
+matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyPrefs);

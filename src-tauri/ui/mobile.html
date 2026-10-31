@@ -117,11 +117,37 @@
       </div>
     </div>
 
-    <section class="tabpage" id="tabpage" hidden>
-      <div class="tabpage-inner">
-        <div class="tp-icon" id="tp-icon"></div>
-        <div class="tp-title" id="tp-title"></div>
-        <div class="tp-text" id="tp-text"></div>
+    <!-- 回收站 -->
+    <section class="gview" id="trashview" hidden>
+      <header class="ghead">
+        <div class="gtitle">回收站<small id="tcount"></small></div>
+        <button class="mgt" id="btn-purge">清空</button>
+      </header>
+      <div class="gmeta">删除的图片会在这里保留 30 天，期间可以恢复或彻底删除。</div>
+      <div class="grid tg" id="trash-grid"></div>
+    </section>
+
+    <!-- 我的 -->
+    <section class="gview" id="meview" hidden>
+      <header class="ghead"><div class="gtitle">我的</div></header>
+      <div class="sect">外观</div>
+      <div class="mcard">
+      <div class="merow"><span>主题</span><div class="seg" id="seg-theme">
+        <button data-theme="auto">跟随</button><button data-theme="dark">深色</button><button data-theme="light">浅色</button>
+      </div></div>
+      <div class="merow"><span>网格列数</span><div class="seg" id="seg-cols">
+        <button data-cols="3">3</button><button data-cols="4">4</button><button data-cols="5">5</button>
+      </div></div>
+      </div>
+      <div class="sect">导入</div>
+      <div class="mcard">
+      <div class="merow tap" id="me-gallery"><span>从手机相册导入</span><i>下一批</i></div>
+      <div class="merow tap" id="me-inbox"><span>分享收件箱</span><i id="me-inbox-n">0 个待整理</i></div>
+      </div>
+      <div class="sect">关于</div>
+      <div class="mcard">
+      <div class="merow"><span>版本</span><i>预览版</i></div>
+      <div class="merow"><span>存储位置</span><i class="ell" id="me-home">…</i></div>
       </div>
     </section>
 
