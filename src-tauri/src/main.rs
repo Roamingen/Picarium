@@ -840,6 +840,7 @@ fn main() {
             set_pinned,
             update_asset,
             stickerbox_lib::commands::delete_asset,
+            stickerbox_lib::commands::share_assets,
             add_to_group,
             clear_groups,
             stickerbox_lib::commands::rename_group,

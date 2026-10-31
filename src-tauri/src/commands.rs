@@ -667,3 +667,48 @@ pub fn set_trash_days(state: State<'_, AppState>, days: u32) -> Result<(), Strin
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     lib.set_trash_days(days).map_err(|e| format!("{e:#}"))
 }
+
+/// 分享到系统：桌面 = 复制到剪贴板，安卓 = 拉起系统分享面板。
+#[tauri::command]
+pub fn share_assets(state: State<'_, AppState>, shas: Vec<String>) -> Result<(), String> {
+    use crate::platform::ShareOut;
+    let paths: Vec<std::path::PathBuf> = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        shas.iter()
+            .filter_map(|s| lib.find(s))
+            .map(|a| std::path::PathBuf::from(&a.path))
+            .collect()
+    };
+    if paths.is_empty() {
+        return Err("没有可分享的图片".to_string());
+    }
+    #[cfg(windows)]
+    {
+        crate::platform::desktop::platform().share_paths(&paths)
+    }
+    #[cfg(target_os = "android")]
+    {
+        crate::platform::android::platform().share_paths(&paths)
+    }
+}
+
+/// 存到系统相册（安卓写 MediaStore；桌面端请用导出功能）。
+#[tauri::command]
+pub fn save_to_gallery(state: State<'_, AppState>, sha: String) -> Result<(), String> {
+    let path = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.find(&sha)
+            .map(|a| std::path::PathBuf::from(&a.path))
+            .ok_or_else(|| "图片不存在".to_string())?
+    };
+    #[cfg(target_os = "android")]
+    {
+        use crate::platform::Gallery;
+        crate::platform::android::platform().save_to_gallery(&path)
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = path;
+        Err("桌面端请用导出功能".to_string())
+    }
+}

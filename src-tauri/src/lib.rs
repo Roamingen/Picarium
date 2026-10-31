@@ -63,7 +63,9 @@ pub fn run() {
             commands::set_pinned_groups,
             commands::create_group,
             commands::rename_group,
-            commands::remove_group
+            commands::remove_group,
+            commands::share_assets,
+            commands::save_to_gallery
         ]);
 
     thumb::register(builder)

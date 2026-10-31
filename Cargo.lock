@@ -3096,6 +3096,8 @@ version = "0.1.0"
 dependencies = [
  "arboard",
  "chrono",
+ "jni",
+ "ndk-context",
  "serde",
  "serde_json",
  "stickerbox-core",

@@ -1345,7 +1345,14 @@ $("imgsel").addEventListener("click", async (e) => {
   if (!b) return;
   const shas = [...imgSel];
   const act = b.dataset.act;
-  if (act === "share") return toast("分享到微信在下一批接上");
+  if (act === "share") {
+    try {
+      await invoke("share_assets", { shas });
+    } catch (err) {
+      toast("分享失败：" + err);
+    }
+    return;
+  }
   if (act === "star") {
     try {
       await invoke("batch_star", { shas, on: true });
@@ -1371,8 +1378,26 @@ $("imgsel").addEventListener("click", async (e) => {
 });
 
 $("v-close").addEventListener("click", closeViewer);
-$("v-share").addEventListener("click", () => toast("分享到微信在下一批接上"));
-$("v-save").addEventListener("click", () => toast("存相册在下一批接上"));
+$("v-share").addEventListener("click", async () => {
+  const a = viewerAsset();
+  if (!a.sha) return;
+  try {
+    await invoke("share_assets", { shas: [a.sha] });
+  } catch (err) {
+    toast("分享失败：" + err);
+  }
+});
+$("v-save").addEventListener("click", async () => {
+  const a = viewerAsset();
+  if (!a.sha) return;
+  toast("正在存到相册…");
+  try {
+    await invoke("save_to_gallery", { sha: a.sha });
+    toast("已存到相册 Pictures/StickerBox");
+  } catch (err) {
+    toast("保存失败：" + err);
+  }
+});
 $("v-star").addEventListener("click", async () => {
   const a = viewerAsset();
   if (!a.sha) return;
