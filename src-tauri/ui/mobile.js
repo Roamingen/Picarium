@@ -19,6 +19,7 @@ const S = {
   pinsOpen: false,
   gq: "",
   gview: null,
+  sharedPaths: [],
   loading: false,
 };
 
@@ -1081,6 +1082,7 @@ function applyPrefs() {
 
 function renderMe() {
   $("me-home").textContent = (S.stats && S.stats.root) || "—";
+  $("me-inbox-n").textContent = S.sharedPaths.length ? `${S.sharedPaths.length} 张待整理` : "0 个待整理";
   for (const b of document.querySelectorAll("#seg-trash button")) b.classList.toggle("on", Number(b.dataset.days) === TRASH_DAYS);
   const theme = localStorage.getItem("sb.theme") || "auto";
   for (const b of document.querySelectorAll("#seg-theme button")) b.classList.toggle("on", b.dataset.theme === theme);
@@ -1101,7 +1103,7 @@ function setTab(tab) {
   $("chips").hidden = !isGallery;
   $("grid").hidden = !isGallery;
   $("fab").hidden = !isGallery;
-  $("inbox").hidden = true;
+  $("inbox").hidden = !(isGallery && S.sharedPaths.length > 0);
   $("pins-wrap").hidden = !isGallery || pinNames().length === 0;
   $("groupsview").hidden = !isGroups || !!S.gview;
   $("groupdetail").hidden = !isGroups || !S.gview;
@@ -1297,13 +1299,51 @@ function wire() {
   $("btn-filter").addEventListener("click", () => toast("筛选面板下一批"));
   $("btn-settings").addEventListener("click", () => setTab("me"));
   $("pins-manage").addEventListener("click", openPinManager);
-  $("inbox-undo").addEventListener("click", () => ($("inbox").hidden = true));
+  $("inbox-undo").addEventListener("click", () => {
+    S.sharedPaths = [];
+    $("inbox").hidden = true;
+  });
+  $("inbox-import").addEventListener("click", async () => {
+    if (!S.sharedPaths.length) return;
+    const paths = S.sharedPaths;
+    S.sharedPaths = [];
+    $("inbox").hidden = true;
+    toast(`正在导入 ${paths.length} 张…`);
+    try {
+      const r = await invokeRetry("import_paths_simple", { paths });
+      toast(r.duplicated ? `已导入 ${r.added} 张（${r.duplicated} 张已存在）` : `已导入 ${r.added} 张`);
+      await refresh();
+      loadGroups();
+      if (S.tab === "me") renderMe();
+    } catch (e) {
+      toast("导入失败：" + (typeof e === "string" ? e : e.message || e));
+    }
+  });
 }
 
 /* ---------- 启动 ---------- */
 
+async function checkShared() {
+  try {
+    const paths = await invokeRetry("take_shared_paths");
+    if (Array.isArray(paths) && paths.length) {
+      S.sharedPaths = paths;
+      $("inbox-text").textContent = `收到 ${paths.length} 张图片`;
+      $("inbox").hidden = false;
+    }
+  } catch (e) {
+    /* 桌面没有分享入口，忽略 */
+  }
+}
+
 wire();
 refresh();
+checkShared();
+// 从别的 App 分享回来时，WebView 会重新获得焦点，这时候再取一次收件箱
+window.addEventListener("focus", checkShared);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) checkShared();
+});
 
 $("seg-theme").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-theme]");
@@ -1324,8 +1364,28 @@ $("trash-grid").addEventListener("click", (e) => {
   const b = e.target.closest(".titem");
   if (b) openTrashItem(b.dataset.sha);
 });
-$("me-gallery").addEventListener("click", () => toast("相册导入在下一批接上"));
-$("me-inbox").addEventListener("click", () => toast("分享收件箱在下一批接上"));
+$("me-gallery").addEventListener("click", async () => {
+  try {
+    const paths = await invoke("pick_gallery_images");
+    if (!paths || !paths.length) return;
+    toast(`正在导入 ${paths.length} 张…`);
+    const r = await invokeRetry("import_paths_simple", { paths });
+    toast(`已导入 ${r.added} 张` + (r.duplicated ? `，${r.duplicated} 张已存在` : ""));
+    await refresh();
+    if (S.tab === "me") renderMe();
+    loadGroups();
+  } catch (e) {
+    toast("导入失败：" + (typeof e === "string" ? e : e.message || e));
+  }
+});
+$("me-inbox").addEventListener("click", () => {
+  if (S.sharedPaths.length) {
+    setTab("gallery");
+    toast(`收件箱里还有 ${S.sharedPaths.length} 张，点图库顶部的「导入」`);
+  } else {
+    toast("分享收件箱是空的");
+  }
+});
 $("seg-trash").addEventListener("click", async (e) => {
   const b = e.target.closest("button[data-days]");
   if (!b) return;

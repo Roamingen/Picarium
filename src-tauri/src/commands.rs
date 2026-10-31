@@ -712,3 +712,87 @@ pub fn save_to_gallery(state: State<'_, AppState>, sha: String) -> Result<(), St
         Err("桌面端请用导出功能".to_string())
     }
 }
+
+/// 打开系统相册多选图片；返回已拷到缓存目录的本地路径（安卓专用）。
+#[tauri::command]
+pub fn pick_gallery_images() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "android")]
+    {
+        use crate::platform::Gallery;
+        let paths = crate::platform::android::platform().pick_from_gallery()?;
+        Ok(paths
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        Err("桌面端请用拖拽或导入按钮".to_string())
+    }
+}
+
+/// 批量导入本地文件/目录（手机端相册导入、分享收件箱共用），返回统计。
+#[tauri::command]
+pub fn import_paths_simple(
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> Result<serde_json::Value, String> {
+    use std::path::Path;
+
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
+    for p in &paths {
+        let path = Path::new(p);
+        if path.is_dir() {
+            stickerbox_core::collect_images(path, &mut files);
+        } else if stickerbox_core::image_ext(path).is_some() {
+            files.push(path.to_path_buf());
+        }
+    }
+
+    let total = files.len();
+    let mut added = 0usize;
+    let mut duplicated = 0usize;
+    let mut errors = 0usize;
+    for file in &files {
+        let imported = {
+            let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+            lib.import_file(file)
+        };
+        match imported {
+            Ok(Some(sha)) => {
+                added += 1;
+                let root = {
+                    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+                    lib.root().to_path_buf()
+                };
+                let ext = stickerbox_core::image_ext(file).unwrap_or_default();
+                let _ = stickerbox_core::ensure_thumb(&root, &sha, &ext);
+            }
+            Ok(None) => duplicated += 1,
+            Err(e) => {
+                errors += 1;
+                eprintln!("[import] {}: {e:#}", file.display());
+            }
+        }
+    }
+    Ok(serde_json::json!({
+        "total": total, "added": added, "duplicated": duplicated, "errors": errors
+    }))
+}
+
+/// 取走「分享到 StickerBox」的图片（安卓）；桌面没有系统分享入口，返回空。
+#[tauri::command]
+pub fn take_shared_paths() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "android")]
+    {
+        let paths = crate::platform::ShareTarget::take_shared(&crate::platform::android::platform())?;
+        Ok(paths
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        Ok(Vec::new())
+    }
+}

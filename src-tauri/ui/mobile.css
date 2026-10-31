@@ -244,6 +244,8 @@ body { overflow-x: hidden; overflow-y: auto; }
 
 .inbox svg { width: 17px; height: 17px; color: var(--accent); flex: 0 0 auto; }
 
+.undo.undo2 { color: var(--dim); margin-left: 4px; }
+
 .undo {
   margin-left: auto;
   border: 0;

@@ -139,15 +139,13 @@ impl Gallery for Android {
     }
 
     fn pick_from_gallery(&self) -> Result<Vec<PathBuf>, String> {
-        // TODO(M2): PickVisualMedia（Photo Picker），不用申请相册读取权限。
-        Err(unsupported("从相册选图"))
+        pick_images_impl()
     }
 }
 
 impl FilePicker for Android {
     fn pick_images(&self) -> Result<Vec<PathBuf>, String> {
-        // TODO(M2): ACTION_OPEN_DOCUMENT + takePersistableUriPermission。
-        Err(unsupported("选择图片"))
+        pick_images_impl()
     }
 
     fn pick_folder(&self) -> Result<Option<PathBuf>, String> {
@@ -158,8 +156,43 @@ impl FilePicker for Android {
 
 impl ShareTarget for Android {
     fn take_shared(&self) -> Result<Vec<PathBuf>, String> {
-        // TODO(M2): 读 intent 里的 EXTRA_STREAM，拷进库再返回本地路径。
-        Ok(Vec::new())
+        // Java 侧的 InboxBridge 已经把 intent 里的图片拷进 cache/inbox/，
+        // 这里取走路径并清空队列。
+        use jni::objects::{JObjectArray, JString};
+
+        with_activity(|env, _context| {
+            let result = env
+                .call_static_method(
+                    "dev/stickerbox/desktop/InboxBridge",
+                    "takePaths",
+                    "()[Ljava/lang/String;",
+                    &[],
+                )
+                .map_err(|e| format!("读取分享收件箱失败：{e}"))?;
+            let arr: JObjectArray = result
+                .l()
+                .map_err(|e| format!("分享收件箱返回异常：{e}"))?
+                .into();
+            if arr.is_null() {
+                return Ok(Vec::new());
+            }
+            let len = env
+                .get_array_length(&arr)
+                .map_err(|e| format!("读取收件箱结果失败：{e}"))?;
+            let mut out = Vec::with_capacity(len as usize);
+            for i in 0..len {
+                let item = env
+                    .get_object_array_element(&arr, i)
+                    .map_err(|e| format!("读取收件箱路径失败：{e}"))?;
+                let js: JString = item.into();
+                let text: String = env
+                    .get_string(&js)
+                    .map_err(|e| format!("收件箱路径转字符串失败：{e}"))?
+                    .into();
+                out.push(PathBuf::from(text));
+            }
+            Ok(out)
+        })
     }
 }
 
@@ -168,4 +201,48 @@ impl Opener for Android {
         // TODO(M2): FileProvider URI + ACTION_VIEW。
         Err(unsupported("用其他应用打开"))
     }
+}
+
+/// 相册选图：Photo Picker（Android 13+）或 OPEN_DOCUMENT 兜底，
+/// 选中后由 Java 侧拷进 cache/import/，这里只负责把返回的路径转成 PathBuf。
+fn pick_images_impl() -> Result<Vec<PathBuf>, String> {
+    use jni::objects::{JObjectArray, JString, JValue};
+
+    with_activity(|env, context| {
+        let max = JValue::Int(100);
+        let result = env
+            .call_static_method(
+                "dev/stickerbox/desktop/PickerBridge",
+                "pickImages",
+                "(Landroid/content/Context;I)[Ljava/lang/String;",
+                &[JValue::Object(context), max],
+            )
+            .map_err(|e| format!("打开相册失败：{e}"))?;
+        let arr: JObjectArray = result
+            .l()
+            .map_err(|e| format!("相册返回异常：{e}"))?
+            .into();
+        if env.exception_check().unwrap_or(false) {
+            return Err("打开相册失败（系统抛异常）".to_string());
+        }
+        if arr.is_null() {
+            return Ok(Vec::new());
+        }
+        let len = env
+            .get_array_length(&arr)
+            .map_err(|e| format!("读取相册结果失败：{e}"))?;
+        let mut out = Vec::with_capacity(len as usize);
+        for i in 0..len {
+            let item = env
+                .get_object_array_element(&arr, i)
+                .map_err(|e| format!("读取相册路径失败：{e}"))?;
+            let js: JString = item.into();
+            let text: String = env
+                .get_string(&js)
+                .map_err(|e| format!("相册路径转字符串失败：{e}"))?
+                .into();
+            out.push(PathBuf::from(text));
+        }
+        Ok(out)
+    })
 }
