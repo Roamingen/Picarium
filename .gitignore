@@ -1,0 +1,16 @@
+target/
+node_modules/
+dist/
+*.log
+.DS_Store
+Thumbs.db
+
+# 安卓：gen/android 本身提交，构建/缓存不提交
+src-tauri/gen/android/**/build/
+src-tauri/gen/android/.gradle/
+src-tauri/gen/android/**/.cxx/
+src-tauri/gen/android/local.properties
+src-tauri/gen/android/app/src/main/assets/
+*.apk
+*.aab
+*.keystore

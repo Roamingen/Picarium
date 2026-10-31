@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "StickerBox",
+  "version": "0.1.0",
+  "identifier": "dev.stickerbox.desktop",
+  "build": {
+    "frontendDist": "ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "StickerBox",
+        "width": 1040,
+        "height": 700,
+        "minWidth": 720,
+        "minHeight": 480,
+        "center": true,
+        "visible": false
+      },
+      {
+        "label": "panel",
+        "url": "panel.html",
+        "title": "StickerBox",
+        "width": 720,
+        "height": 520,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "**"
+        ]
+      }
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "all"
+  }
+}

@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>StickerBox</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">StickerBox</div>
+    <div class="search-wrap">
+      <input id="q" class="search" placeholder="筛选：名字 / 拼音 / 首字母…" autocomplete="off" spellcheck="false" />
+      <button id="q-clear" class="search-clear" title="清空" hidden>✕</button>
+    </div>
+    <div class="spacer"></div>
+    <span id="stats" class="dim">…</span>
+    <button id="clip-toggle" class="clip-toggle" title="点击开启/暂停剪贴板捕获">
+      <span id="clip-dot" class="clip-dot"></span><span id="clip-text">剪贴板捕获</span>
+    </button>
+    <button id="settings-btn" class="pin-btn" title="设置">⚙️</button>
+    <button id="pin" class="pin-btn" title="置顶窗口">📌</button>
+  </header>
+
+  <div class="toolbar">
+    <button id="pick" class="btn">导入文件夹…</button>
+    <button id="pick-files" class="btn">导入图片…</button>
+    <button id="select-mode" class="btn">多选</button>
+    <button id="filter-btn" class="btn">筛选</button>
+    <input id="dir" class="path" placeholder="或粘贴路径后回车" spellcheck="false" />
+    <span class="dim drop-hint">也可以直接把文件/文件夹拖进窗口</span>
+    <button id="empty-trash" class="btn danger" hidden>清空回收站</button>
+    <div id="import-bar" class="import-bar" hidden>
+      <div id="import-fill" class="import-fill"></div>
+      <span id="import-text" class="import-text"></span>
+    </div>
+  </div>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <button class="side-item active" data-group="__all__">全部<span id="c-all">0</span></button>
+      <button class="side-item" data-group="__none__">未分组<span id="c-none" class="badge">0</span></button>
+      <button class="side-item" data-group="__star__">收藏<span id="c-star">0</span></button>
+      <button class="side-item" data-group="__recent__">最近使用<span id="c-recent">0</span></button>
+      <div class="side-title">分组<button id="group-add" class="side-add" title="新建分组">＋</button></div>
+      <div id="group-list"></div>
+      <div class="side-title">其他</div>
+      <button class="side-item" data-group="__trash__">回收站<span id="c-trash">0</span></button>
+    </aside>
+
+    <main>
+      <div id="grid" class="grid"></div>
+      <button id="load-more" class="load-more" hidden>加载更多</button>
+      <div id="empty" class="empty">
+        <p>这里还没有表情。</p>
+        <p class="dim">点「选择文件夹…」，或者把一堆图片直接拖进窗口。</p>
+      </div>
+    </main>
+  </div>
+
+
+  <div id="trashbar" class="batchbar" hidden>
+    <span id="trash-count" class="batch-count">已选 0 张</span>
+    <button class="btn small" data-tact="all">全选</button>
+    <button class="btn small" data-tact="restore">恢复</button>
+    <button class="btn small danger" data-tact="delete">彻底删除</button>
+    <button class="btn small" data-tact="clear">取消</button>
+  </div>
+  <div id="batchbar" class="batchbar" hidden>
+    <span id="batch-count" class="batch-count">已选 0 张</span>
+    <button class="btn small" data-act="all">全选</button>
+    <button class="btn small" data-act="group">加入分组</button>
+    <button class="btn small" data-act="leave" id="batch-leave" hidden>移出</button>
+    <button class="btn small" data-act="tag">加标签</button>
+    <button class="btn small" data-act="copyfiles">复制文件</button>
+    <button class="btn small" data-act="star">收藏</button>
+    <button class="btn small danger" data-act="delete">删除</button>
+    <button class="btn small" data-act="clear">取消</button>
+  </div>
+
+  <footer>
+    <span id="last-action" class="last-action hint">Shift + 左键：从紫色锚点连续选到当前位置</span>
+  </footer>
+
+  <div id="tip" class="tip"></div>
+
+  <div id="editor" class="modal-mask" hidden>
+    <div class="modal">
+      <div class="modal-head">
+        <span class="modal-title">编辑表情</span>
+        <span id="e-meta" class="dim"></span>
+      </div>
+      <div class="editor-hint">Esc 离开输入框 → j/k 选字段 → Enter 进入；输入框内可用 Ctrl+J/K 换字段</div>
+      <label class="field">
+        <span>名称</span>
+        <input id="e-name" autocomplete="off" spellcheck="false" />
+      </label>
+      <div class="field">
+        <span>标签</span>
+        <div id="p-tags" class="picker"></div>
+      </div>
+      <div class="field">
+        <span>分组</span>
+        <div id="p-groups" class="picker"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button id="e-open" class="btn" title="用系统默认的图片查看器打开">打开方式</button>
+        <button id="e-copy-file" class="btn" title="复制原文件，动图不会丢帧">复制文件</button>
+        <button id="e-del" class="btn danger">删除</button>
+        <button id="e-ungroup" class="btn" hidden>移出分组</button>
+        <div class="spacer"></div>
+        <button id="e-cancel" class="btn">取消</button>
+        <button id="e-save" class="btn primary">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm" class="modal-mask" hidden>
+    <div class="modal small">
+      <div id="confirm-text" class="confirm-text"></div>
+
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button id="confirm-cancel" class="btn">取消</button>
+        <button id="confirm-ok" class="btn danger">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="gmenu" class="menu" hidden>
+    <button data-act="rename">重命名分组…</button>
+    <button data-act="clear">解散分组（表情保留）</button>
+    <button data-act="delete" class="danger">删除分组及其中表情</button>
+  </div>
+
+  <div id="prompt" class="modal-mask" hidden>
+    <div class="modal small">
+      <div class="modal-head"><span class="modal-title" id="prompt-title">重命名</span></div>
+      <input id="prompt-input" class="prompt-input" />
+
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button id="prompt-cancel" class="btn">取消</button>
+        <button id="prompt-ok" class="btn primary">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings" class="modal-mask" hidden>
+    <div class="modal wide">
+      <div class="modal-head">
+        <span class="modal-title">设置</span>
+        <button id="set-close" class="btn small">保存并关闭</button>
+      </div>
+      <div class="set-tabs">
+        <button class="set-tab active" data-tab="general">常规</button>
+        <button class="set-tab" data-tab="appearance">外观</button>
+        <button class="set-tab" data-tab="keys">按键</button>
+        <button class="set-tab" data-tab="data">数据</button>
+      </div>
+      <div id="tab-general">
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">表情库位置</div>
+          <div id="set-root" class="dim set-value">…</div>
+        </div>
+        <button id="set-open" class="btn">打开文件夹</button>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">剪贴板捕获</div>
+          <div class="dim set-value">复制图片后自动入库（资源管理器除外）</div>
+        </div>
+        <label class="switch"><input id="set-clip" type="checkbox" /><span></span></label>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">开机自启</div>
+          <div class="dim set-value">静默启动到托盘，不弹主窗口</div>
+        </div>
+        <label class="switch"><input id="set-auto" type="checkbox" /><span></span></label>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">主题</div>
+          <div class="dim set-value">深色 / 浅色 / Catppuccin / 自定义 JSON</div>
+        </div>
+        <select id="set-theme" class="select">
+          <option value="dark">深色</option>
+          <option value="light">浅色</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">彻底删除时</div>
+          <div class="dim set-value">「彻底删除 / 清空回收站」如何处理文件</div>
+        </div>
+        <select id="set-delete-mode" class="select">
+          <option value="recycle">移入系统回收站</option>
+          <option value="permanent">永久删除</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">拖拽虚影位置</div>
+          <div class="dim set-value">虚影左上角相对鼠标的偏移，负数在左上</div>
+        </div>
+        <div class="ghost-offset">
+          <label>X <input id="ghost-x" class="num-input" type="number" step="2" value="0" /></label>
+          <label>Y <input id="ghost-y" class="num-input" type="number" step="2" value="0" /></label>
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">收藏标记</div>
+          <div class="dim set-value">卡片右下角显示的符号</div>
+        </div>
+        <select id="set-glyph" class="select">
+          <option value="heart">爱心</option>
+          <option value="star">星星</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">标记颜色</div>
+          <div class="dim set-value">收藏符号的颜色</div>
+        </div>
+        <input id="set-star-color" type="color" class="color-input" value="#f5b301" />
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">悬停预览</div>
+          <div class="dim set-value">鼠标停留多久播放动图（毫秒，0 = 关闭）</div>
+        </div>
+        <input id="set-hover-delay" type="number" class="num-input" step="50" min="0" max="2000" value="350" />
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">网格大小</div>
+          <div class="dim set-value">一屏显示多少张</div>
+        </div>
+        <select id="set-grid-size" class="select">
+          <option value="compact">紧凑</option>
+          <option value="normal">标准</option>
+          <option value="large">大图</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">单击复制为</div>
+          <div class="dim set-value">右键菜单里会显示另一种方式</div>
+        </div>
+        <select id="set-copy-default" class="select">
+          <option value="bitmap">位图（直接粘贴成图片）</option>
+          <option value="file">源文件（保留动画）</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">启动时</div>
+          <div class="dim set-value">开机自启后是否直接显示主界面</div>
+        </div>
+        <select id="set-start-hidden" class="select">
+          <option value="show">显示主界面</option>
+          <option value="hide">只留托盘</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">滚动留白</div>
+          <div class="dim set-value">光标距上下边缘预留几行（0–10）</div>
+        </div>
+        <input id="set-scrolloff" class="num-input" type="number" min="0" max="10" step="1" />
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">启动时默认进入</div>
+          <div class="dim set-value">自定义可填分组名，找不到就回到「全部」</div>
+        </div>
+        <div class="set-btns">
+          <select id="set-start-view" class="select">
+            <option value="all">全部</option>
+            <option value="recent">最近使用</option>
+            <option value="star">收藏</option>
+            <option value="ungrouped">未分组</option>
+            <option value="custom">自定义分组…</option>
+          </select>
+          <input id="set-start-view-name" class="num-input wide-input" placeholder="分组名" hidden />
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">主界面尺寸</div>
+          <div class="dim set-value">不会超过当前显示器大小</div>
+        </div>
+        <div class="set-btns">
+          <input id="win-w" class="num-input" type="number" step="10" min="640" />
+          <span class="dim">×</span>
+          <input id="win-h" class="num-input" type="number" step="10" min="420" />
+          <button id="win-apply" class="btn small">应用</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">快贴面板尺寸</div>
+          <div class="dim set-value">不会超过当前显示器大小</div>
+        </div>
+        <div class="set-btns">
+          <input id="panel-w" class="num-input" type="number" step="10" min="480" />
+          <span class="dim">×</span>
+          <input id="panel-h" class="num-input" type="number" step="10" min="320" />
+          <button id="panel-apply" class="btn small">应用</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">快贴排序</div>
+          <div class="dim set-value">面板里结果的排列方式</div>
+        </div>
+        <select id="set-panel-sort" class="select">
+          <option value="recent">最近使用</option>
+          <option value="name">名称顺序</option>
+          <option value="added">入库时间</option>
+        </select>
+      </div>
+      <div class="set-row column">
+        <div class="set-text">
+          <div class="set-label">剪贴板黑名单</div>
+          <div class="dim set-value">这些程序复制图片时不会被捕获；默认已屏蔽 Snipaste，带不带 .exe 都行</div>
+        </div>
+        <div id="p-blacklist" class="picker"></div>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">虚拟滚动</div>
+          <div class="dim set-value">只渲染看得见的卡片，几千张也不卡</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="set-virtualize" /><span></span></label>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">最近使用上限</div>
+          <div class="dim set-value">快贴面板最多显示多少条最近使用（10–1000）</div>
+        </div>
+        <input id="set-recent-limit" class="num-input" type="number" min="10" max="1000" step="10" />
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">快贴位置</div>
+          <div class="dim set-value">相对屏幕中心的偏移（0,0 = 正中间），自动限制在屏幕内</div>
+        </div>
+        <div class="set-btns">
+          <input id="panel-pos-x" class="num-input" type="number" step="10" />
+          <span class="dim">,</span>
+          <input id="panel-pos-y" class="num-input" type="number" step="10" />
+          <button id="panel-pos-apply" class="btn small">应用</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">复制/粘贴高亮</div>
+          <div class="dim set-value">复制/粘贴之后闪一下相关图片</div>
+        </div>
+        <div class="set-btns">
+          <input id="set-flash-color" type="color" class="color-input" value="#ffffff" />
+          <input id="set-flash-dur" class="num-input" type="number" min="0" max="2000" step="20" />
+          <span class="dim">ms</span>
+        </div>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">光标环速度</div>
+          <div class="dim set-value">转一圈需要几秒（0.4–10）</div>
+        </div>
+        <input id="set-cursor-speed" class="num-input" type="number" min="0.4" max="10" step="0.2" />
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">光标环配色</div>
+          <div class="dim set-value">1–8 种颜色，按顺序绕一圈</div>
+        </div>
+        <div id="cursor-colors" class="set-btns"></div>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">设置备份</div>
+          <div class="dim set-value">导出到库目录，或从 JSON 文件导入</div>
+        </div>
+        <div class="set-btns">
+          <button id="set-export" class="btn small">导出</button>
+          <button id="set-import" class="btn small">导入…</button>
+          <input id="set-import-file" type="file" accept="application/json,.json" hidden />
+        </div>
+      </div>
+      <div class="set-foot dim" id="set-version"></div>
+      </div>
+      <div id="tab-keys" hidden>
+        <div class="keys-section">系统快捷键</div>
+        <div class="km-row system-row">
+          <span class="km-name">呼出快贴面板</span>
+          <span class="km-keys"><kbd id="hotkey-value">Ctrl+Alt+Space</kbd></span>
+          <span class="set-btns">
+            <button id="hotkey-edit" class="btn small">修改</button>
+            <button id="hotkey-clear" class="btn small">禁用</button>
+          </span>
+          <span></span>
+        </div>
+        <div class="km-row system-row">
+          <span class="km-name">剪贴板捕获开关</span>
+          <span class="km-keys"><kbd id="clip-hotkey-value">未设置</kbd></span>
+          <span class="set-btns">
+            <button id="clip-hotkey-edit" class="btn small">修改</button>
+            <button id="clip-hotkey-clear" class="btn small">禁用</button>
+          </span>
+          <span></span>
+        </div>
+        <div class="keys-section">内部快捷键</div>
+        <div class="keys-head">
+          <span class="dim">点「添加键」后按新键；连按两下字母可设序列（如 gg）。<kbd>dd</kbd> 在回收站里表示彻底删除。按 <kbd>?</kbd> 看完整速查。</span>
+        </div>
+        <div id="keymap-list" class="keymap-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="filter-panel" class="filter-panel" hidden>
+    <div class="fp-head">筛选</div>
+    <div class="fp-row"><span>大小</span>
+      <input id="f-min-mb" class="num-input" type="number" step="0.1" placeholder="min" />
+      <span class="dim">–</span>
+      <input id="f-max-mb" class="num-input" type="number" step="0.1" placeholder="max" />
+      <span class="dim">MB</span>
+    </div>
+    <div class="fp-row"><span>宽度</span>
+      <input id="f-min-w" class="num-input" type="number" placeholder="min" />
+      <span class="dim">–</span>
+      <input id="f-max-w" class="num-input" type="number" placeholder="max" />
+      <span class="dim">px</span>
+    </div>
+    <div class="fp-row"><span>高度</span>
+      <input id="f-min-h" class="num-input" type="number" placeholder="min" />
+      <span class="dim">–</span>
+      <input id="f-max-h" class="num-input" type="number" placeholder="max" />
+      <span class="dim">px</span>
+    </div>
+    <div class="fp-row"><span>格式</span>
+      <label><input type="checkbox" class="f-ext" value="gif" /> GIF</label>
+      <label><input type="checkbox" class="f-ext" value="png" /> PNG</label>
+      <label><input type="checkbox" class="f-ext" value="jpg" /> JPG</label>
+      <label><input type="checkbox" class="f-ext" value="webp" /> WebP</label>
+      <label><input type="checkbox" class="f-ext" value="bmp" /> BMP</label>
+    </div>
+    <div class="fp-row"><span>标签</span><div id="f-tags" class="f-tag-list picker"></div></div>
+    <div class="fp-row"><span>来源</span><div id="f-source" class="source-picker"></div></div>
+    <div class="fp-row"><span>日期</span>
+      <input id="f-from" class="num-input" type="date" />
+      <span class="dim">–</span>
+      <input id="f-to" class="num-input" type="date" />
+    </div>
+    <div class="fp-presets">
+      <label class="f-tag"><input type="checkbox" id="f-pre1" /> 微信动图 ≤1MB</label>
+      <label class="f-tag"><input type="checkbox" id="f-pre10" /> 微信可发 ≤10MB</label>
+      <label class="f-tag"><input type="checkbox" id="f-pre1000" /> 宽≤1000px</label>
+    </div>
+    <div class="fp-foot">
+      <button id="f-reset" class="btn small">清空</button>
+      <div class="spacer"></div>
+      <button id="f-apply" class="btn small primary">应用</button>
+    </div>
+  </div>
+
+  <div id="whichkey" class="whichkey" hidden></div>
+
+  <div id="help" class="help-mask" hidden>
+    <div class="help-box">
+      <div class="help-head">
+        <span>快捷键速查</span>
+        <span class="dim">按 ? 或 Esc 关闭</span>
+      </div>
+      <div class="help-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+[package]
+name = "stickerbox-core"
+version = "0.1.0"
+edition = "2021"
+description = "StickerBox core: content-addressed sticker library, no UI, no platform assumptions"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+walkdir = "2"
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+pinyin = "0.10"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"] }

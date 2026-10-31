@@ -1,0 +1,1725 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+
+use stickerbox_core::{Asset, Library, ScanStats};
+use stickerbox_lib::platform::{Opener, ShareOut};
+use stickerbox_lib::{clipboard, platform, recycle};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Emitter, Manager, State};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+struct AppState {
+    lib: Arc<Mutex<Library>>,
+    gate: Arc<clipboard::Gate>,
+    paused: Arc<AtomicBool>,
+    hotkey: Arc<Mutex<String>>,
+    clip_hotkey: Arc<Mutex<String>>,
+    blacklist: Arc<Mutex<Vec<String>>>,
+}
+
+/// 库位置候选，按优先级。`STICKERBOX_HOME` 一旦设置就只认它。
+fn candidate_roots() -> Vec<PathBuf> {
+    if let Ok(p) = std::env::var("STICKERBOX_HOME") {
+        return vec![PathBuf::from(p)];
+    }
+    let mut v = Vec::new();
+    if let Ok(p) = std::env::var("USERPROFILE") {
+        v.push(PathBuf::from(p).join("StickerBox"));
+    }
+    if let Ok(p) = std::env::var("LOCALAPPDATA") {
+        v.push(PathBuf::from(p).join("StickerBox"));
+    }
+    if let Ok(d) = std::env::current_dir() {
+        v.push(d.join("StickerBox"));
+    }
+    v
+}
+
+/// 依次尝试候选目录，返回第一个能用的。全都不行就打印清晰原因后退出，而不是 panic。
+fn open_library() -> Library {
+    let mut tried = Vec::new();
+    for root in candidate_roots() {
+        match Library::open(&root) {
+            Ok(lib) => {
+                eprintln!("[library] {}", root.display());
+                return lib;
+            }
+            Err(e) => tried.push(format!("  {} → {e}", root.display())),
+        }
+    }
+    eprintln!("无法打开库，已尝试：\n{}", tried.join("\n"));
+    eprintln!("解决办法：设置环境变量 STICKERBOX_HOME 指向一个可写目录，例如");
+    eprintln!("  $env:STICKERBOX_HOME = \"D:\\StickerBox\"");
+    std::process::exit(1);
+}
+
+fn mime_for(ext: &str) -> &'static str {
+    match ext {
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        _ => "image/png",
+    }
+}
+
+fn empty_404() -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
+    tauri::http::Response::builder()
+        .status(404)
+        .body(std::borrow::Cow::Owned(Vec::new()))
+        .expect("404")
+}
+
+/// 复制「文件」而不是位图：GIF 动画只有这条路能保住
+#[tauri::command]
+fn copy_asset_file(state: State<'_, AppState>, sha: String) -> Result<(), String> {
+    let path = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.assets()
+            .iter()
+            .find(|a| a.sha == sha)
+            .map(|a| a.path.clone())
+            .ok_or_else(|| "库里找不到这张图".to_string())?
+    };
+
+    let gate = state.gate.clone();
+    let _guard = gate.acquire();
+    gate.suppress(800);
+    let path = PathBuf::from(&path);
+    let result = platform::desktop::platform().share_paths(std::slice::from_ref(&path));
+    if result.is_ok() {
+        if let Ok(mut lib) = state.lib.lock() {
+            let _ = lib.touch_used(&sha);
+        }
+    }
+    result
+}
+
+#[tauri::command]
+fn set_pinned(window: tauri::WebviewWindow, pinned: bool) -> Result<(), String> {
+    window.set_always_on_top(pinned).map_err(|e| e.to_string())
+}
+
+/// 单实例锁：抢到 127.0.0.1:47821 的是第一个实例，抢不到就通知它显示窗口后退出。
+/// 用网络端口而不是命名互斥体，是为了少一个 Windows 专属 API、也方便跨平台。
+fn acquire_singleton() -> Option<std::net::TcpListener> {
+    match std::net::TcpListener::bind("127.0.0.1:47821") {
+        Ok(listener) => Some(listener),
+        Err(_) => {
+            use std::io::Write;
+            if let Ok(mut stream) = std::net::TcpStream::connect("127.0.0.1:47821") {
+                let _ = stream.write_all(b"show");
+            }
+            None
+        }
+    }
+}
+
+fn show_main(app: &tauri::AppHandle) {
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+    }
+}
+
+fn register_hotkey(app: &tauri::AppHandle, accel: &str, kind: &str) -> Result<(), String> {
+    if accel.trim().is_empty() {
+        return Ok(());
+    }
+    let sc: Shortcut = accel
+        .parse()
+        .map_err(|_| format!("「{accel}」不是合法快捷键"))?;
+    let handle = app.clone();
+    let kind = kind.to_string();
+    app.global_shortcut()
+        .on_shortcut(sc, move |_app, _sc, ev| {
+            if ev.state() != ShortcutState::Pressed {
+                return;
+            }
+            if kind == "clip" {
+                toggle_clipboard(&handle);
+            } else {
+                toggle_panel(&handle);
+            }
+        })
+        .map_err(|e| format!("注册失败（可能被占用）：{e}"))
+}
+
+/// 全局热键切换剪贴板捕获，并把状态写回设置
+fn toggle_clipboard(app: &tauri::AppHandle) {
+    let st = app.state::<AppState>();
+    let enabled_now = !st.paused.load(Ordering::Relaxed);
+    let next = !enabled_now;
+    st.paused.store(!next, Ordering::Relaxed);
+
+    if let Ok(lib) = st.lib.lock() {
+        let path = lib.root().join("settings.json");
+        let mut cur = read_settings_value(&path);
+        merge_json(&mut cur, &serde_json::json!({ "clipboardEnabled": next }));
+        if let Ok(text) = serde_json::to_string_pretty(&cur) {
+            let _ = std::fs::write(&path, text);
+        }
+    }
+    let _ = app.emit(
+        "clipboard-toggled",
+        serde_json::json!({ "enabled": next }),
+    );
+}
+
+fn toggle_panel(app: &tauri::AppHandle) {
+    let Some(win) = app.get_webview_window("panel") else {
+        return;
+    };
+    if win.is_visible().unwrap_or(false) {
+        let _ = win.hide();
+    } else {
+        let _ = win.show();
+        let _ = win.set_focus();
+        let _ = app.emit("panel-open", ());
+    }
+}
+
+fn apply_query(list: Vec<Asset>, q: &str, limit: Option<usize>) -> Vec<Asset> {
+    let mut out: Vec<Asset> = if q.is_empty() {
+        list
+    } else {
+        list.into_iter()
+            .filter(|a| stickerbox_core::match_score(a, q) > 0)
+            .collect()
+    };
+    if let Some(l) = limit {
+        out.truncate(l);
+    }
+    out
+}
+
+fn friendly_app(name: &str) -> String {
+    match name.to_ascii_lowercase().as_str() {
+        "weixin.exe" | "wechat.exe" => "微信".to_string(),
+        "qq.exe" | "qqnt.exe" => "QQ".to_string(),
+        "telegram.exe" => "Telegram".to_string(),
+        "discord.exe" => "Discord".to_string(),
+        "snipaste.exe" => "Snipaste".to_string(),
+        "explorer.exe" => "资源管理器".to_string(),
+        "chrome.exe" => "Chrome".to_string(),
+        "msedge.exe" => "Edge".to_string(),
+        "firefox.exe" => "Firefox".to_string(),
+        _ => name.to_string(),
+    }
+}
+
+fn source_key(a: &Asset) -> String {
+    if a.source == "folder" {
+        "folder".to_string()
+    } else if a.source_ref.is_empty() {
+        a.source.clone()
+    } else {
+        let app = std::path::Path::new(&a.source_ref)
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| a.source_ref.clone());
+        format!("{}|{}", a.source, app)
+    }
+}
+
+#[derive(Default)]
+struct AssetFilters {
+    min_bytes: Option<u64>,
+    max_bytes: Option<u64>,
+    min_w: Option<u32>,
+    max_w: Option<u32>,
+    min_h: Option<u32>,
+    max_h: Option<u32>,
+    exts: Vec<String>,
+    tags: Vec<String>,
+    source: String,
+    source_keys: Vec<String>,
+    from: String,
+    to: String,
+}
+
+fn parse_filters(v: Option<serde_json::Value>) -> AssetFilters {
+    let mut f = AssetFilters::default();
+    let Some(obj) = v.and_then(|x| x.as_object().cloned()) else {
+        return f;
+    };
+    // 0 视为「未设置」：前端空输入会传 0，不能当成真正的阈值
+    let num = |k: &str| obj.get(k).and_then(|x| x.as_u64()).filter(|v| *v > 0);
+    let text = |k: &str| obj.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+    f.min_bytes = num("minBytes");
+    f.max_bytes = num("maxBytes");
+    f.min_w = num("minWidth").map(|x| x as u32);
+    f.max_w = num("maxWidth").map(|x| x as u32);
+    f.min_h = num("minHeight").map(|x| x as u32);
+    f.max_h = num("maxHeight").map(|x| x as u32);
+    f.exts = obj
+        .get("exts")
+        .and_then(|x| x.as_array())
+        .map(|a| a.iter().filter_map(|e| e.as_str()).map(|s| s.to_lowercase()).collect())
+        .unwrap_or_default();
+    f.tags = obj
+        .get("tags")
+        .and_then(|x| x.as_array())
+        .map(|a| a.iter().filter_map(|e| e.as_str()).map(|s| s.to_string()).collect())
+        .unwrap_or_default();
+    f.source = text("source");
+    f.source_keys = obj
+        .get("sourceKeys")
+        .and_then(|x| x.as_array())
+        .map(|a| a.iter().filter_map(|e| e.as_str()).map(|s| s.to_string()).collect())
+        .unwrap_or_default();
+    f.from = text("from");
+    f.to = text("to");
+    f
+}
+
+fn apply_filters(list: Vec<Asset>, f: &AssetFilters) -> Vec<Asset> {
+    let before = list.len();
+    let out: Vec<Asset> = list.into_iter()
+        .filter(|a| {
+            if let Some(x) = f.min_bytes {
+                if a.bytes < x {
+                    return false;
+                }
+            }
+            if let Some(x) = f.max_bytes {
+                if a.bytes > x {
+                    return false;
+                }
+            }
+            if let Some(x) = f.min_w {
+                if a.width < x {
+                    return false;
+                }
+            }
+            if let Some(x) = f.max_w {
+                if a.width > x {
+                    return false;
+                }
+            }
+            if let Some(x) = f.min_h {
+                if a.height < x {
+                    return false;
+                }
+            }
+            if let Some(x) = f.max_h {
+                if a.height > x {
+                    return false;
+                }
+            }
+            if !f.exts.is_empty() && !f.exts.iter().any(|e| e == &a.ext.to_lowercase()) {
+                return false;
+            }
+            if !f.tags.is_empty() && !f.tags.iter().all(|t| a.tags.iter().any(|x| x == t)) {
+                return false;
+            }
+            if !f.source.is_empty() && a.source != f.source {
+                return false;
+            }
+            if !f.source_keys.is_empty() {
+                let key = source_key(a);
+                if !f.source_keys.iter().any(|k| k == &key) {
+                    return false;
+                }
+            }
+            if !f.from.is_empty() && a.added_at.get(..10).unwrap_or("") < f.from.as_str() {
+                return false;
+            }
+            if !f.to.is_empty() && a.added_at.get(..10).unwrap_or("") > f.to.as_str() {
+                return false;
+            }
+            true
+        })
+        .collect();
+    if std::env::var("STICKERBOX_FILTER_DEBUG").is_ok() {
+        eprintln!(
+            "[filter] before={} after={} exts={:?} tags={:?} maxB={:?} minB={:?}",
+            before,
+            out.len(),
+            f.exts,
+            f.tags,
+            f.max_bytes,
+            f.min_bytes
+        );
+    }
+    out
+}
+
+const BUILTIN_THEMES: &[(&str, &str)] = &[
+    ("catppuccin-mocha", include_str!("../themes/catppuccin-mocha.json")),
+    ("catppuccin-macchiato", include_str!("../themes/catppuccin-macchiato.json")),
+    ("catppuccin-frappe", include_str!("../themes/catppuccin-frappe.json")),
+    ("catppuccin-latte", include_str!("../themes/catppuccin-latte.json")),
+];
+
+#[tauri::command]
+fn themes_list(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+    let root = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.root().to_path_buf()
+    };
+    let mut out = Vec::new();
+    for (id, text) in BUILTIN_THEMES {
+        if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(text) {
+            if let Some(o) = v.as_object_mut() {
+                o.insert("id".into(), serde_json::json!(id));
+                o.insert("builtin".into(), serde_json::json!(true));
+                out.push(v);
+            }
+        }
+    }
+    let dir = root.join("themes");
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()) != Some("json".into()) {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&text) else { continue };
+            let Some(o) = v.as_object_mut() else { continue };
+            if !o.get("colors").map(|c| c.is_object()).unwrap_or(false) {
+                continue;
+            }
+            let id = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("custom")
+                .to_string();
+            o.entry("name")
+                .or_insert_with(|| serde_json::json!(id.clone()));
+            o.insert("id".into(), serde_json::json!(id));
+            o.insert("builtin".into(), serde_json::json!(false));
+            out.push(v);
+        }
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+fn get_asset(state: State<'_, AppState>, sha: String) -> Result<Asset, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.find(&sha).cloned().ok_or_else(|| "库里找不到这张图".to_string())
+}
+
+#[tauri::command]
+fn list_assets(
+    state: State<'_, AppState>,
+    q: String,
+    group: Option<String>,
+    limit: Option<usize>,
+    sort: Option<String>,
+    filters: Option<String>,
+) -> Result<Vec<Asset>, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    let sort = sort.unwrap_or_default();
+    let filters_json = filters.and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+    if std::env::var("STICKERBOX_FILTER_DEBUG").is_ok() {
+        eprintln!("[filter-raw] {:?}", filters_json);
+    }
+    if std::env::var("STICKERBOX_FILTER_DEBUG").is_ok() {
+        eprintln!("[call] q={:?} group={:?} limit={:?} f={:?}", q, group, limit, filters_json);
+    }
+    let filters = parse_filters(filters_json);
+    if let Some(g) = group.as_deref() {
+        let query = q.trim().to_lowercase();
+        if g == "__star__" {
+            let list = lib.starred();
+            let list = lib.ordered("__star__", list);
+            let list = apply_query(list, &query, limit);
+            let list = apply_filters(list, &filters);
+            return Ok(sort_assets(list, &sort, limit));
+        }
+        if g == "__recent__" {
+            // 有筛选词时先取全量，再过滤，避免被 limit 截断后漏掉匹配项
+            let list = lib.recent(if query.is_empty() {
+                limit.unwrap_or(100)
+            } else {
+                usize::MAX
+            });
+            let list = apply_query(list, &query, limit);
+            let list = apply_filters(list, &filters);
+            return Ok(sort_assets(list, &sort, limit));
+        }
+    }
+    let fetch = if sort.is_empty() { limit.unwrap_or(500) } else { usize::MAX };
+    let list = lib.search(&q, group.as_deref(), fetch);
+    let list = match group.as_deref() {
+        Some(g) if !g.is_empty() && !g.starts_with("__") => lib.ordered(g, list),
+        _ => list,
+    };
+    let list = apply_filters(list, &filters);
+    Ok(sort_assets(list, &sort, limit))
+}
+
+fn sort_assets(mut list: Vec<Asset>, sort: &str, limit: Option<usize>) -> Vec<Asset> {
+    match sort {
+        "name" => list.sort_by(|a, b| {
+            a.name
+                .to_lowercase()
+                .cmp(&b.name.to_lowercase())
+                .then(b.added_at.cmp(&a.added_at))
+        }),
+        "added" => list.sort_by(|a, b| b.added_at.cmp(&a.added_at)),
+        "used" | "recent" => list.sort_by(|a, b| {
+            b.used_at
+                .cmp(&a.used_at)
+                .then(b.added_at.cmp(&a.added_at))
+        }),
+        _ => {}
+    }
+    if let Some(l) = limit {
+        list.truncate(l);
+    }
+    list
+}
+
+#[tauri::command]
+fn set_order(state: State<'_, AppState>, key: String, shas: Vec<String>) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_order(&key, shas).map_err(|e| format!("{e:#}"))
+}
+
+/// 批量复制原文件到剪贴板（保留动画；微信/QQ 可一次粘贴多张）
+#[tauri::command]
+fn copy_assets_files(state: State<'_, AppState>, shas: Vec<String>) -> Result<usize, String> {
+    let paths: Vec<std::path::PathBuf> = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        shas.iter()
+            .filter_map(|sha| lib.find(sha).map(|a| std::path::PathBuf::from(&a.path)))
+            .collect()
+    };
+    if paths.is_empty() {
+        return Err("找不到这些文件".to_string());
+    }
+    platform::desktop::platform().share_paths(&paths)?;
+    Ok(paths.len())
+}
+
+fn clamp_to_monitor(win: &tauri::WebviewWindow, width: u32, height: u32) -> (u32, u32) {
+    let mut max_w = 1920.0;
+    let mut max_h = 1080.0;
+    if let Ok(Some(m)) = win.current_monitor() {
+        let s = m.scale_factor();
+        max_w = m.size().width as f64 / s;
+        max_h = m.size().height as f64 / s;
+    }
+    let w = (width as f64).clamp(640.0, (max_w - 40.0).max(640.0)) as u32;
+    let h = (height as f64).clamp(420.0, (max_h - 80.0).max(420.0)) as u32;
+    (w, h)
+}
+
+#[tauri::command]
+fn set_window_size(
+    app: tauri::AppHandle,
+    label: String,
+    width: u32,
+    height: u32,
+) -> Result<serde_json::Value, String> {
+    let win = app
+        .get_webview_window(&label)
+        .ok_or_else(|| "窗口不存在".to_string())?;
+    let (w, h) = clamp_to_monitor(&win, width, height);
+    win.set_size(tauri::LogicalSize::new(w, h))
+        .map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({ "width": w, "height": h }))
+}
+
+#[tauri::command]
+fn set_panel_position(app: tauri::AppHandle, x: i32, y: i32) -> Result<serde_json::Value, String> {
+    let win = app
+        .get_webview_window("panel")
+        .ok_or_else(|| "窗口不存在".to_string())?;
+    let mut cx = x;
+    let mut cy = y;
+    if let Ok(Some(m)) = win.current_monitor() {
+        let s = m.scale_factor();
+        let w = m.size().width as f64 / s;
+        let h = m.size().height as f64 / s;
+        let size = win
+            .outer_size()
+            .map(|z| (z.width as f64 / s, z.height as f64 / s))
+            .unwrap_or((720.0, 520.0));
+        // 以屏幕中心为原点：0,0 = 正中间
+        cx = ((w - size.0) / 2.0 + x as f64).clamp(0.0, (w - size.0).max(0.0)) as i32;
+        cy = ((h - size.1) / 2.0 + y as f64).clamp(0.0, (h - size.1).max(0.0)) as i32;
+    }
+    win.set_position(tauri::LogicalPosition::new(cx, cy))
+        .map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({ "x": cx, "y": cy }))
+}
+
+/// 用系统默认程序打开这张图
+#[tauri::command]
+fn open_asset(state: State<'_, AppState>, sha: String) -> Result<(), String> {
+    let path = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.find(&sha)
+            .map(|a| a.path.clone())
+            .ok_or_else(|| "找不到这张图".to_string())?
+    };
+    platform::desktop::platform().open(Path::new(&path))
+}
+
+#[tauri::command]
+fn js_log(msg: String) {
+    eprintln!("[js] {msg}");
+}
+
+#[tauri::command]
+fn selftest_mode() -> String {
+    let v = std::env::var("STICKERBOX_SELFTEST").unwrap_or_default();
+    eprintln!("[selftest] mode={v:?}");
+    v
+}
+
+#[tauri::command]
+fn ui_state() -> String {
+    std::env::var("STICKERBOX_UI_STATE").unwrap_or_default()
+}
+
+#[tauri::command]
+fn selftest_report(
+    state: State<'_, AppState>,
+    report: serde_json::Value,
+) -> Result<String, String> {
+    let root = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.root().to_path_buf()
+    };
+    let path = root.join("selftest-report.json");
+    let text = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
+    std::fs::write(&path, text).map_err(|e| format!("写报告失败：{e}"))?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn source_stats(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    let mut map: std::collections::BTreeMap<String, (String, usize)> = Default::default();
+    for a in lib.assets() {
+        let key = source_key(a);
+        let label = match a.source.as_str() {
+            "folder" => "本地导入".to_string(),
+            "clipboard" => {
+                let app = std::path::Path::new(&a.source_ref)
+                    .file_name()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "剪贴板".to_string());
+                format!("剪贴板 · {}", friendly_app(&app))
+            }
+            other => other.to_string(),
+        };
+        let entry = map.entry(key).or_insert((label, 0));
+        entry.1 += 1;
+    }
+    Ok(map
+        .into_iter()
+        .map(|(key, (label, count))| serde_json::json!({"key": key, "label": label, "count": count}))
+        .collect())
+}
+
+#[tauri::command]
+fn clipboard_sources(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    let mut map: std::collections::BTreeMap<String, usize> = Default::default();
+    for a in lib.assets() {
+        if a.source == "clipboard" && !a.source_ref.is_empty() {
+            *map.entry(a.source_ref.clone()).or_insert(0) += 1;
+        }
+    }
+    Ok(map
+        .into_iter()
+        .map(|(name, count)| serde_json::json!({"name": name, "count": count}))
+        .collect())
+}
+
+#[tauri::command]
+fn set_hotkey(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    accel: String,
+) -> Result<(), String> {
+    let old = {
+        let h = state.hotkey.lock().map_err(|e| e.to_string())?;
+        h.clone()
+    };
+    if let Ok(old_sc) = old.parse::<Shortcut>() {
+        let _ = app.global_shortcut().unregister(old_sc);
+    }
+    register_hotkey(&app, &accel, "panel")?;
+    {
+        let mut h = state.hotkey.lock().map_err(|e| e.to_string())?;
+        *h = accel.clone();
+    }
+    let path = settings_file(&state)?;
+    let mut cur = read_settings_value(&path);
+    merge_json(&mut cur, &serde_json::json!({ "hotkey": accel }));
+    if let Some(obj) = cur.as_object_mut() {
+        obj.remove("root");
+        obj.remove("version");
+    }
+    if let Ok(text) = serde_json::to_string_pretty(&cur) {
+        let _ = std::fs::write(&path, text);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_clip_hotkey(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    accel: String,
+) -> Result<(), String> {
+    let old = {
+        let h = state.clip_hotkey.lock().map_err(|e| e.to_string())?;
+        h.clone()
+    };
+    if let Ok(old_sc) = old.parse::<Shortcut>() {
+        let _ = app.global_shortcut().unregister(old_sc);
+    }
+    register_hotkey(&app, &accel, "clip")?;
+    {
+        let mut h = state.clip_hotkey.lock().map_err(|e| e.to_string())?;
+        *h = accel.clone();
+    }
+    let path = settings_file(&state)?;
+    let mut cur = read_settings_value(&path);
+    merge_json(&mut cur, &serde_json::json!({ "clipHotkey": accel }));
+    if let Some(obj) = cur.as_object_mut() {
+        obj.remove("root");
+        obj.remove("version");
+    }
+    if let Ok(text) = serde_json::to_string_pretty(&cur) {
+        let _ = std::fs::write(&path, text);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn create_group(state: State<'_, AppState>, name: String) -> Result<bool, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.create_group(&name).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn batch_star(state: State<'_, AppState>, shas: Vec<String>, on: bool) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_star(&shas, on).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn batch_tags(
+    state: State<'_, AppState>,
+    shas: Vec<String>,
+    tags: Vec<String>,
+) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.add_tags(&shas, tags).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn batch_ungroup(
+    state: State<'_, AppState>,
+    shas: Vec<String>,
+    group: String,
+) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.remove_from_group(&shas, &group)
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn batch_untag(
+    state: State<'_, AppState>,
+    shas: Vec<String>,
+    tags: Vec<String>,
+) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.remove_tags(&shas, &tags).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn batch_delete(state: State<'_, AppState>, shas: Vec<String>) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    let mut n = 0;
+    for sha in shas {
+        if lib.remove(&sha).is_ok() {
+            n += 1;
+        }
+    }
+    Ok(n)
+}
+
+#[tauri::command]
+fn group_stats(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    let groups: Vec<serde_json::Value> = lib
+        .group_stats()
+        .into_iter()
+        .map(|(name, count)| serde_json::json!({ "name": name, "count": count }))
+        .collect();
+    Ok(serde_json::json!({
+        "groups": groups,
+        "ungrouped": lib.ungrouped_count(),
+        "ungroupedNew": lib.ungrouped_new(),
+        "starred": lib.starred_count(),
+        "recent": lib.recent_count(),
+        "total": lib.assets().len(),
+    }))
+}
+
+/// 拖拽 / 选择器统一入口：目录递归扫描，文件直接入库
+#[tauri::command]
+async fn import_paths(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    paths: Vec<String>,
+) -> Result<ScanStats, String> {
+    let lib = state.lib.clone();
+
+    // 先把文件列出来，不持锁、不读内容
+    let mut files: Vec<PathBuf> = Vec::new();
+    for p in &paths {
+        let path = Path::new(p);
+        if path.is_dir() {
+            stickerbox_core::collect_images(path, &mut files);
+        } else if stickerbox_core::image_ext(path).is_some() {
+            files.push(path.to_path_buf());
+        }
+    }
+
+    let total = files.len();
+    let mut stats = ScanStats {
+        scanned: total,
+        added: 0,
+        duplicated: 0,
+        skipped: 0,
+        errors: 0,
+    };
+
+    for (i, file) in files.iter().enumerate() {
+        // 一次只锁一张：界面查询能插进来，不会整窗口卡死
+        let imported = {
+            let mut guard = lib.lock().map_err(|e| e.to_string())?;
+            guard.import_file(file)
+        };
+
+        match imported {
+            Ok(Some(sha)) => {
+                stats.added += 1;
+                // 缩略图在锁外生成，避免长时间占用
+                let root = {
+                    let guard = lib.lock().map_err(|e| e.to_string())?;
+                    guard.root().to_path_buf()
+                };
+                let ext = stickerbox_core::image_ext(file).unwrap_or_default();
+                let _ = stickerbox_core::ensure_thumb(&root, &sha, &ext);
+            }
+            Ok(None) => stats.duplicated += 1,
+            Err(e) => {
+                stats.errors += 1;
+                eprintln!("[import] {}: {e:#}", file.display());
+            }
+        }
+
+        let _ = app.emit(
+            "import-progress",
+            serde_json::json!({ "done": i + 1, "total": total }),
+        );
+    }
+
+    Ok(stats)
+}
+
+#[tauri::command]
+fn library_stats(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    serde_json::to_value(lib.stats()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn scan_folder(state: State<'_, AppState>, path: String) -> Result<ScanStats, String> {
+    let lib = state.lib.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut guard = lib.lock().map_err(|e| e.to_string())?;
+        guard
+            .scan_folder(Path::new(&path))
+            .map_err(|e| format!("{e:#}"))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// 把一张表情放进系统剪贴板（RGBA）。之后在任何聊天窗口 Ctrl+V 即可。
+/// 把 RGBA 放进剪贴板：拿闸门锁 + 开抑制窗口 + 失败重试
+fn clip_copy(gate: &clipboard::Gate, w: u32, h: u32, bytes: &[u8]) -> Result<(), String> {
+    let _guard = gate.acquire();
+    gate.suppress(1500);
+
+    let mut last_err: Option<String> = None;
+    for _ in 0..5 {
+        let attempt = arboard::Clipboard::new().and_then(|mut cb| {
+            cb.set_image(arboard::ImageData {
+                width: w as usize,
+                height: h as usize,
+                bytes: std::borrow::Cow::Borrowed(bytes),
+            })
+        });
+        match attempt {
+            Ok(()) => {
+                last_err = None;
+                break;
+            }
+            Err(e) => {
+                last_err = Some(format!("{e}"));
+                std::thread::sleep(std::time::Duration::from_millis(60));
+            }
+        }
+    }
+
+    match last_err {
+        Some(e) => Err(format!("{e}（剪贴板被其他程序占用，请稍后重试）")),
+        None => Ok(()),
+    }
+}
+
+#[tauri::command]
+fn copy_asset(state: State<'_, AppState>, sha: String) -> Result<(), String> {
+    let path = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.assets()
+            .iter()
+            .find(|a| a.sha == sha)
+            .map(|a| a.path.clone())
+            .ok_or_else(|| "库里找不到这张图".to_string())?
+    };
+
+    let (w, h, bytes) =
+        stickerbox_core::load_rgba(Path::new(&path)).map_err(|e| format!("{e:#}"))?;
+
+    let result = clip_copy(&state.gate, w, h, &bytes);
+    if result.is_ok() {
+        if let Ok(mut lib) = state.lib.lock() {
+            let _ = lib.touch_used(&sha);
+        }
+    }
+    result
+}
+
+#[tauri::command]
+fn update_asset(
+    state: State<'_, AppState>,
+    sha: String,
+    name: Option<String>,
+    tags: Option<Vec<String>>,
+    groups: Option<Vec<String>>,
+) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.update(&sha, name, tags, groups)
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn delete_asset(state: State<'_, AppState>, sha: String) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.remove(&sha).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn add_to_group(state: State<'_, AppState>, shas: Vec<String>, group: String) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.add_group(&shas, &group).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn clear_groups(state: State<'_, AppState>, shas: Vec<String>) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.clear_groups(&shas).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn rename_group(state: State<'_, AppState>, old: String, new: String) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.rename_group(&old, &new).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn remove_group(
+    state: State<'_, AppState>,
+    name: String,
+    delete_assets: bool,
+) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.remove_group(&name, delete_assets)
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn mark_ungrouped_seen(state: State<'_, AppState>) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.mark_ungrouped_seen().map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn tag_stats(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    Ok(lib
+        .tag_stats()
+        .into_iter()
+        .map(|(name, count)| serde_json::json!({ "name": name, "count": count }))
+        .collect())
+}
+
+#[tauri::command]
+fn trash_list(
+    state: State<'_, AppState>,
+    q: Option<String>,
+    filters: Option<String>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    let query = q.unwrap_or_default();
+    let items = if query.trim().is_empty() {
+        lib.trash()
+    } else {
+        lib.search_trash(&query)
+    };
+    let filters_json = filters.and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+    let f = parse_filters(filters_json);
+    let items: Vec<_> = items
+        .into_iter()
+        .filter(|item| !apply_filters(vec![item.asset.clone()], &f).is_empty())
+        .collect();
+    Ok(items
+        .into_iter()
+        .map(|item| {
+            serde_json::json!({
+                "sha": item.asset.sha,
+                "name": item.asset.name,
+                "ext": item.asset.ext,
+                "bytes": item.asset.bytes,
+                "width": item.asset.width,
+                "height": item.asset.height,
+                "groups": item.asset.groups,
+                "tags": item.asset.tags,
+                "added_at": item.asset.added_at,
+                "animated": item.asset.animated,
+                "deleted_at": item.deleted_at,
+            })
+        })
+        .collect())
+}
+
+#[tauri::command]
+fn trash_restore(state: State<'_, AppState>, sha: String) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.restore(&sha).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+fn trash_delete(
+    state: State<'_, AppState>,
+    sha: String,
+    permanent: Option<bool>,
+) -> Result<(), String> {
+    let path = {
+        let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.delete_forever(&sha).map_err(|e| format!("{e:#}"))?
+    };
+    if let Some(p) = path {
+        if permanent.unwrap_or(false) {
+            let _ = std::fs::remove_file(&p);
+        } else if let Err(e) = recycle::move_to_recycle_bin(&[p]) {
+            eprintln!("[trash] {e}");
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn trash_purge(state: State<'_, AppState>, permanent: Option<bool>) -> Result<usize, String> {
+    let paths = {
+        let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.purge_trash().map_err(|e| format!("{e:#}"))?
+    };
+    let n = paths.len();
+    if permanent.unwrap_or(false) {
+        for p in &paths {
+            let _ = std::fs::remove_file(p);
+        }
+    } else if let Err(e) = recycle::move_to_recycle_bin(&paths) {
+        eprintln!("[trash] {e}");
+    }
+    Ok(n)
+}
+
+fn settings_file(state: &State<'_, AppState>) -> Result<std::path::PathBuf, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    Ok(lib.root().join("settings.json"))
+}
+
+fn read_settings_value(path: &std::path::Path) -> serde_json::Value {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .unwrap_or_else(|| serde_json::json!({}))
+}
+
+fn merge_json(base: &mut serde_json::Value, patch: &serde_json::Value) {
+    match (base, patch) {
+        (serde_json::Value::Object(b), serde_json::Value::Object(p)) => {
+            for (k, v) in p {
+                merge_json(b.entry(k.clone()).or_insert(serde_json::Value::Null), v);
+            }
+        }
+        (b, p) => *b = p.clone(),
+    }
+}
+
+fn apply_side_effects(state: &State<'_, AppState>, patch: &serde_json::Value) {
+    if let Some(enabled) = patch.get("clipboardEnabled").and_then(|v| v.as_bool()) {
+        state.paused.store(!enabled, Ordering::Relaxed);
+    }
+    if let Some(list) = patch.get("clipboardBlacklist").and_then(|v| v.as_array()) {
+        let items: Vec<String> = list
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if let Ok(mut guard) = state.blacklist.lock() {
+            *guard = items;
+        }
+    }
+    if let Some(enabled) = patch.get("autostart").and_then(|v| v.as_bool()) {
+        if let Ok(exe) = std::env::current_exe() {
+            let _ = autostart_apply(enabled, &exe.to_string_lossy());
+        }
+    }
+}
+
+#[tauri::command]
+fn get_settings(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let path = settings_file(&state)?;
+    let mut v = read_settings_value(&path);
+    let root = path
+        .parent()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+    if let Some(obj) = v.as_object_mut() {
+        obj.insert("root".into(), serde_json::json!(root));
+        obj.insert(
+            "clipboardEnabled".into(),
+            serde_json::json!(!state.paused.load(Ordering::Relaxed)),
+        );
+        obj.insert("autostart".into(), serde_json::json!(autostart_enabled()));
+        obj.insert(
+            "version".into(),
+            serde_json::json!(env!("CARGO_PKG_VERSION")),
+        );
+        if let Ok(h) = state.hotkey.lock() {
+            obj.insert("hotkey".into(), serde_json::json!(*h));
+        }
+        if let Ok(h) = state.clip_hotkey.lock() {
+            obj.insert("clipHotkey".into(), serde_json::json!(*h));
+        }
+        if let Ok(b) = state.blacklist.lock() {
+            obj.insert("clipboardBlacklist".into(), serde_json::json!(*b));
+        }
+    }
+    Ok(v)
+}
+
+#[tauri::command]
+fn patch_settings(state: State<'_, AppState>, patch: serde_json::Value) -> Result<(), String> {
+    let path = settings_file(&state)?;
+    let mut cur = read_settings_value(&path);
+    merge_json(&mut cur, &patch);
+    // 运行时字段不落盘
+    if let Some(obj) = cur.as_object_mut() {
+        obj.remove("root");
+        obj.remove("version");
+        if obj.contains_key("starStyle") {
+            obj.remove("starGlyph");
+        }
+    }
+    let json = serde_json::to_string_pretty(&cur).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| format!("写入设置失败：{e}"))?;
+    apply_side_effects(&state, &patch);
+    Ok(())
+}
+
+#[tauri::command]
+fn export_settings(state: State<'_, AppState>) -> Result<String, String> {
+    let path = settings_file(&state)?;
+    let out = path.with_file_name("settings-export.json");
+    let v = read_settings_value(&path);
+    let json = serde_json::to_string_pretty(&v).map_err(|e| e.to_string())?;
+    std::fs::write(&out, json).map_err(|e| format!("导出失败：{e}"))?;
+    Ok(out.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn import_settings(state: State<'_, AppState>, json: String) -> Result<(), String> {
+    let patch: serde_json::Value =
+        serde_json::from_str(&json).map_err(|_| "不是合法的 JSON".to_string())?;
+    let path = settings_file(&state)?;
+    let mut cur = read_settings_value(&path);
+    merge_json(&mut cur, &patch);
+    if let Some(obj) = cur.as_object_mut() {
+        obj.remove("root");
+        obj.remove("version");
+    }
+    let text = serde_json::to_string_pretty(&cur).map_err(|e| e.to_string())?;
+    std::fs::write(&path, text).map_err(|e| format!("写入设置失败：{e}"))?;
+    apply_side_effects(&state, &patch);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_clipboard_enabled(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
+    state.paused.store(!enabled, Ordering::Relaxed);
+    let path = settings_file(&state)?;
+    let mut cur = read_settings_value(&path);
+    merge_json(&mut cur, &serde_json::json!({ "clipboardEnabled": enabled }));
+    if let Some(obj) = cur.as_object_mut() {
+        obj.remove("root");
+        obj.remove("version");
+        obj.remove("autostart");
+    }
+    if let Ok(text) = serde_json::to_string_pretty(&cur) {
+        let _ = std::fs::write(&path, text);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_autostart(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    autostart_apply(enabled, &exe.to_string_lossy())
+        .map_err(|e| format!("设置开机自启失败：{e}"))?;
+    let path = settings_file(&state)?;
+    let mut cur = read_settings_value(&path);
+    merge_json(&mut cur, &serde_json::json!({ "autostart": enabled }));
+    if let Some(obj) = cur.as_object_mut() {
+        obj.remove("root");
+        obj.remove("version");
+    }
+    if let Ok(text) = serde_json::to_string_pretty(&cur) {
+        let _ = std::fs::write(&path, text);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn open_library_folder(state: State<'_, AppState>) -> Result<(), String> {
+    let root = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.root().to_string_lossy().to_string()
+    };
+    std::process::Command::new("explorer")
+        .arg(&root)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+fn autostart_apply(enable: bool, exe: &str) -> std::io::Result<()> {
+    use std::os::windows::process::CommandExt;
+    const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+    let mut cmd = std::process::Command::new("reg");
+    if enable {
+        cmd.args([
+            "add",
+            RUN_KEY,
+            "/v",
+            "StickerBox",
+            "/t",
+            "REG_SZ",
+            "/d",
+            &format!("\"{exe}\" --tray"),
+            "/f",
+        ]);
+    } else {
+        cmd.args(["delete", RUN_KEY, "/v", "StickerBox", "/f"]);
+    }
+    cmd.creation_flags(0x08000000);
+    let status = cmd.status()?;
+    if enable && !status.success() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "reg add 返回失败",
+        ));
+    }
+    Ok(())
+}
+
+fn autostart_enabled() -> bool {
+    use std::os::windows::process::CommandExt;
+    const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
+    let mut cmd = std::process::Command::new("reg");
+    cmd.args(["query", RUN_KEY, "/v", "StickerBox"]);
+    cmd.creation_flags(0x08000000);
+    cmd.output().map(|o| o.status.success()).unwrap_or(false)
+}
+
+#[tauri::command]
+fn hide_panel(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.hide().map_err(|e| e.to_string())
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+
+    if args.len() >= 3 && args[1] == "probe" {
+        let p = PathBuf::from(&args[2]);
+        println!("target = {}", p.display());
+        match std::fs::create_dir_all(p.join("blobs")) {
+            Ok(_) => println!("mkdir blobs: OK"),
+            Err(e) => println!("mkdir blobs: ERR {e} kind={:?}", e.kind()),
+        }
+        match std::fs::write(p.join("probe.txt"), b"hi") {
+            Ok(_) => println!("write: OK"),
+            Err(e) => println!("write: ERR {e}"),
+        }
+        println!("cwd = {:?}", std::env::current_dir());
+        return;
+    }
+
+    // 诊断：打印每个候选目录能不能用（排查权限问题时用）
+    if args.len() >= 2 && args[1] == "diag" {        println!("USERPROFILE   = {:?}", std::env::var("USERPROFILE"));
+        println!("LOCALAPPDATA  = {:?}", std::env::var("LOCALAPPDATA"));
+        println!("STICKERBOX_HOME = {:?}", std::env::var("STICKERBOX_HOME"));
+        println!("cwd           = {:?}", std::env::current_dir());
+        for root in candidate_roots() {
+            let existed = root.exists();
+            let probe = root.join(".write-test");
+            let result = std::fs::create_dir_all(&root)
+                .and_then(|_| std::fs::write(&probe, b"1"))
+                .and_then(|_| std::fs::remove_file(&probe));
+            match result {
+                Ok(_) => {
+                    // 只为探测而建的目录，测完删掉，不留垃圾
+                    if !existed {
+                        let _ = std::fs::remove_dir_all(&root);
+                    }
+                    println!("[OK]   {}", root.display())
+                }
+                Err(e) => println!("[FAIL] {} → {e}", root.display()),
+            }
+        }
+        return;
+    }
+
+    // 命令行导入：stickerbox.exe scan <目录>
+    // 图形界面之外也能批量入库，方便脚本化和排查问题。
+    if args.len() >= 3 && args[1] == "scan" {
+        let mut lib = open_library();
+        let stats = lib.scan_folder(Path::new(&args[2])).expect("扫描失败");
+        println!("{}", serde_json::to_string(&stats).unwrap());
+        return;
+    }
+
+    // 第二个实例：通知已有窗口后直接退出
+    let Some(singleton) = acquire_singleton() else {
+        return;
+    };
+
+    let lib = open_library();
+
+    // 启动时恢复「剪贴板捕获」开关
+    let settings_path = lib.root().join("settings.json");
+    let boot_settings: serde_json::Value = std::fs::read_to_string(&settings_path)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    let blacklist_items: Vec<String> = boot_settings
+        .get("clipboardBlacklist")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect()
+        })
+        .unwrap_or_else(|| vec!["snipaste.exe".to_string()]);
+    let blacklist = Arc::new(Mutex::new(blacklist_items));
+    let start_hidden = std::env::args().any(|a| a == "--tray")
+        || boot_settings
+            .get("startHidden")
+            .and_then(|x| x.as_bool())
+            .unwrap_or(false);
+
+    let paused = Arc::new(AtomicBool::new(false));
+    {
+        let path = lib.root().join("settings.json");
+        if let Ok(txt) = std::fs::read_to_string(&path) {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) {
+                if v.get("clipboardEnabled").and_then(|x| x.as_bool()) == Some(false) {
+                    paused.store(true, Ordering::Relaxed);
+                }
+            }
+        }
+    }
+
+    let hotkey_accel = boot_settings
+        .get("hotkey")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Ctrl+Alt+Space")
+        .to_string();
+    let clip_hotkey_accel = boot_settings
+        .get("clipHotkey")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .register_uri_scheme_protocol("thumb", |ctx, request| {
+            let app = ctx.app_handle();
+            let sha = request.uri().path().trim_start_matches('/').to_string();
+            let want_raw = request
+                .uri()
+                .query()
+                .map(|q| q.split('&').any(|kv| kv == "raw=1"))
+                .unwrap_or(false);
+            let state = app.state::<AppState>();
+
+            let found = {
+                let lib = match state.lib.lock() {
+                    Ok(l) => l,
+                    Err(_) => return empty_404(),
+                };
+                let root = lib.root().to_path_buf();
+                if let Some(a) = lib.assets().iter().find(|a| a.sha == sha) {
+                    Some((root.clone(), lib.blob_path(&a.sha, &a.ext), a.ext.clone()))
+                } else if let Some(item) = lib.trash().into_iter().find(|i| i.asset.sha == sha) {
+                    let src = lib
+                        .trash_path()
+                        .join(format!("{}.{}", item.asset.sha, item.asset.ext));
+                    Some((root, src, item.asset.ext))
+                } else {
+                    None
+                }
+            };
+
+            let Some((root, src, ext)) = found else {
+                return empty_404();
+            };
+
+            if want_raw {
+                return match std::fs::read(&src) {
+                    Ok(bytes) => tauri::http::Response::builder()
+                        .header("Content-Type", mime_for(&ext))
+                        .header("Cache-Control", "public, max-age=3600")
+                        .body(std::borrow::Cow::Owned(bytes))
+                        .expect("raw response"),
+                    Err(_) => empty_404(),
+                };
+            }
+
+            match stickerbox_core::ensure_thumb_from(&root, &sha, &src) {
+                Ok(path) => match std::fs::read(&path) {
+                    Ok(bytes) => tauri::http::Response::builder()
+                        .header(
+                            "Content-Type",
+                            if path.extension().and_then(|e| e.to_str()) == Some("jpg") {
+                                "image/jpeg"
+                            } else {
+                                "image/webp"
+                            },
+                        )
+                        .header("Cache-Control", "public, max-age=31536000, immutable")
+                        .body(std::borrow::Cow::Owned(bytes))
+                        .expect("thumb response"),
+                    Err(_) => empty_404(),
+                },
+                Err(e) => {
+                    eprintln!("[thumb] {sha} ({ext}): {e:#}");
+                    empty_404()
+                }
+            }
+        })
+        .manage(AppState {
+            lib: Arc::new(Mutex::new(lib)),
+            gate: Arc::new(clipboard::Gate::new()),
+            paused: paused.clone(),
+            hotkey: Arc::new(Mutex::new(hotkey_accel.clone())),
+            clip_hotkey: Arc::new(Mutex::new(clip_hotkey_accel.clone())),
+            blacklist: blacklist.clone(),
+        })
+        .invoke_handler(tauri::generate_handler![
+            list_assets,
+            get_asset,
+            themes_list,
+            library_stats,
+            group_stats,
+            scan_folder,
+            import_paths,
+            copy_asset,
+            copy_asset_file,
+            batch_star,
+            create_group,
+            copy_assets_files,
+            set_window_size,
+            set_hotkey,
+            open_asset,
+            source_stats,
+            set_clip_hotkey,
+            selftest_mode,
+            js_log,
+            clipboard_sources,
+            ui_state,
+            selftest_report,
+            set_panel_position,
+            patch_settings,
+            export_settings,
+            import_settings,
+            set_order,
+            batch_tags,
+            batch_untag,
+            batch_ungroup,
+            batch_delete,
+            set_pinned,
+            update_asset,
+            delete_asset,
+            add_to_group,
+            clear_groups,
+            rename_group,
+            remove_group,
+            mark_ungrouped_seen,
+            tag_stats,
+            trash_list,
+            trash_restore,
+            trash_delete,
+            trash_purge,
+            get_settings,
+            set_clipboard_enabled,
+            set_autostart,
+            open_library_folder,
+            hide_panel
+        ])
+        .setup(move |app| {
+            // 热键被别的软件占用是常态，注册失败不应该让整个应用起不来
+            if let Err(e) = register_hotkey(app.handle(), &hotkey_accel, "panel") {
+                eprintln!("[hotkey] 面板热键注册失败: {e}");
+            }
+            if !clip_hotkey_accel.trim().is_empty() {
+                if let Err(e) = register_hotkey(app.handle(), &clip_hotkey_accel, "clip") {
+                    eprintln!("[hotkey] 剪贴板热键注册失败: {e}");
+                }
+            }
+
+            // 窗口在配置里默认不可见：静默启动时完全不闪；正常启动才显示
+            if let Some(main) = app.get_webview_window("main") {
+                if start_hidden {
+                    let _ = main.hide();
+                } else {
+                    let _ = main.show();
+                    let _ = main.set_focus();
+                }
+            }
+
+            // 恢复快贴面板位置
+            if let (Some(x), Some(y)) = (
+                boot_settings.get("panelX").and_then(|v| v.as_i64()),
+                boot_settings.get("panelY").and_then(|v| v.as_i64()),
+            ) {
+                if let Some(win) = app.get_webview_window("panel") {
+                    let mut cx = x as i32;
+                    let mut cy = y as i32;
+                    if let Ok(Some(m)) = win.current_monitor() {
+                        let sc = m.scale_factor();
+                        let mw = m.size().width as f64 / sc;
+                        let mh = m.size().height as f64 / sc;
+                        let (pw, ph) = win
+                            .outer_size()
+                            .map(|z| (z.width as f64 / sc, z.height as f64 / sc))
+                            .unwrap_or((720.0, 520.0));
+                        // 以屏幕中心为原点：0,0 = 正中间
+                        cx = ((mw - pw) / 2.0 + cx as f64).clamp(0.0, (mw - pw).max(0.0)) as i32;
+                        cy = ((mh - ph) / 2.0 + cy as f64).clamp(0.0, (mh - ph).max(0.0)) as i32;
+                    }
+                    let _ = win.set_position(tauri::LogicalPosition::new(cx, cy));
+                }
+            }
+
+            // 恢复上次的窗口尺寸，并按当前显示器上限裁剪
+            for (label, key_w, key_h, def_w, def_h) in [
+                ("main", "windowWidth", "windowHeight", 1040, 700),
+                ("panel", "panelWidth", "panelHeight", 720, 520),
+            ] {
+                if let Some(win) = app.get_webview_window(label) {
+                    let w = boot_settings
+                        .get(key_w)
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(def_w) as u32;
+                    let h = boot_settings
+                        .get(key_h)
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(def_h) as u32;
+                    let (w, h) = clamp_to_monitor(&win, w, h);
+                    let _ = win.set_size(tauri::LogicalSize::new(w, h));
+                }
+            }
+
+            // 快贴面板：失焦就隐藏。
+            // 但只有「真正拿到过焦点」之后才隐藏——否则在抢焦点失败时会瞬间闪没。
+            if let Some(panel) = app.get_webview_window("panel") {
+                let w = panel.clone();
+                let armed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+                let a = armed.clone();
+                panel.on_window_event(move |e| match e {
+                    tauri::WindowEvent::Focused(true) => {
+                        a.store(true, std::sync::atomic::Ordering::SeqCst);
+                    }
+                    tauri::WindowEvent::Focused(false) => {
+                        if a.swap(false, std::sync::atomic::Ordering::SeqCst) {
+                            let _ = w.hide();
+                        }
+                    }
+                    _ => {}
+                });
+            }
+
+            // 关主窗口 = 收进托盘，不退出
+            if let Some(main) = app.get_webview_window("main") {
+                let w = main.clone();
+                main.on_window_event(move |e| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = e {
+                        api.prevent_close();
+                        let _ = w.hide();
+                    }
+                });
+            }
+
+            // 托盘菜单
+            let item_show = MenuItem::with_id(app, "show", "打开 StickerBox", true, None::<&str>)?;
+            let item_panel = MenuItem::with_id(app, "panel", "快贴面板", true, None::<&str>)?;
+            let item_clip = MenuItem::with_id(app, "clip", "暂停剪贴板捕获", true, None::<&str>)?;
+            let item_quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(
+                app,
+                &[&item_show, &item_panel, &item_clip, &item_quit],
+            )?;
+            let paused = app.state::<AppState>().paused.clone();
+            let tray_icon = tauri::image::Image::new(include_bytes!("../icons/tray.rgba"), 32, 32);
+
+            TrayIconBuilder::new()
+                .icon(tray_icon)
+                .tooltip("StickerBox · Ctrl+Alt+Space")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event({
+                    let paused = paused.clone();
+                    let item_clip = item_clip.clone();
+                    move |app, event| match event.id.as_ref() {
+                        "show" => show_main(app),
+                        "panel" => toggle_panel(app),
+                        "clip" => {
+                            let next = !paused.load(Ordering::Relaxed);
+                            paused.store(next, Ordering::Relaxed);
+                            let _ = item_clip.set_text(if next {
+                                "恢复剪贴板捕获"
+                            } else {
+                                "暂停剪贴板捕获"
+                            });
+                        }
+                        "quit" => app.exit(0),
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        show_main(tray.app_handle());
+                    }
+                })
+                .build(app)?;
+
+            // 自测钩子：验证「复制出去不会被自己再收一遍」
+            let selftest = std::env::var("STICKERBOX_SELFTEST").ok();
+            if matches!(selftest.as_deref(), Some("copy") | Some("file") | Some("files")) {
+                let st = app.state::<AppState>();
+                let lib = st.lib.clone();
+                let gate = st.gate.clone();
+                let mode = selftest.unwrap();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    if mode == "files" {
+                        let paths: Vec<std::path::PathBuf> = {
+                            let guard = lib.lock().unwrap();
+                            guard
+                                .assets()
+                                .iter()
+                                .take(3)
+                                .map(|a| std::path::PathBuf::from(&a.path))
+                                .collect()
+                        };
+                        match platform::desktop::platform().share_paths(&paths) {
+                            Ok(()) => println!("[selftest] files: {} paths", paths.len()),
+                            Err(e) => println!("[selftest] files: {e}"),
+                        }
+                        return;
+                    }
+                    let path = {
+                        let guard = lib.lock().unwrap();
+                        guard.assets().first().map(|a| a.path.clone())
+                    };
+                    let Some(p) = path else { return };
+                    if mode == "file" {
+                        let _g = gate.acquire();
+                        gate.suppress(800);
+                        let pb = PathBuf::from(&p);
+                        match platform::desktop::platform().share_paths(std::slice::from_ref(&pb)) {
+                            Ok(()) => println!("[selftest] file: Ok"),
+                            Err(e) => println!("[selftest] file: {e}"),
+                        }
+                    } else {
+                        match stickerbox_core::load_rgba(Path::new(&p)) {
+                            Ok((w, h, bytes)) => {
+                                let r = clip_copy(&gate, w, h, &bytes);
+                                println!("[selftest] copy: {r:?}");
+                            }
+                            Err(e) => println!("[selftest] decode: {e:#}"),
+                        }
+                    }
+                });
+            }
+
+            // 单实例：收到第二个实例的连接就显示主窗口
+            {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    for _ in singleton.incoming() {
+                        show_main(&handle);
+                    }
+                });
+            }
+
+            // 剪贴板捕获线程
+            let state = app.state::<AppState>();
+            clipboard::spawn(
+                app.handle().clone(),
+                state.lib.clone(),
+                paused.clone(),
+                state.gate.clone(),
+                state.blacklist.clone(),
+            );
+
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("StickerBox 启动失败");
+}

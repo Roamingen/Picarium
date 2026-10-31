@@ -1,0 +1,14 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "url": "index.html",
+        "title": "StickerBox",
+        "width": 420,
+        "height": 900,
+        "visible": true
+      }
+    ]
+  }
+}

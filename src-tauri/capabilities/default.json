@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "StickerBox 默认权限：主窗口与快贴面板",
+  "windows": ["main", "panel"],
+  "permissions": ["core:default", "dialog:default"]
+}

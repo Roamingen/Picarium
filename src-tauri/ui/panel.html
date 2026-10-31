@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>StickerBox</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="panel-body">
+  <div class="panel">
+    <div class="panel-search-row">
+      <svg class="panel-glass" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2" />
+        <line x1="15.5" y1="15.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+      </svg>
+      <input id="q" class="panel-search" placeholder="搜索：中文 / 拼音 / 首字母…" autocomplete="off" spellcheck="false" />
+      <span id="count" class="panel-count"></span>
+    </div>
+
+    <div id="grid" class="panel-grid"></div>
+    <div id="hint" class="panel-empty">没有匹配的表情</div>
+  <div id="tip" class="tip"></div>
+
+    <div class="panel-foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 选择</span>
+      <span><kbd>Enter</kbd> 复制</span>
+      <span><kbd>Esc</kbd> 关闭</span>
+    </div>
+  </div>
+
+  <script>
+    document.documentElement.dataset.theme = localStorage.getItem('stickerbox-theme') || 'dark';
+    const { invoke, convertFileSrc } = window.__TAURI__.core;
+    const $ = (id) => document.getElementById(id);
+    const grid = $('grid');
+    const input = $('q');
+    const hint = $('hint');
+    const tipEl = $('tip');
+    const count = $('count');
+    const COLS = 6;
+    let items = [];
+    let cursor = 0;
+    let panelSort = 'recent';
+    let recentLimit = 60;
+    let hoverDelay = 350;
+
+    function thumbUrl(sha) {
+      try { return convertFileSrc(sha, 'thumb'); } catch (_) { return `http://thumb.localhost/${sha}`; }
+    }
+
+    function render() {
+      grid.innerHTML = '';
+      if (!items.length) {
+        hint.style.display = 'block';
+        count.textContent = '';
+        return;
+      }
+      hint.style.display = 'none';
+      count.textContent = items.length + ' 个结果';
+
+      const frag = document.createDocumentFragment();
+      items.forEach((a, i) => {
+        const el = document.createElement('button');
+        el.className = 'panel-card' + (i === cursor ? ' active' : '');
+        const img = document.createElement('img');
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.src = thumbUrl(a.sha);
+        img.onerror = () => { img.onerror = null; img.src = convertFileSrc(a.path); };
+        el.appendChild(img);
+        let hoverTimer = null;
+        el.addEventListener('mouseenter', (e) => {
+          cursor = i;
+          paint();
+          showTip(a, e);
+          if (a.animated && hoverDelay > 0) {
+            hoverTimer = setTimeout(() => {
+              img.src = convertFileSrc(a.path);
+              el.dataset.anim = '1';
+            }, hoverDelay);
+          }
+        });
+        el.addEventListener('mousemove', moveTip);
+        el.addEventListener('mouseleave', () => {
+          tipEl.classList.remove('show');
+          clearTimeout(hoverTimer);
+          if (el.dataset.anim) {
+            img.src = thumbUrl(a.sha);
+            delete el.dataset.anim;
+          }
+        });
+        el.addEventListener('click', () => { cursor = i; copy(); });
+        frag.appendChild(el);
+      });
+      grid.appendChild(frag);
+      const active = grid.children[cursor];
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
+
+    function showTip(a, e) {
+      const tags = a.tags && a.tags.length ? a.tags.join(' · ') : '无标签';
+      tipEl.innerHTML = `<div class="tip-name">${esc(a.name)}</div>`
+        + `<div class="tip-row">${a.width} × ${a.height} · ${(a.bytes / 1024).toFixed(0)} KB</div>`
+        + `<div class="tip-row">${esc(a.ext.toUpperCase())} · ${tags}</div>`;
+      tipEl.classList.add('show');
+      moveTip(e);
+    }
+
+    function moveTip(e) {
+      if (!tipEl.classList.contains('show')) return;
+      const pad = 14;
+      const r = tipEl.getBoundingClientRect();
+      let x = e.clientX + pad, y = e.clientY + pad;
+      if (x + r.width > window.innerWidth - 6) x = e.clientX - r.width - pad;
+      if (y + r.height > window.innerHeight - 6) y = e.clientY - r.height - pad;
+      tipEl.style.transform = `translate(${x}px, ${y}px)`;
+    }
+
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function paint() {
+      [...grid.children].forEach((el, i) => el.classList.toggle('active', i === cursor));
+      const active = grid.children[cursor];
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
+
+    function move(dx, dy) {
+      if (!items.length) return;
+      let next = cursor + dx + dy * COLS;
+      if (next < 0) next = 0;
+      if (next >= items.length) next = items.length - 1;
+      cursor = next;
+      paint();
+    }
+
+    async function copy() {
+      const a = items[cursor];
+      if (!a) return;
+      try {
+        if (a.animated) {
+          await invoke('copy_asset_file', { sha: a.sha });
+        } else {
+          await invoke('copy_asset', { sha: a.sha });
+        }
+        await invoke('hide_panel');
+      } catch (e) {
+        hint.textContent = '复制失败：' + e;
+        hint.style.display = 'block';
+      }
+    }
+
+    async function search(q) {
+      items = await invoke('list_assets', { q, limit: recentLimit, sort: panelSort });
+      cursor = 0;
+      render();
+    }
+
+    let timer = null;
+    input.addEventListener('input', (e) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => search(e.target.value), 60);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'Enter': e.preventDefault(); copy(); break;
+        case 'Escape': e.preventDefault(); invoke('hide_panel'); break;
+        case 'ArrowRight': e.preventDefault(); move(1, 0); break;
+        case 'ArrowLeft': e.preventDefault(); move(-1, 0); break;
+        case 'ArrowDown': e.preventDefault(); move(0, 1); break;
+        case 'ArrowUp': e.preventDefault(); move(0, -1); break;
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') invoke('hide_panel');
+    });
+
+    window.__TAURI__.event.listen('panel-open', async () => {
+      input.value = '';
+      await search('');
+      input.focus();
+      input.select();
+    });
+
+    (async () => {
+      try {
+        const st = await invoke('get_settings');
+        if (st.panelSort) panelSort = st.panelSort;
+        if (typeof st.recentLimit === 'number') recentLimit = st.recentLimit;
+        if (typeof st.hoverDelay === 'number') hoverDelay = st.hoverDelay;
+        if (st.theme) document.documentElement.dataset.theme = st.theme;
+      } catch (_) {}
+      input.focus();
+      search('');
+    })();
+  </script>
+</body>
+</html>
