@@ -459,3 +459,42 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<serde_json::Value, Str
     }
     Ok(v)
 }
+
+#[tauri::command]
+pub fn trash_list(
+    state: State<'_, AppState>,
+    q: Option<String>,
+    filters: Option<String>,
+) -> Result<Vec<serde_json::Value>, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    let query = q.unwrap_or_default();
+    let items = if query.trim().is_empty() {
+        lib.trash()
+    } else {
+        lib.search_trash(&query)
+    };
+    let filters_json = filters.and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
+    let f = parse_filters(filters_json);
+    let items: Vec<_> = items
+        .into_iter()
+        .filter(|item| !apply_filters(vec![item.asset.clone()], &f).is_empty())
+        .collect();
+    Ok(items
+        .into_iter()
+        .map(|item| {
+            serde_json::json!({
+                "sha": item.asset.sha,
+                "name": item.asset.name,
+                "ext": item.asset.ext,
+                "bytes": item.asset.bytes,
+                "width": item.asset.width,
+                "height": item.asset.height,
+                "groups": item.asset.groups,
+                "tags": item.asset.tags,
+                "added_at": item.asset.added_at,
+                "animated": item.asset.animated,
+                "deleted_at": item.deleted_at,
+            })
+        })
+        .collect())
+}

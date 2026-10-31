@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use stickerbox_core::{Library, ScanStats};
-use stickerbox_lib::commands::{apply_filters, parse_filters, read_settings_value, settings_file};
+use stickerbox_lib::commands::{read_settings_value, settings_file};
 use stickerbox_lib::platform::{Opener, ShareOut};
 use stickerbox_lib::state::{autostart_apply, candidate_roots, AppState};
 use stickerbox_lib::{clipboard, platform, recycle, thumb};
@@ -581,45 +581,6 @@ fn mark_ungrouped_seen(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn trash_list(
-    state: State<'_, AppState>,
-    q: Option<String>,
-    filters: Option<String>,
-) -> Result<Vec<serde_json::Value>, String> {
-    let lib = state.lib.lock().map_err(|e| e.to_string())?;
-    let query = q.unwrap_or_default();
-    let items = if query.trim().is_empty() {
-        lib.trash()
-    } else {
-        lib.search_trash(&query)
-    };
-    let filters_json = filters.and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-    let f = parse_filters(filters_json);
-    let items: Vec<_> = items
-        .into_iter()
-        .filter(|item| !apply_filters(vec![item.asset.clone()], &f).is_empty())
-        .collect();
-    Ok(items
-        .into_iter()
-        .map(|item| {
-            serde_json::json!({
-                "sha": item.asset.sha,
-                "name": item.asset.name,
-                "ext": item.asset.ext,
-                "bytes": item.asset.bytes,
-                "width": item.asset.width,
-                "height": item.asset.height,
-                "groups": item.asset.groups,
-                "tags": item.asset.tags,
-                "added_at": item.asset.added_at,
-                "animated": item.asset.animated,
-                "deleted_at": item.deleted_at,
-            })
-        })
-        .collect())
-}
-
-#[tauri::command]
 fn trash_restore(state: State<'_, AppState>, sha: String) -> Result<(), String> {
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     lib.restore(&sha).map_err(|e| format!("{e:#}"))
@@ -956,7 +917,7 @@ fn main() {
             remove_group,
             mark_ungrouped_seen,
             stickerbox_lib::commands::tag_stats,
-            trash_list,
+            stickerbox_lib::commands::trash_list,
             trash_restore,
             trash_delete,
             trash_purge,

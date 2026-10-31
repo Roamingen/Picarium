@@ -48,6 +48,7 @@ pub fn run() {
             commands::group_stats,
             commands::source_stats,
             commands::tag_stats,
+            commands::trash_list,
             commands::get_settings
         ]);
 
