@@ -83,6 +83,10 @@ pub struct LibraryStats {
     pub root: String,
 }
 
+fn default_trash_days() -> u32 {
+    7
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct IndexFile {
     version: u32,
@@ -105,6 +109,9 @@ struct IndexFile {
     /// 置顶分组（按置顶顺序）
     #[serde(default)]
     pinned_groups: Vec<String>,
+    /// 回收站保留天数（到期自动清理）
+    #[serde(default = "default_trash_days")]
+    trash_days: u32,
 }
 
 pub struct Library {
@@ -117,6 +124,7 @@ pub struct Library {
     group_order: Vec<String>,
     group_covers: std::collections::BTreeMap<String, String>,
     pinned_groups: Vec<String>,
+    trash_days: u32,
 }
 
 impl Library {
@@ -136,6 +144,7 @@ impl Library {
         let mut group_covers: std::collections::BTreeMap<String, String> =
             std::collections::BTreeMap::new();
         let mut pinned_groups: Vec<String> = Vec::new();
+        let mut trash_days: u32 = default_trash_days();
 
         if index_path.exists() {
             let txt = fs::read_to_string(&index_path)?;
@@ -148,6 +157,7 @@ impl Library {
                     group_order = f.group_order;
                     group_covers = f.group_covers;
                     pinned_groups = f.pinned_groups;
+                    trash_days = f.trash_days.clamp(1, 365);
                 }
                 _ => {
                     // 索引坏了不要紧：备份一份，按 blob 目录重建（后续里程碑）
@@ -270,9 +280,16 @@ impl Library {
             group_order,
             group_covers,
             pinned_groups,
+            trash_days,
         };
         if migrated {
             let _ = lib.save();
+        }
+        // 打开时按保留天数清一次过期项（清不掉也不影响启动）
+        if let Ok(n) = lib.purge_expired_trash() {
+            if n > 0 {
+                eprintln!("[library] 回收站自动清理了 {n} 张过期图片");
+            }
         }
         Ok(lib)
     }
@@ -557,6 +574,46 @@ impl Library {
         fs::write(&tmp, serde_json::to_string_pretty(items)?)?;
         fs::rename(&tmp, &path)?;
         Ok(())
+    }
+
+    /// 回收站保留天数
+    pub fn trash_days(&self) -> u32 {
+        self.trash_days
+    }
+
+    /// 设置回收站保留天数（1–365 天）
+    pub fn set_trash_days(&mut self, days: u32) -> Result<()> {
+        self.trash_days = days.clamp(1, 365);
+        self.save()
+    }
+
+    /// 删除回收站里超过保留天数的条目，返回清掉的数量
+    pub fn purge_expired_trash(&self) -> Result<usize> {
+        let items = self.read_trash();
+        if items.is_empty() {
+            return Ok(0);
+        }
+        let cutoff = Utc::now() - chrono::Duration::days(self.trash_days as i64);
+        let mut kept = Vec::new();
+        let mut removed = 0usize;
+        for item in items {
+            let expired = chrono::DateTime::parse_from_rfc3339(&item.deleted_at)
+                .map(|t| t.with_timezone(&Utc) < cutoff)
+                .unwrap_or(false);
+            if expired {
+                let path = self
+                    .trash_path()
+                    .join(format!("{}.{}", item.asset.sha, item.asset.ext));
+                let _ = fs::remove_file(path);
+                removed += 1;
+            } else {
+                kept.push(item);
+            }
+        }
+        if removed > 0 {
+            self.write_trash(&kept)?;
+        }
+        Ok(removed)
     }
 
     /// 回收站列表（新的在前）
@@ -1068,6 +1125,7 @@ impl Library {
             group_order: self.group_order.clone(),
             group_covers: self.group_covers.clone(),
             pinned_groups: self.pinned_groups.clone(),
+            trash_days: self.trash_days,
             orders: self.orders.clone(),
         };
         let json = serde_json::to_string_pretty(&index)?;
@@ -1539,6 +1597,40 @@ mod tests {
         assert!(lib.group_order().iter().any(|g| g == "丙"));
         lib.remove_group("丙", false).unwrap();
         assert!(lib.group_cover("丙").is_none());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn trash_days_roundtrip_and_expiry() {
+        let base = std::env::temp_dir().join(format!("sb-trashdays-{}", std::process::id()));
+        let src = base.join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([9, 9, 9, 255]))
+            .save(src.join("old.png"))
+            .unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([7, 7, 7, 255]))
+            .save(src.join("new.png"))
+            .unwrap();
+
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        assert_eq!(lib.trash_days(), 7);
+        lib.scan_folder(&src).unwrap();
+        let shas: Vec<String> = lib.assets().iter().map(|a| a.sha.clone()).collect();
+        lib.remove(&shas[0]).unwrap();
+        lib.remove(&shas[1]).unwrap();
+        let mut items = lib.trash();
+        assert_eq!(items.len(), 2);
+        // 手动把其中一条改成 10 天前删除
+        items[0].deleted_at = (Utc::now() - chrono::Duration::days(10)).to_rfc3339();
+        lib.write_trash(&items).unwrap();
+
+        let n = lib.purge_expired_trash().unwrap();
+        assert_eq!(n, 1);
+        assert_eq!(lib.trash().len(), 1);
+
+        lib.set_trash_days(30).unwrap();
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        assert_eq!(lib.trash_days(), 30);
         let _ = std::fs::remove_dir_all(&base);
     }
 

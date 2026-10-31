@@ -111,5 +111,7 @@ npx tauri android build --debug --apk --target x86_64 --ci
 - 格式：`<type>(<scope>): <摘要>`；摘要用中文、一行说清做什么。
 - 常用 type：`feat` 新功能、`fix` 修 bug、`refactor` 不改行为的重构、`chore` 构建/杂务、`docs` 文档、`test` 测试。
 - scope 用模块名：`android`、`core`、`ui`、`platform`、`git` 等。
+- **commit 前先汇报、等用户点头**；不要自己连着提交。
+- 一个对话可以多个 commit，但同一件事的改动要聚合，且必须验证到边界（该跑的测试/截图/回归都跑完）再提交。
 - 一批一个 commit；body 写「为什么 + 关键验证结果」，不写流水账。
 - 例：`feat(android): 只读命令层与 thumb 协议搬进 lib crate`

@@ -336,12 +336,6 @@ fn set_clip_hotkey(
 }
 
 #[tauri::command]
-fn batch_star(state: State<'_, AppState>, shas: Vec<String>, on: bool) -> Result<(), String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.set_star(&shas, on).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
 fn batch_tags(
     state: State<'_, AppState>,
     shas: Vec<String>,
@@ -527,12 +521,6 @@ fn update_asset(
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     lib.update(&sha, name, tags, groups)
         .map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
-fn delete_asset(state: State<'_, AppState>, sha: String) -> Result<(), String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.remove(&sha).map_err(|e| format!("{e:#}"))
 }
 
 #[tauri::command]
@@ -827,7 +815,6 @@ fn main() {
             import_paths,
             copy_asset,
             copy_asset_file,
-            batch_star,
             stickerbox_lib::commands::create_group,
             copy_assets_files,
             set_window_size,
@@ -845,13 +832,14 @@ fn main() {
             export_settings,
             import_settings,
             set_order,
+            stickerbox_lib::commands::batch_star,
             batch_tags,
             batch_untag,
             batch_ungroup,
             batch_delete,
             set_pinned,
             update_asset,
-            delete_asset,
+            stickerbox_lib::commands::delete_asset,
             add_to_group,
             clear_groups,
             stickerbox_lib::commands::rename_group,

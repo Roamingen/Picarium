@@ -639,3 +639,31 @@ pub fn trash_purge(
     }
     Ok(n)
 }
+
+/// 删除一张图（移进回收站）
+#[tauri::command]
+pub fn delete_asset(state: State<'_, AppState>, sha: String) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.remove(&sha).map_err(|e| format!("{e:#}"))
+}
+
+/// 批量收藏 / 取消收藏
+#[tauri::command]
+pub fn batch_star(state: State<'_, AppState>, shas: Vec<String>, on: bool) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_star(&shas, on).map_err(|e| format!("{e:#}"))
+}
+
+/// 回收站保留天数
+#[tauri::command]
+pub fn get_trash_days(state: State<'_, AppState>) -> Result<u32, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    Ok(lib.trash_days())
+}
+
+/// 设置回收站保留天数（1–365）
+#[tauri::command]
+pub fn set_trash_days(state: State<'_, AppState>, days: u32) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_trash_days(days).map_err(|e| format!("{e:#}"))
+}

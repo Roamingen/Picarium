@@ -27,10 +27,17 @@ const SVG = {
   folder:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
+  starFill: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
 };
 
 let selMode = false;
 const sel = new Set();
+let imgSelMode = false;
+const imgSel = new Set();
+let imgHoldInfo = null;
+let imgHoldTimer = 0;
+let imgHoldFired = false;
 let holdInfo = null;
 let holdTimer = 0;
 let dragCtx = null;
@@ -240,10 +247,12 @@ function renderGrid() {
 }
 
 function cardHtml(a) {
-  return `<button class="card" data-sha="${escapeAttr(a.sha)}" data-name="${escapeAttr(a.name)}">
+  const on = imgSel.has(a.sha);
+  return `<button class="card${on ? " sel" : ""}" data-sha="${escapeAttr(a.sha)}" data-name="${escapeAttr(a.name)}">
     <img loading="lazy" src="${thumbUrl(a.sha)}" alt="" onerror="this.style.display='none'">
     ${a.animated ? '<span class="badge">GIF</span>' : ""}
     ${a.starred ? '<span class="star">★</span>' : ""}
+    <span class="fcheck">${SVG.check || ""}</span>
   </button>`;
 }
 
@@ -329,6 +338,94 @@ async function openGroup(name) {
   } catch (e) {
     $("gd-grid").innerHTML = '<div class="gempty">读取失败：' + escapeHtml(String(e)) + "</div>";
   }
+}
+
+/* ---------- 图片预览 / 多选 ---------- */
+
+function setImgSelMode(on) {
+  imgSelMode = on;
+  if (!on) imgSel.clear();
+  $("imgsel").hidden = !on;
+  $("imgn").textContent = String(imgSel.size);
+  renderGrid();
+}
+
+function toggleImgSel(sha) {
+  if (imgSel.has(sha)) imgSel.delete(sha);
+  else imgSel.add(sha);
+  if (!imgSel.size) return setImgSelMode(false);
+  $("imgn").textContent = String(imgSel.size);
+  renderGrid();
+}
+
+let vIndex = 0;
+let vZoomed = false;
+
+function fmtSource(src) {
+  const map = { wechat: "微信", qq: "QQ", file: "文件", folder: "文件夹", clipboard: "剪贴板", share: "分享", desktop: "桌面" };
+  return "来自" + (map[src] || src || "未知");
+}
+
+function viewerAsset() {
+  return (S.items || [])[vIndex] || {};
+}
+
+function renderViewer() {
+  const a = viewerAsset();
+  $("v-count").textContent = `${S.items.length ? vIndex + 1 : 0} / ${S.items.length}`;
+  $("v-name").textContent = a.name || "未命名";
+  $("v-img").src = thumbUrl(a.sha, !!a.animated);
+  const bits = [];
+  if (a.width && a.height) bits.push(`${a.width} × ${a.height}`);
+  if (a.bytes) bits.push(fmtSize(a.bytes));
+  if (a.added_at) bits.push(String(a.added_at).slice(0, 10));
+  if (a.source) bits.push(fmtSource(a.source));
+  $("v-meta").textContent = bits.join(" · ");
+  const tags = [];
+  (a.groups || []).forEach((g) => tags.push(`<span class="vtag">${escapeHtml(g)}</span>`));
+  tags.push(`<span class="vtag">${a.animated ? "GIF" : "图片"}</span>`);
+  (a.tags || []).forEach((t) => tags.push(`<span class="vtag tag">${escapeHtml(t)}</span>`));
+  tags.push('<span class="vtag plus" id="v-tag-add">+ 标签</span>');
+  $("v-tags").innerHTML = tags.join("");
+  const on = !!a.starred;
+  $("v-star").innerHTML = (on ? SVG.starFill : SVG.star) + `<span>${on ? "已收藏" : "收藏"}</span>`;
+  $("v-star").classList.toggle("on", on);
+  vZoomed = false;
+  $("v-img").classList.remove("zoomed");
+  $("v-img").style.transformOrigin = "center center";
+}
+
+function openViewer(sha) {
+  const idx = (S.items || []).findIndex((x) => x.sha === sha);
+  vIndex = idx < 0 ? 0 : idx;
+  renderViewer();
+  $("viewer").hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
+function closeViewer() {
+  $("viewer").hidden = true;
+  $("v-img").removeAttribute("src");
+  $("v-img").classList.remove("zoomed");
+  vZoomed = false;
+  document.body.style.overflow = "";
+}
+
+function stepViewer(delta) {
+  if (!S.items.length) return;
+  const next = Math.min(S.items.length - 1, Math.max(0, vIndex + delta));
+  if (next === vIndex) return;
+  vIndex = next;
+  renderViewer();
+}
+
+async function loadTrashDays() {
+  try {
+    TRASH_DAYS = (await invokeRetry("get_trash_days")) || 7;
+  } catch {
+    /* 读不到就先用默认 7 天 */
+  }
+  renderMe();
 }
 
 function backGroups() {
@@ -888,7 +985,7 @@ function openPinManager() {
 /* ---------- tab ---------- */
 
 // ---- 回收站 ----
-const TRASH_DAYS = 30;
+let TRASH_DAYS = 7;
 
 function daysLeft(item) {
   const t = item.deleted_at ? new Date(item.deleted_at).getTime() : Date.now();
@@ -907,8 +1004,9 @@ async function loadTrash() {
   }
   S.trashItems = items;
   $("tcount").textContent = items.length ? ` ${items.length} 张` : "";
+  $("trash-meta").textContent = `删除的图片会在这里保留 ${TRASH_DAYS} 天，期间可以恢复或彻底删除。`;
   if (!items.length) {
-    grid.innerHTML = `<div class="empty">回收站是空的。<br><small>删除的表情会先放这里，30 天后自动清理。</small></div>`;
+    grid.innerHTML = `<div class="empty">回收站是空的。<br><small>删除的表情会先放这里，${TRASH_DAYS} 天后自动清理。</small></div>`;
     return;
   }
   grid.innerHTML = items
@@ -983,6 +1081,7 @@ function applyPrefs() {
 
 function renderMe() {
   $("me-home").textContent = (S.stats && S.stats.root) || "—";
+  for (const b of document.querySelectorAll("#seg-trash button")) b.classList.toggle("on", Number(b.dataset.days) === TRASH_DAYS);
   const theme = localStorage.getItem("sb.theme") || "auto";
   for (const b of document.querySelectorAll("#seg-theme button")) b.classList.toggle("on", b.dataset.theme === theme);
   const cols = String(Number(localStorage.getItem("sb.cols")) || 3);
@@ -1013,6 +1112,10 @@ function setTab(tab) {
   if (isGroups) {
     if (S.gview) $("gd-title").textContent = S.gview;
     else renderFolders();
+  }
+  if (tab !== "gallery") {
+    if (imgSelMode) setImgSelMode(false);
+    if (!$("viewer").hidden) closeViewer();
   }
   if (tab === "trash") loadTrash();
   if (tab === "me") renderMe();
@@ -1141,9 +1244,42 @@ function wire() {
     }
   });
 
-  $("grid").addEventListener("click", (e) => {
+  const gridEl = $("grid");
+  gridEl.addEventListener("pointerdown", (e) => {
     const c = e.target.closest(".card");
-    if (c) toast("预览还没做，下一批上线");
+    if (!c) return;
+    imgHoldFired = false;
+    imgHoldInfo = { sha: c.dataset.sha, x: e.clientX, y: e.clientY, el: c };
+    clearTimeout(imgHoldTimer);
+    imgHoldTimer = setTimeout(() => {
+      if (!imgHoldInfo) return;
+      imgHoldFired = true;
+      imgSel.add(imgHoldInfo.sha);
+      setImgSelMode(true);
+      imgHoldInfo.el.classList.add("lift");
+      setTimeout(() => imgHoldInfo && imgHoldInfo.el && imgHoldInfo.el.classList.remove("lift"), 160);
+      if (navigator.vibrate) navigator.vibrate(12);
+      imgHoldInfo = null;
+      // 长按后浏览器可能不派发 click；600ms 后自动解除，避免吞掉下一次点击
+      setTimeout(() => { imgHoldFired = false; }, 600);
+    }, 340);
+  });
+  gridEl.addEventListener("pointermove", (e) => {
+    if (!imgHoldInfo) return;
+    if (Math.hypot(e.clientX - imgHoldInfo.x, e.clientY - imgHoldInfo.y) > 8) {
+      clearTimeout(imgHoldTimer);
+      imgHoldInfo = null;
+    }
+  });
+  const endHold = () => { clearTimeout(imgHoldTimer); imgHoldInfo = null; };
+  gridEl.addEventListener("pointerup", endHold);
+  gridEl.addEventListener("pointercancel", endHold);
+  gridEl.addEventListener("click", (e) => {
+    const c = e.target.closest(".card");
+    if (!c) return;
+    if (imgHoldFired) { imgHoldFired = false; return; }
+    if (imgSelMode) toggleImgSel(c.dataset.sha);
+    else openViewer(c.dataset.sha);
   });
 
   $("nav").addEventListener("click", (e) => {
@@ -1190,5 +1326,129 @@ $("trash-grid").addEventListener("click", (e) => {
 });
 $("me-gallery").addEventListener("click", () => toast("相册导入在下一批接上"));
 $("me-inbox").addEventListener("click", () => toast("分享收件箱在下一批接上"));
+$("seg-trash").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-days]");
+  if (!b) return;
+  try {
+    await invoke("set_trash_days", { days: Number(b.dataset.days) });
+    TRASH_DAYS = Number(b.dataset.days);
+    renderMe();
+    toast(`回收站保留 ${TRASH_DAYS} 天`);
+    if (S.tab === "trash") await loadTrash();
+  } catch (err) {
+    toast("保存失败：" + err);
+  }
+});
+
+$("imgsel").addEventListener("click", async (e) => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const shas = [...imgSel];
+  const act = b.dataset.act;
+  if (act === "share") return toast("分享到微信在下一批接上");
+  if (act === "star") {
+    try {
+      await invoke("batch_star", { shas, on: true });
+      setImgSelMode(false);
+      toast("已收藏");
+      await refresh();
+    } catch (err) {
+      toast("收藏失败：" + err);
+    }
+    return;
+  }
+  if (act === "delete") {
+    if (!(await confirmSheet(`把选中的 ${shas.length} 张移入回收站？`))) return;
+    try {
+      for (const sha of shas) await invokeRetry("delete_asset", { sha });
+      setImgSelMode(false);
+      toast("已移入回收站");
+      await refresh();
+    } catch (err) {
+      toast("删除失败：" + err);
+    }
+  }
+});
+
+$("v-close").addEventListener("click", closeViewer);
+$("v-share").addEventListener("click", () => toast("分享到微信在下一批接上"));
+$("v-save").addEventListener("click", () => toast("存相册在下一批接上"));
+$("v-star").addEventListener("click", async () => {
+  const a = viewerAsset();
+  if (!a.sha) return;
+  try {
+    await invoke("batch_star", { shas: [a.sha], on: !a.starred });
+    a.starred = !a.starred;
+    renderViewer();
+    toast(a.starred ? "已收藏" : "已取消收藏");
+    await refresh();
+    const idx = S.items.findIndex((x) => x.sha === a.sha);
+    if (idx >= 0) vIndex = idx;
+    renderViewer();
+  } catch (err) {
+    toast("操作失败：" + err);
+  }
+});
+$("v-del").addEventListener("click", async () => {
+  const a = viewerAsset();
+  if (!a.sha) return;
+  if (!(await confirmSheet("把这张移入回收站？"))) return;
+  try {
+    await invokeRetry("delete_asset", { sha: a.sha });
+    closeViewer();
+    toast("已移入回收站");
+    await refresh();
+  } catch (err) {
+    toast("删除失败：" + err);
+  }
+});
+$("v-tags").addEventListener("click", (e) => {
+  if (e.target.closest("#v-tag-add")) toast("标签编辑在后面的批次接上");
+});
+$("v-more").addEventListener("click", () => {
+  const a = viewerAsset();
+  const rows = [
+    ["文件名", a.name || "—"],
+    ["尺寸", a.width && a.height ? `${a.width} × ${a.height}` : "—"],
+    ["大小", a.bytes ? fmtSize(a.bytes) : "—"],
+    ["添加时间", a.added_at ? String(a.added_at).replace("T", " ").slice(0, 16) : "—"],
+    ["来源", a.source ? fmtSource(a.source) : "—"],
+    ["SHA-1", a.sha || "—"],
+  ];
+  openSheet("文件信息", `<div class="kv">${rows.map(([k, v]) => `<div class="kvrow"><span>${k}</span><b>${escapeHtml(String(v))}</b></div>`).join("")}</div>`);
+});
+
+// 预览：左右滑动切换、双击放大
+(function wireViewerGestures() {
+  const stage = $("v-stage");
+  let sx = 0, sy = 0, down = false, lastTap = 0;
+  stage.addEventListener("pointerdown", (e) => {
+    down = true; sx = e.clientX; sy = e.clientY;
+  });
+  stage.addEventListener("pointerup", (e) => {
+    if (!down) return;
+    down = false;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) > 48 && Math.abs(dy) < 70) {
+      stepViewer(dx < 0 ? 1 : -1);
+      return;
+    }
+    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        vZoomed = !vZoomed;
+        const img = $("v-img");
+        img.classList.toggle("zoomed", vZoomed);
+        img.style.transformOrigin = vZoomed ? "center center" : "center center";
+        lastTap = 0;
+      } else {
+        lastTap = now;
+      }
+    }
+  });
+  stage.addEventListener("pointercancel", () => { down = false; });
+})();
+
 applyPrefs();
+loadTrashDays();
 matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyPrefs);
