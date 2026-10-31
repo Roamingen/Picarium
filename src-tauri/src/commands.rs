@@ -798,3 +798,21 @@ pub fn take_shared_paths() -> Result<Vec<String>, String> {
         Ok(Vec::new())
     }
 }
+
+#[tauri::command]
+pub fn add_to_group(state: State<'_, AppState>, shas: Vec<String>, group: String) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.add_group(&shas, &group).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn batch_ungroup(state: State<'_, AppState>, shas: Vec<String>, group: String) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.remove_from_group(&shas, &group).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn clear_groups(state: State<'_, AppState>, shas: Vec<String>) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.clear_groups(&shas).map_err(|e| format!("{e:#}"))
+}

@@ -345,16 +345,6 @@ fn batch_tags(
     lib.add_tags(&shas, tags).map_err(|e| format!("{e:#}"))
 }
 
-#[tauri::command]
-fn batch_ungroup(
-    state: State<'_, AppState>,
-    shas: Vec<String>,
-    group: String,
-) -> Result<(), String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.remove_from_group(&shas, &group)
-        .map_err(|e| format!("{e:#}"))
-}
 
 #[tauri::command]
 fn batch_untag(
@@ -523,21 +513,7 @@ fn update_asset(
         .map_err(|e| format!("{e:#}"))
 }
 
-#[tauri::command]
-fn add_to_group(
-    state: State<'_, AppState>,
-    shas: Vec<String>,
-    group: String,
-) -> Result<(), String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.add_group(&shas, &group).map_err(|e| format!("{e:#}"))
-}
 
-#[tauri::command]
-fn clear_groups(state: State<'_, AppState>, shas: Vec<String>) -> Result<(), String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.clear_groups(&shas).map_err(|e| format!("{e:#}"))
-}
 
 #[tauri::command]
 fn mark_ungrouped_seen(state: State<'_, AppState>) -> Result<(), String> {
@@ -835,14 +811,14 @@ fn main() {
             stickerbox_lib::commands::batch_star,
             batch_tags,
             batch_untag,
-            batch_ungroup,
+            stickerbox_lib::commands::batch_ungroup,
             batch_delete,
             set_pinned,
             update_asset,
             stickerbox_lib::commands::delete_asset,
             stickerbox_lib::commands::share_assets,
-            add_to_group,
-            clear_groups,
+            stickerbox_lib::commands::add_to_group,
+            stickerbox_lib::commands::clear_groups,
             stickerbox_lib::commands::rename_group,
             stickerbox_lib::commands::remove_group,
             mark_ungrouped_seen,

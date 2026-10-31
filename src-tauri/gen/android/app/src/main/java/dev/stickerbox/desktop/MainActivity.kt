@@ -22,7 +22,10 @@ class MainActivity : TauriActivity() {
       val bars = insets.getInsets(
         WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
       )
-      v.updatePadding(top = bars.top, bottom = bars.bottom)
+      // 键盘弹出时把 WebView 也顶上去，否则底部弹层的输入框会被键盘盖住。
+      // targetSdk 35 下 adjustResize 不再自动生效，只能用 IME inset 自己补。
+      val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+      v.updatePadding(top = bars.top, bottom = maxOf(bars.bottom, ime.bottom))
       insets
     }
     ViewCompat.requestApplyInsets(root)

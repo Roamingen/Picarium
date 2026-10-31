@@ -4,7 +4,7 @@
 
 ## 0. 先读这两份
 
-1. 最新交接：`docs/交接-<日期>.md`（当前是 `docs/交接-2026-10-31.md`）
+1. 最新交接：`docs/交接-<日期>.md`（当前是 `docs/交接-2026-11-01.md`）
 2. 待办与路线：`docs/11-待办.md`、`docs/19-安卓路线.md`、`docs/24-安卓移植进展.md`
 
 读完先复述「现在在哪、下一步是什么」，再动手。
@@ -77,7 +77,10 @@ $env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
 $env:NDK_HOME="$env:LOCALAPPDATA\Android\Sdk\ndk\28.2.13676358"
 $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
 npx tauri android build --debug --apk --target x86_64 --ci
+npx tauri android build --apk --target aarch64 --ci        # release（已配签名）
 ```
+
+模拟器、签名、打包与验收的完整步骤见 **`docs/25-安卓构建、签名与模拟器.md`**（含「同 AVD 已在运行」等常见错误）。
 
 注意：`~/.gradle/gradle.properties` 里的代理已注释（代理 7890 当时没开）；Gradle wrapper 已指向腾讯镜像。开代理后可自行恢复。
 
@@ -104,7 +107,7 @@ npx tauri android build --debug --apk --target x86_64 --ci
 - 换对话前更新 `docs/交接-<日期>.md`（模板见 `docs/交接模板.md`）；
 - 必须记录：稳定点、已完成、下一步第一批、验证命令与结果、已知坑、用户偏好；
 - 新对话第一句建议：
-  > 读 `AGENTS.md` 和 `docs/交接-2026-10-31.md`，复述现状与下一步；只做第一批，做完停下等我审。
+  > 读 `AGENTS.md` 和 `docs/交接-2026-11-01.md`，复述现状与下一步；只做第一批，做完停下等我审。
 
 ## 8. 提交规范（Conventional Commits）
 
@@ -116,3 +119,8 @@ npx tauri android build --debug --apk --target x86_64 --ci
 - 一批一个 commit；body 写「为什么 + 关键验证结果」，不写流水账。
 - **不往 git 里加图片/二进制**（截图、APK、录屏）：体积会永久留在历史里。新截图一律放 `.demo/`（已 gitignore）或系统临时目录，用 `present` 给用户看；`docs/shots/` 已入库的历史图保留，不再新增。
 - 例：`feat(android): 只读命令层与 thumb 协议搬进 lib crate`
+
+## 9. 前端/UI 改动必须先进预览
+
+- 任何界面（PC 或手机）的改动，**先出 HTML 预览图**（放 `docs/mock/`，截图放 `.demo/`），给用户看完、点头后再写实现。
+- 禁止"一拍脑袋"直接改 `mobile.js` / `app.js` / CSS 上线；小修（颜色、文案、间距）也要在汇报里说明改了什么，必要时附对比图。

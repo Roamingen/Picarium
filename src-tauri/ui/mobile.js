@@ -38,6 +38,8 @@ let selMode = false;
 const sel = new Set();
 let imgSelMode = false;
 const imgSel = new Set();
+let trashSelMode = false;
+const trashSel = new Set();
 let imgHoldInfo = null;
 let imgHoldTimer = 0;
 let imgHoldFired = false;
@@ -93,7 +95,7 @@ function toast(msg) {
 function groupParam() {
   if (S.view === "all") return null;
   if (S.view === "star") return "__star__";
-  if (S.view === "ungrouped") return "__none__";
+  if (S.view === "ungrouped") return "";
   if (S.view === "recent") return "__recent__";
   return S.view;
 }
@@ -166,14 +168,10 @@ function renderHeader() {
 function renderChips() {
   const s = S.stats || {};
   const chips = $("chips");
-  const dot =
-    s.ungroupedNew > 0
-      ? `<span class="dot" style="width:6px;height:6px;border-radius:50%;background:#ff6b6b;display:inline-block"></span>`
-      : "";
   const items = [
     { key: "all", label: "全部", count: s.total },
     { key: "star", label: "收藏", count: s.starred },
-    { key: "ungrouped", label: "未分组", count: s.ungrouped, extra: dot },
+    { key: "ungrouped", label: "未分组", count: s.ungrouped },
     { key: "recent", label: "最近", count: null },
   ];
 
@@ -193,27 +191,10 @@ function renderChips() {
   if (S.q) {
     html += `<button class="chip fch" data-qclear="1">搜：${escapeHtml(S.q)} <span class="x">✕</span></button>`;
   }
-  if (S.filters.type) {
-    const t = S.filters.type === "gif" ? "GIF" : "静态图";
-    html += `<button class="chip fch" data-fclear="type">${t} <span class="x">✕</span></button>`;
-  }
-  for (const t of S.filters.tags) {
-    html += `<button class="chip fch" data-fclear="tag:${escapeHtml(t)}">标签：${escapeHtml(t)} <span class="x">✕</span></button>`;
-  }
-  if (S.filters.days) {
-    const d = S.filters.days === 1 ? "今天" : `${S.filters.days} 天`;
-    html += `<button class="chip fch" data-fclear="days">${d} <span class="x">✕</span></button>`;
-  }
-  if (S.filters.sort) {
-    const m = { oldest: "最旧", size: "最大", name: "名称" };
-    html += `<button class="chip fch" data-fclear="sort">排序：${m[S.filters.sort] || S.filters.sort} <span class="x">✕</span></button>`;
-  }
-  if (hasFilters()) {
-    html += `<button class="chip fch" data-fclearall="1">清空筛选 <span class="x">✕</span></button>`;
-  }
   chips.innerHTML = html;
-  // 分组/搜索的过滤 chip 排在最后，自动滚到右端让用户看见
-  const hasFilter = S.q || hasFilters() || !["all", "star", "ungrouped", "recent"].includes(S.view);
+  $("btn-filter").classList.toggle("active", hasFilters());
+  // 分组/搜索的 chip 排在最后，自动滚到右端让用户看见
+  const hasFilter = S.q || !["all", "star", "ungrouped", "recent"].includes(S.view);
   chips.scrollLeft = hasFilter ? chips.scrollWidth : 0;
 }
 
@@ -239,8 +220,8 @@ function hasFilters() {
 }
 
 function pinNames() {
-  if (S.pinned.length) return S.pinned.filter((n) => S.groupList.some((g) => g.name === n));
-  return S.groupList.map((g) => g.name);
+  // 只显示真正置顶的分组；没置顶就不出现在首页
+  return S.pinned.filter((n) => S.groupList.some((g) => g.name === n));
 }
 
 function pinLimit() {
@@ -267,9 +248,7 @@ function renderPins() {
     </button>`;
   };
 
-  $("pins").innerHTML =
-    list.map(card).join("") +
-    `<button class="pin more" data-all="1"><div class="pc">+</div><div class="pn">全部</div></button>`;
+  $("pins").innerHTML = list.map(card).join("");
 }
 
 function folderEmoji(count) {
@@ -332,6 +311,7 @@ function folderCard(g) {
     ? `<img src="${thumbUrl(g.cover, g.animated)}" alt="" loading="lazy" onerror="this.remove()">`
     : folderIcon(g.name);
   return `<button class="folder${sel.has(g.name) ? " sel" : ""}${g.pinned ? " pinned" : ""}" data-group="${escapeAttr(g.name)}">
+    ${g.pinned ? `<span class="gpin" title="已置顶">${SVG.pin}</span>` : ""}
     <span class="fcheck">${SVG.check}</span>
     <div class="fc">${cover}${g.animated && g.cover ? '<span class="gb">GIF</span>' : ""}</div>
     <div class="fb"><span class="fname">${escapeHtml(g.name)}</span><span class="fsub">${g.count} 张</span></div>
@@ -342,7 +322,17 @@ function renderFolders(keepScroll) {
   const folderBox = $("folders");
   if (!folderBox) return;
   const q = S.gq.trim().toLowerCase();
-  const list = S.groupList.filter((g) => !q || g.name.toLowerCase().includes(q));
+  const list = S.groupList
+    .filter((g) => !q || g.name.toLowerCase().includes(q))
+    .slice()
+    .sort((a, b) => {
+      const pa = S.pinned.indexOf(a.name);
+      const pb = S.pinned.indexOf(b.name);
+      if (pa >= 0 && pb >= 0) return pa - pb;
+      if (pa >= 0) return -1;
+      if (pb >= 0) return 1;
+      return S.groupList.indexOf(a) - S.groupList.indexOf(b);
+    });
   const y = keepScroll ? window.scrollY : null;
   $("gcount").textContent = selMode ? ` 已选 ${sel.size} 个` : ` ${S.groupList.length} 个`;
   $("btn-newgroup").innerHTML = selMode
@@ -366,11 +356,20 @@ function renderFolders(keepScroll) {
 function cssEsc(s) {
   return String(s).replace(/["\\]/g, "\\$&");
 }
+function syncGroupPin(name) {
+  const on = S.pinned.includes(name);
+  const b = $("btn-gpin");
+  b.classList.toggle("on", on);
+  b.title = on ? "取消置顶" : "置顶到图库";
+  b.style.color = on ? "var(--accent)" : "";
+}
+
 async function openGroup(name) {
   S.gview = name;
   setTab("groups");
   const g = S.groupList.find((x) => x.name === name);
   $("gd-title").textContent = name;
+  syncGroupPin(name);
   $("gd-meta").textContent = g ? `${g.count} 张 · 长按可换封面 / 重命名` : "";
   $("gd-grid").innerHTML = '<div class="spinner">正在读取…</div>';
   try {
@@ -386,12 +385,19 @@ async function openGroup(name) {
 
 /* ---------- 图片预览 / 多选 ---------- */
 
+function paintImgSel() {
+  document.querySelectorAll("#grid .card").forEach((c) => {
+    c.classList.toggle("sel", imgSel.has(c.dataset.sha));
+  });
+}
+
 function setImgSelMode(on) {
   imgSelMode = on;
   if (!on) imgSel.clear();
   $("imgsel").hidden = !on;
+  $("fab").hidden = on || trashSelMode;
   $("imgn").textContent = String(imgSel.size);
-  renderGrid();
+  paintImgSel();
 }
 
 function toggleImgSel(sha) {
@@ -399,11 +405,26 @@ function toggleImgSel(sha) {
   else imgSel.add(sha);
   if (!imgSel.size) return setImgSelMode(false);
   $("imgn").textContent = String(imgSel.size);
-  renderGrid();
+  paintImgSel();
 }
 
 let vIndex = 0;
-let vZoomed = false;
+let vScale = 1, vTx = 0, vTy = 0;
+const vPointers = new Map();
+let vPinch = null, vPan = null, vLastTap = 0;
+
+function applyViewerTransform() {
+  const img = $("v-img");
+  if (img) img.style.transform = `translate(${vTx}px, ${vTy}px) scale(${vScale})`;
+}
+function resetViewerTransform() {
+  vScale = 1; vTx = 0; vTy = 0;
+  vPointers.clear(); vPinch = null; vPan = null;
+  applyViewerTransform();
+}
+function clampViewScale(n) {
+  return Math.max(1, Math.min(5, n));
+}
 
 function fmtSource(src) {
   const map = { wechat: "微信", qq: "QQ", file: "文件", folder: "文件夹", clipboard: "剪贴板", share: "分享", desktop: "桌面" };
@@ -418,7 +439,8 @@ function renderViewer() {
   const a = viewerAsset();
   $("v-count").textContent = `${S.items.length ? vIndex + 1 : 0} / ${S.items.length}`;
   $("v-name").textContent = a.name || "未命名";
-  $("v-img").src = thumbUrl(a.sha, !!a.animated);
+  // 预览用原图，放大后仍然清晰
+  $("v-img").src = thumbUrl(a.sha, true);
   const bits = [];
   if (a.width && a.height) bits.push(`${a.width} × ${a.height}`);
   if (a.bytes) bits.push(fmtSize(a.bytes));
@@ -430,13 +452,16 @@ function renderViewer() {
   tags.push(`<span class="vtag">${a.animated ? "GIF" : "图片"}</span>`);
   (a.tags || []).forEach((t) => tags.push(`<span class="vtag tag">${escapeHtml(t)}</span>`));
   tags.push('<span class="vtag plus" id="v-tag-add">+ 标签</span>');
+  tags.push(`<button class="vtag addgrp" id="v-addgroup">${SVG.folder}加入分组</button>`);
   $("v-tags").innerHTML = tags.join("");
   const on = !!a.starred;
   $("v-star").innerHTML = (on ? SVG.starFill : SVG.star) + `<span>${on ? "已收藏" : "收藏"}</span>`;
   $("v-star").classList.toggle("on", on);
-  vZoomed = false;
-  $("v-img").classList.remove("zoomed");
-  $("v-img").style.transformOrigin = "center center";
+  resetViewerTransform();
+  const hint = $("v-hint");
+  hint.classList.remove("fade");
+  clearTimeout(window.__vhintTimer);
+  window.__vhintTimer = setTimeout(() => hint.classList.add("fade"), 2400);
 }
 
 function openViewer(sha) {
@@ -450,8 +475,7 @@ function openViewer(sha) {
 function closeViewer() {
   $("viewer").hidden = true;
   $("v-img").removeAttribute("src");
-  $("v-img").classList.remove("zoomed");
-  vZoomed = false;
+  resetViewerTransform();
   document.body.style.overflow = "";
 }
 
@@ -1055,13 +1079,72 @@ async function loadTrash() {
   }
   grid.innerHTML = items
     .map(
-      (it) => `<button class="titem" data-sha="${escapeAttr(it.sha)}">
+      (it) => `<button class="titem${trashSel.has(it.sha) ? " sel" : ""}" data-sha="${escapeAttr(it.sha)}">
+        <span class="tcheck">${SVG.check}</span>
         <span class="tthumb"><img src="${thumbUrl(it.sha)}" alt="" loading="lazy" onerror="this.remove()"></span>
         <span class="tname">${escapeHtml(it.name || "未命名")}</span>
         <span class="tsub">${daysLeft(it)} 天后清理</span>
       </button>`
     )
     .join("");
+}
+
+function paintTrashSel() {
+  document.querySelectorAll("#trash-grid .titem").forEach((c) => {
+    c.classList.toggle("sel", trashSel.has(c.dataset.sha));
+  });
+  $("trashn").textContent = String(trashSel.size);
+}
+
+function setTrashSelMode(on) {
+  trashSelMode = on;
+  if (on) closeSheet();
+  if (!on) trashSel.clear();
+  $("trashsel").hidden = !on;
+  $("fab").hidden = on || imgSelMode;
+  $("tcount").textContent = on
+    ? ` 已选 ${trashSel.size} 张`
+    : (S.trashItems || []).length ? ` ${S.trashItems.length} 张` : "";
+  paintTrashSel();
+}
+
+function toggleTrashSel(sha) {
+  if (trashSel.has(sha)) trashSel.delete(sha);
+  else trashSel.add(sha);
+  if (!trashSel.size) return setTrashSelMode(false);
+  paintTrashSel();
+  $("tcount").textContent = ` 已选 ${trashSel.size} 张`;
+}
+
+async function trashBatchRestore() {
+  const shas = [...trashSel];
+  if (!shas.length) return;
+  try {
+    for (const sha of shas) await invoke("trash_restore", { sha });
+    closeSheet();
+    toast(`已恢复 ${shas.length} 张`);
+    setTrashSelMode(false);
+    await loadTrash();
+    await refresh();
+  } catch (e) {
+    toast("恢复失败：" + e);
+  }
+}
+
+async function trashBatchDelete() {
+  const shas = [...trashSel];
+  if (!shas.length) return;
+  if (!(await confirmSheet(`彻底删除选中的 ${shas.length} 张？文件会被删掉，不能恢复。`))) return;
+  try {
+    for (const sha of shas) await invoke("trash_delete", { sha, permanent: true });
+    closeSheet();
+    toast(`已彻底删除 ${shas.length} 张`);
+    setTrashSelMode(false);
+    await loadTrash();
+    await refresh();
+  } catch (e) {
+    toast("删除失败：" + e);
+  }
 }
 
 function openTrashItem(sha) {
@@ -1191,6 +1274,7 @@ function setTab(tab) {
     if (imgSelMode) setImgSelMode(false);
     if (!$("viewer").hidden) closeViewer();
   }
+  if (tab !== "trash" && trashSelMode) setTrashSelMode(false);
   if (tab === "trash") loadTrash();
   if (tab === "me") renderMe();
 }
@@ -1316,6 +1400,23 @@ function wire() {
     else batchSingle(act);
   });
   $("btn-gback").addEventListener("click", backGroups);
+  $("btn-gpin").addEventListener("click", async () => {
+    if (!S.gview) return;
+    const name = S.gview;
+    const next = S.pinned.includes(name) ? S.pinned.filter((n) => n !== name) : [...S.pinned, name];
+    try {
+      await invoke("set_pinned_groups", { groups: next });
+      S.pinned = next;
+      const g = S.groupList.find((x) => x.name === name);
+      if (g) g.pinned = next.includes(name);
+      syncGroupPin(name);
+      renderPins();
+      renderFolders(true);
+      toast(next.includes(name) ? "已置顶到图库" : "已取消置顶");
+    } catch (err) {
+      toast("设置失败：" + err);
+    }
+  });
   $("btn-gcover").addEventListener("click", () => {
     if (S.gview) openCoverPicker(S.gview);
   });
@@ -1377,7 +1478,7 @@ function wire() {
     setTab(b.dataset.tab);
   });
 
-  $("fab").addEventListener("click", () => toast("相册导入在后续批次"));
+  $("fab").addEventListener("click", openImportSheet);
   $("btn-filter").addEventListener("click", openFilters);
   $("btn-settings").addEventListener("click", () => setTab("me"));
   $("pins-manage").addEventListener("click", openPinManager);
@@ -1433,6 +1534,16 @@ $("seg-theme").addEventListener("click", (e) => {
   localStorage.setItem("sb.theme", b.dataset.theme);
 
   applyPrefs();
+(function watchKeyboard() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const sync = () => {
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty("--kb", kb + "px");
+  };
+  vv.addEventListener("resize", sync);
+  vv.addEventListener("scroll", sync);
+})();
   renderMe();
 });
 $("seg-cols").addEventListener("click", (e) => {
@@ -1443,11 +1554,47 @@ $("seg-cols").addEventListener("click", (e) => {
   renderMe();
 });
 $("btn-purge").addEventListener("click", purgeTrash);
+let trashHold = null, trashHoldTimer = 0, trashHoldFired = false;
+$("trash-grid").addEventListener("pointerdown", (e) => {
+  const b = e.target.closest(".titem");
+  if (!b) return;
+  trashHoldFired = false;
+  trashHold = { sha: b.dataset.sha, x: e.clientX, y: e.clientY };
+  clearTimeout(trashHoldTimer);
+  trashHoldTimer = setTimeout(() => {
+    if (!trashHold) return;
+    trashHoldFired = true;
+    trashSel.add(trashHold.sha);
+    setTrashSelMode(true);
+    if (navigator.vibrate) navigator.vibrate(12);
+    trashHold = null;
+    setTimeout(() => { trashHoldFired = false; }, 600);
+  }, 340);
+});
+$("trash-grid").addEventListener("pointermove", (e) => {
+  if (!trashHold) return;
+  if (Math.hypot(e.clientX - trashHold.x, e.clientY - trashHold.y) > 8) {
+    clearTimeout(trashHoldTimer);
+    trashHold = null;
+  }
+});
+const endTrashHold = () => { clearTimeout(trashHoldTimer); trashHold = null; };
+$("trash-grid").addEventListener("pointerup", endTrashHold);
+$("trash-grid").addEventListener("pointercancel", endTrashHold);
 $("trash-grid").addEventListener("click", (e) => {
   const b = e.target.closest(".titem");
-  if (b) openTrashItem(b.dataset.sha);
+  if (!b) return;
+  if (trashHoldFired) { trashHoldFired = false; return; }
+  if (trashSelMode) toggleTrashSel(b.dataset.sha);
+  else openTrashItem(b.dataset.sha);
 });
-$("me-gallery").addEventListener("click", async () => {
+$("trashsel").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-tact]");
+  if (!b) return;
+  if (b.dataset.tact === "restore") trashBatchRestore();
+  if (b.dataset.tact === "delete") trashBatchDelete();
+});
+async function importFromGallery() {
   try {
     const paths = await invoke("pick_gallery_images");
     if (!paths || !paths.length) return;
@@ -1460,7 +1607,22 @@ $("me-gallery").addEventListener("click", async () => {
   } catch (e) {
     toast("导入失败：" + (typeof e === "string" ? e : e.message || e));
   }
-});
+}
+
+function openImportSheet() {
+  openSheet("导入图片", `<div class="menu">
+      <button data-act="gallery">从手机相册导入</button>
+      <button data-act="cancel">取消</button>
+    </div>`);
+  $("sheet-body").onclick = (e) => {
+    const b = e.target.closest("[data-act]");
+    if (!b) return;
+    closeSheet();
+    if (b.dataset.act === "gallery") importFromGallery();
+  };
+}
+
+$("me-gallery").addEventListener("click", importFromGallery);
 $("me-inbox").addEventListener("click", () => {
   if (S.sharedPaths.length) {
     setTab("gallery");
@@ -1496,6 +1658,10 @@ $("imgsel").addEventListener("click", async (e) => {
     }
     return;
   }
+  if (act === "group") {
+    openMoveSheet(shas);
+    return;
+  }
   if (act === "star") {
     try {
       await invoke("batch_star", { shas, on: true });
@@ -1519,6 +1685,58 @@ $("imgsel").addEventListener("click", async (e) => {
     }
   }
 });
+
+async function afterMoveRefresh(sha) {
+  await refresh();
+  if (!$("viewer").hidden && sha) {
+    const i = (S.items || []).findIndex((x) => x.sha === sha);
+    if (i >= 0) {
+      vIndex = i;
+      renderViewer();
+    }
+  }
+}
+
+async function openMoveSheet(shas) {
+  const rows = S.groupList
+    .map(
+      (g) =>
+        `<button data-move="${escapeAttr(g.name)}">${escapeHtml(g.name)}<span class="muted">${g.count}</span></button>`
+    )
+    .join("");
+  openSheet(
+    "加入分组",
+    `<div class="menu">${rows || '<div class="gempty">还没有分组，先去分组页新建</div>'}
+      <button data-move-out="1" class="danger">移出全部分组</button>
+      <button data-move-cancel="1">取消</button>
+    </div>`
+  );
+  $("sheet-body").onclick = async (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    try {
+      if (b.dataset.move !== undefined) {
+        for (const sha of shas) await invokeRetry("add_to_group", { shas: [sha], group: b.dataset.move });
+        closeSheet();
+        setImgSelMode(false);
+        toast("已加入「" + b.dataset.move + "」");
+        await afterMoveRefresh(shas[0]);
+        await loadGroups();
+      } else if (b.dataset.moveOut !== undefined) {
+        await invoke("clear_groups", { shas });
+        closeSheet();
+        setImgSelMode(false);
+        toast("已移出分组");
+        await afterMoveRefresh(shas[0]);
+        await loadGroups();
+      } else {
+        closeSheet();
+      }
+    } catch (err) {
+      toast("操作失败：" + err);
+    }
+  };
+}
 
 $("v-close").addEventListener("click", closeViewer);
 $("v-share").addEventListener("click", async () => {
@@ -1572,6 +1790,10 @@ $("v-del").addEventListener("click", async () => {
 });
 $("v-tags").addEventListener("click", (e) => {
   if (e.target.closest("#v-tag-add")) toast("标签编辑在后面的批次接上");
+  if (e.target.closest("#v-addgroup")) {
+    const a = viewerAsset();
+    if (a && a.sha) openMoveSheet([a.sha]);
+  }
 });
 $("v-more").addEventListener("click", () => {
   const a = viewerAsset();
@@ -1586,35 +1808,129 @@ $("v-more").addEventListener("click", () => {
   openSheet("文件信息", `<div class="kv">${rows.map(([k, v]) => `<div class="kvrow"><span>${k}</span><b>${escapeHtml(String(v))}</b></div>`).join("")}</div>`);
 });
 
-// 预览：左右滑动切换、双击放大
+// 预览：点图片进全屏；左右滑动切换
 (function wireViewerGestures() {
   const stage = $("v-stage");
-  let sx = 0, sy = 0, down = false, lastTap = 0;
+  let sx = 0, sy = 0, down = false, moved = false;
   stage.addEventListener("pointerdown", (e) => {
-    down = true; sx = e.clientX; sy = e.clientY;
+    down = true; moved = false; sx = e.clientX; sy = e.clientY;
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (down && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) moved = true;
   });
   stage.addEventListener("pointerup", (e) => {
     if (!down) return;
     down = false;
     const dx = e.clientX - sx, dy = e.clientY - sy;
-    if (Math.abs(dx) > 48 && Math.abs(dy) < 70) {
-      stepViewer(dx < 0 ? 1 : -1);
-      return;
-    }
-    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) {
-      const now = Date.now();
-      if (now - lastTap < 300) {
-        vZoomed = !vZoomed;
-        const img = $("v-img");
-        img.classList.toggle("zoomed", vZoomed);
-        img.style.transformOrigin = vZoomed ? "center center" : "center center";
-        lastTap = 0;
-      } else {
-        lastTap = now;
-      }
-    }
+    if (Math.abs(dx) > 48 && Math.abs(dy) < 70) { stepViewer(dx < 0 ? 1 : -1); return; }
+    if (!moved) openLightbox(viewerAsset().sha);
   });
   stage.addEventListener("pointercancel", () => { down = false; });
+})();
+
+// 全屏看图（黑色沉浸，仅这一层用黑底）
+let lbScale = 1, lbTx = 0, lbTy = 0;
+const lbPointers = new Map();
+let lbPinch = null, lbPan = null, lbLastTap = 0, lbTapTimer = 0;
+
+function lbApply() {
+  const im = $("lb-img");
+  if (im) im.style.transform = `translate(${lbTx}px, ${lbTy}px) scale(${lbScale})`;
+}
+function lbReset() {
+  lbScale = 1; lbTx = 0; lbTy = 0;
+  lbPointers.clear(); lbPinch = null; lbPan = null;
+  lbApply();
+}
+function lbShow(sha) {
+  if (!sha) return;
+  $("lb-img").src = thumbUrl(sha, true);
+  lbReset();
+}
+function openLightbox(sha) {
+  lbShow(sha);
+  $("lightbox").hidden = false;
+}
+function closeLightbox() {
+  clearTimeout(lbTapTimer);
+  $("lightbox").hidden = true;
+  $("lb-img").removeAttribute("src");
+  lbReset();
+}
+$("lb-close").addEventListener("click", closeLightbox);
+
+(function wireLightboxGestures() {
+  const box = $("lightbox");
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+  box.addEventListener("pointerdown", (e) => {
+    try { box.setPointerCapture(e.pointerId); } catch {}
+    lbPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (lbPointers.size === 2) {
+      const [a, b] = [...lbPointers.values()];
+      lbPinch = { d0: dist(a, b) || 1, s0: lbScale, mid0: mid(a, b), tx0: lbTx, ty0: lbTy };
+      lbPan = null;
+    } else if (lbPointers.size === 1) {
+      lbPan = { x: e.clientX, y: e.clientY, tx: lbTx, ty: lbTy, moved: false };
+    }
+  });
+
+  box.addEventListener("pointermove", (e) => {
+    if (!lbPointers.has(e.pointerId)) return;
+    lbPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (lbPointers.size >= 2 && lbPinch) {
+      const [a, b] = [...lbPointers.values()];
+      const m = mid(a, b);
+      lbScale = clampViewScale(lbPinch.s0 * (dist(a, b) / lbPinch.d0));
+      lbTx = lbPinch.tx0 + (m.x - lbPinch.mid0.x);
+      lbTy = lbPinch.ty0 + (m.y - lbPinch.mid0.y);
+      lbApply();
+      e.preventDefault();
+    } else if (lbPointers.size === 1 && lbPan && lbScale > 1) {
+      const dx = e.clientX - lbPan.x, dy = e.clientY - lbPan.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) lbPan.moved = true;
+      lbTx = lbPan.tx + dx;
+      lbTy = lbPan.ty + dy;
+      lbApply();
+      e.preventDefault();
+    }
+  });
+
+  const finish = (e) => {
+    const wasOne = lbPointers.size === 1;
+    lbPointers.delete(e.pointerId);
+    if (lbPointers.size < 2) lbPinch = null;
+    if (lbPointers.size !== 0) return;
+    const pan = lbPan;
+    lbPan = null;
+    if (pan && pan.moved) {
+      if (lbScale < 1.05) lbReset();
+      return;
+    }
+    if (!wasOne || !pan) return;
+    const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
+    if (Math.abs(dx) < 12 && Math.abs(dy) < 12) {
+      const now = Date.now();
+      if (now - lbLastTap < 300) {
+        clearTimeout(lbTapTimer);
+        lbLastTap = 0;
+        lbScale = lbScale > 1 ? 1 : 2.6;
+        if (lbScale === 1) { lbTx = 0; lbTy = 0; }
+        lbApply();
+      } else {
+        lbLastTap = now;
+        lbTapTimer = setTimeout(() => { if (lbScale === 1) closeLightbox(); }, 280);
+      }
+      return;
+    }
+    if (lbScale === 1 && Math.abs(dx) > 48 && Math.abs(dy) < 70) {
+      stepViewer(dx < 0 ? 1 : -1);
+      lbShow(viewerAsset().sha);
+    }
+  };
+  box.addEventListener("pointerup", finish);
+  box.addEventListener("pointercancel", finish);
 })();
 
 // 筛选面板
