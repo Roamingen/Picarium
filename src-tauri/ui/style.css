@@ -3,6 +3,8 @@
   --bg: #14161a;
   --bg-2: #1b1e24;
   --surface: #0f1115;
+  --pin-bg: rgba(0, 0, 0, .26);
+  --pin-bg-hover: rgba(0, 0, 0, .34);
   --surface-2: #232833;
   --surface-3: #1c212a;
   --modal: #191d24;
@@ -56,6 +58,8 @@
   --bg: #f5f6f8;
   --bg-2: #eceef2;
   --surface: #ffffff;
+  --pin-bg: rgba(0, 0, 0, .05);
+  --pin-bg-hover: rgba(0, 0, 0, .08);
   --surface-2: #eef0f4;
   --surface-3: #ffffff;
   --modal: #ffffff;
@@ -531,6 +535,10 @@ kbd {
 }
 
 .side-item:hover { background: var(--surface-2); }
+
+.side-item.pinned { background: var(--pin-bg); }
+.side-item.pinned:hover { background: var(--pin-bg-hover); }
+.side-item.pinned.active { background: var(--active); }
 
 .side-item.active {
   background: var(--active);

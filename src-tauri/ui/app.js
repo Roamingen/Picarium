@@ -1550,17 +1550,20 @@ async function loadGroups() {
   $('c-trash').textContent = trashItems.length;
 
   const list = $('group-list');
+  const pinnedList = $('pinned-list');
+  const pinnedWrap = $('pinned-wrap');
   list.innerHTML = '';
+  pinnedList.innerHTML = '';
+  pinnedWrap.hidden = !meta.groups.some((g) => g.pinned);
   for (const g of meta.groups) {
     const b = document.createElement('button');
-    b.className = 'side-item' + (currentGroup === g.name ? ' active' : '');
+    b.className = 'side-item' + (currentGroup === g.name ? ' active' : '') + (g.pinned ? ' pinned' : '');
     b.dataset.group = g.name;
     b.draggable = true;
     const cover = g.cover
       ? `<img class="g-cover" src="${convertFileSrc(g.cover, 'thumb')}" alt="" loading="lazy" onerror="this.remove()">`
       : icon('folder-plus', 14);
-    const pin = g.pinned ? `<span class="g-pin" title="已置顶到图库">${icon('pin', 12)}</span>` : '';
-    b.innerHTML = `<span class="g-thumb">${cover}</span><span class="g-name">${escapeHtml(g.name)}</span>${pin}<span class="g-count">${g.count}</span>`;
+    b.innerHTML = `<span class="g-thumb">${cover}</span><span class="g-name">${escapeHtml(g.name)}</span><span class="g-count">${g.count}</span>`;
     b.addEventListener('click', () => selectGroup(g.name));
     b.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -1610,7 +1613,7 @@ async function loadGroups() {
       await Promise.all([refresh(), loadGroups()]);
       toast(`已把 ${shas.length} 张加入「${g.name}」`);
     });
-    list.appendChild(b);
+    (g.pinned ? pinnedList : list).appendChild(b);
   }
 
   renderPickers();

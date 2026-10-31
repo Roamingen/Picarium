@@ -278,10 +278,9 @@ function folderCard(g) {
   const cover = g.cover
     ? `<img src="${thumbUrl(g.cover, g.animated)}" alt="" loading="lazy" onerror="this.remove()">`
     : folderIcon(g.name);
-  const pinned = g.pinned ? `<span class="pinmark" title="已置顶">${SVG.pin}</span>` : "";
-  return `<button class="folder${sel.has(g.name) ? " sel" : ""}" data-group="${escapeAttr(g.name)}">
+  return `<button class="folder${sel.has(g.name) ? " sel" : ""}${g.pinned ? " pinned" : ""}" data-group="${escapeAttr(g.name)}">
     <span class="fcheck">${SVG.check}</span>
-    <div class="fc">${cover}${g.animated && g.cover ? '<span class="gb">GIF</span>' : ""}${pinned}</div>
+    <div class="fc">${cover}${g.animated && g.cover ? '<span class="gb">GIF</span>' : ""}</div>
     <div class="fb"><span class="fname">${escapeHtml(g.name)}</span><span class="fsub">${g.count} 张</span></div>
   </button>`;
 }

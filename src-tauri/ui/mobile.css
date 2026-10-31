@@ -558,19 +558,6 @@ body { overflow-x: hidden; overflow-y: auto; }
 
 .folder .fc img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-.folder .pinmark {
-  position: absolute;
-  left: 8px;
-  top: 8px;
-  font-size: 10px;
-  display: flex;
-  align-items: center;
-  background: rgba(8, 10, 14, .62);
-  border-radius: 6px;
-  padding: 4px 7px;
-  color: #e6eeff;
-}
-.folder .pinmark svg { width: 16px; height: 16px; display: block; }
 
 .folder .fb { padding: 8px 10px 10px; }
 .folder .fname {
@@ -667,7 +654,10 @@ body { overflow-x: hidden; overflow-y: auto; }
   transition: opacity .16s, transform .16s, background .16s;
   z-index: 2;
 }
+.folder.pinned { background: rgba(110, 168, 254, .07); border-color: rgba(110, 168, 254, .28); }
+.folder.pinned .fb { background: rgba(110, 168, 254, .05); }
 .folder.sel .fcheck { opacity: 1; transform: scale(1); background: var(--accent); border-color: var(--accent); }
+.folder.pinned.sel .fcheck { background: var(--accent); }
 .folder.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
 .folder.sel .fb { background: rgba(110,168,254,.10); }
 .folder .fcheck svg { width: 14px; height: 14px; }
