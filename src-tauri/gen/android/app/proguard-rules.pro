@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# JNI 反射调用：名字只存在于 Rust 字符串里，必须保留
+-keep class dev.stickerbox.desktop.ShareBridge {
+    public static *;
+}

@@ -18,3 +18,9 @@ src-tauri/gen/android/app/src/main/assets/
 # 临时调试产物（截图、adb 转发脚本）
 .demo/
 .tools/
+
+src-tauri/gen/android/keystore.properties
+*.jks
+
+# 截图不入库（体积考虑，2026-10-31 起）
+docs/shots/
