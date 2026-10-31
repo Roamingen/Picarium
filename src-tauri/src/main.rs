@@ -4,40 +4,15 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use stickerbox_core::{Asset, Library, ScanStats};
+use stickerbox_core::{Library, ScanStats};
+use stickerbox_lib::commands::{apply_filters, parse_filters, read_settings_value, settings_file};
 use stickerbox_lib::platform::{Opener, ShareOut};
-use stickerbox_lib::{clipboard, platform, recycle};
+use stickerbox_lib::state::{autostart_apply, candidate_roots, AppState};
+use stickerbox_lib::{clipboard, platform, recycle, thumb};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
-
-struct AppState {
-    lib: Arc<Mutex<Library>>,
-    gate: Arc<clipboard::Gate>,
-    paused: Arc<AtomicBool>,
-    hotkey: Arc<Mutex<String>>,
-    clip_hotkey: Arc<Mutex<String>>,
-    blacklist: Arc<Mutex<Vec<String>>>,
-}
-
-/// 库位置候选，按优先级。`STICKERBOX_HOME` 一旦设置就只认它。
-fn candidate_roots() -> Vec<PathBuf> {
-    if let Ok(p) = std::env::var("STICKERBOX_HOME") {
-        return vec![PathBuf::from(p)];
-    }
-    let mut v = Vec::new();
-    if let Ok(p) = std::env::var("USERPROFILE") {
-        v.push(PathBuf::from(p).join("StickerBox"));
-    }
-    if let Ok(p) = std::env::var("LOCALAPPDATA") {
-        v.push(PathBuf::from(p).join("StickerBox"));
-    }
-    if let Ok(d) = std::env::current_dir() {
-        v.push(d.join("StickerBox"));
-    }
-    v
-}
 
 /// 依次尝试候选目录，返回第一个能用的。全都不行就打印清晰原因后退出，而不是 panic。
 fn open_library() -> Library {
@@ -55,23 +30,6 @@ fn open_library() -> Library {
     eprintln!("解决办法：设置环境变量 STICKERBOX_HOME 指向一个可写目录，例如");
     eprintln!("  $env:STICKERBOX_HOME = \"D:\\StickerBox\"");
     std::process::exit(1);
-}
-
-fn mime_for(ext: &str) -> &'static str {
-    match ext {
-        "jpg" | "jpeg" => "image/jpeg",
-        "gif" => "image/gif",
-        "webp" => "image/webp",
-        "bmp" => "image/bmp",
-        _ => "image/png",
-    }
-}
-
-fn empty_404() -> tauri::http::Response<std::borrow::Cow<'static, [u8]>> {
-    tauri::http::Response::builder()
-        .status(404)
-        .body(std::borrow::Cow::Owned(Vec::new()))
-        .expect("404")
 }
 
 /// 复制「文件」而不是位图：GIF 动画只有这条路能保住
@@ -165,10 +123,7 @@ fn toggle_clipboard(app: &tauri::AppHandle) {
             let _ = std::fs::write(&path, text);
         }
     }
-    let _ = app.emit(
-        "clipboard-toggled",
-        serde_json::json!({ "enabled": next }),
-    );
+    let _ = app.emit("clipboard-toggled", serde_json::json!({ "enabled": next }));
 }
 
 fn toggle_panel(app: &tauri::AppHandle) {
@@ -182,301 +137,6 @@ fn toggle_panel(app: &tauri::AppHandle) {
         let _ = win.set_focus();
         let _ = app.emit("panel-open", ());
     }
-}
-
-fn apply_query(list: Vec<Asset>, q: &str, limit: Option<usize>) -> Vec<Asset> {
-    let mut out: Vec<Asset> = if q.is_empty() {
-        list
-    } else {
-        list.into_iter()
-            .filter(|a| stickerbox_core::match_score(a, q) > 0)
-            .collect()
-    };
-    if let Some(l) = limit {
-        out.truncate(l);
-    }
-    out
-}
-
-fn friendly_app(name: &str) -> String {
-    match name.to_ascii_lowercase().as_str() {
-        "weixin.exe" | "wechat.exe" => "微信".to_string(),
-        "qq.exe" | "qqnt.exe" => "QQ".to_string(),
-        "telegram.exe" => "Telegram".to_string(),
-        "discord.exe" => "Discord".to_string(),
-        "snipaste.exe" => "Snipaste".to_string(),
-        "explorer.exe" => "资源管理器".to_string(),
-        "chrome.exe" => "Chrome".to_string(),
-        "msedge.exe" => "Edge".to_string(),
-        "firefox.exe" => "Firefox".to_string(),
-        _ => name.to_string(),
-    }
-}
-
-fn source_key(a: &Asset) -> String {
-    if a.source == "folder" {
-        "folder".to_string()
-    } else if a.source_ref.is_empty() {
-        a.source.clone()
-    } else {
-        let app = std::path::Path::new(&a.source_ref)
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| a.source_ref.clone());
-        format!("{}|{}", a.source, app)
-    }
-}
-
-#[derive(Default)]
-struct AssetFilters {
-    min_bytes: Option<u64>,
-    max_bytes: Option<u64>,
-    min_w: Option<u32>,
-    max_w: Option<u32>,
-    min_h: Option<u32>,
-    max_h: Option<u32>,
-    exts: Vec<String>,
-    tags: Vec<String>,
-    source: String,
-    source_keys: Vec<String>,
-    from: String,
-    to: String,
-}
-
-fn parse_filters(v: Option<serde_json::Value>) -> AssetFilters {
-    let mut f = AssetFilters::default();
-    let Some(obj) = v.and_then(|x| x.as_object().cloned()) else {
-        return f;
-    };
-    // 0 视为「未设置」：前端空输入会传 0，不能当成真正的阈值
-    let num = |k: &str| obj.get(k).and_then(|x| x.as_u64()).filter(|v| *v > 0);
-    let text = |k: &str| obj.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
-    f.min_bytes = num("minBytes");
-    f.max_bytes = num("maxBytes");
-    f.min_w = num("minWidth").map(|x| x as u32);
-    f.max_w = num("maxWidth").map(|x| x as u32);
-    f.min_h = num("minHeight").map(|x| x as u32);
-    f.max_h = num("maxHeight").map(|x| x as u32);
-    f.exts = obj
-        .get("exts")
-        .and_then(|x| x.as_array())
-        .map(|a| a.iter().filter_map(|e| e.as_str()).map(|s| s.to_lowercase()).collect())
-        .unwrap_or_default();
-    f.tags = obj
-        .get("tags")
-        .and_then(|x| x.as_array())
-        .map(|a| a.iter().filter_map(|e| e.as_str()).map(|s| s.to_string()).collect())
-        .unwrap_or_default();
-    f.source = text("source");
-    f.source_keys = obj
-        .get("sourceKeys")
-        .and_then(|x| x.as_array())
-        .map(|a| a.iter().filter_map(|e| e.as_str()).map(|s| s.to_string()).collect())
-        .unwrap_or_default();
-    f.from = text("from");
-    f.to = text("to");
-    f
-}
-
-fn apply_filters(list: Vec<Asset>, f: &AssetFilters) -> Vec<Asset> {
-    let before = list.len();
-    let out: Vec<Asset> = list.into_iter()
-        .filter(|a| {
-            if let Some(x) = f.min_bytes {
-                if a.bytes < x {
-                    return false;
-                }
-            }
-            if let Some(x) = f.max_bytes {
-                if a.bytes > x {
-                    return false;
-                }
-            }
-            if let Some(x) = f.min_w {
-                if a.width < x {
-                    return false;
-                }
-            }
-            if let Some(x) = f.max_w {
-                if a.width > x {
-                    return false;
-                }
-            }
-            if let Some(x) = f.min_h {
-                if a.height < x {
-                    return false;
-                }
-            }
-            if let Some(x) = f.max_h {
-                if a.height > x {
-                    return false;
-                }
-            }
-            if !f.exts.is_empty() && !f.exts.iter().any(|e| e == &a.ext.to_lowercase()) {
-                return false;
-            }
-            if !f.tags.is_empty() && !f.tags.iter().all(|t| a.tags.iter().any(|x| x == t)) {
-                return false;
-            }
-            if !f.source.is_empty() && a.source != f.source {
-                return false;
-            }
-            if !f.source_keys.is_empty() {
-                let key = source_key(a);
-                if !f.source_keys.iter().any(|k| k == &key) {
-                    return false;
-                }
-            }
-            if !f.from.is_empty() && a.added_at.get(..10).unwrap_or("") < f.from.as_str() {
-                return false;
-            }
-            if !f.to.is_empty() && a.added_at.get(..10).unwrap_or("") > f.to.as_str() {
-                return false;
-            }
-            true
-        })
-        .collect();
-    if std::env::var("STICKERBOX_FILTER_DEBUG").is_ok() {
-        eprintln!(
-            "[filter] before={} after={} exts={:?} tags={:?} maxB={:?} minB={:?}",
-            before,
-            out.len(),
-            f.exts,
-            f.tags,
-            f.max_bytes,
-            f.min_bytes
-        );
-    }
-    out
-}
-
-const BUILTIN_THEMES: &[(&str, &str)] = &[
-    ("catppuccin-mocha", include_str!("../themes/catppuccin-mocha.json")),
-    ("catppuccin-macchiato", include_str!("../themes/catppuccin-macchiato.json")),
-    ("catppuccin-frappe", include_str!("../themes/catppuccin-frappe.json")),
-    ("catppuccin-latte", include_str!("../themes/catppuccin-latte.json")),
-];
-
-#[tauri::command]
-fn themes_list(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
-    let root = {
-        let lib = state.lib.lock().map_err(|e| e.to_string())?;
-        lib.root().to_path_buf()
-    };
-    let mut out = Vec::new();
-    for (id, text) in BUILTIN_THEMES {
-        if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(text) {
-            if let Some(o) = v.as_object_mut() {
-                o.insert("id".into(), serde_json::json!(id));
-                o.insert("builtin".into(), serde_json::json!(true));
-                out.push(v);
-            }
-        }
-    }
-    let dir = root.join("themes");
-    if let Ok(entries) = std::fs::read_dir(&dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()) != Some("json".into()) {
-                continue;
-            }
-            let Ok(text) = std::fs::read_to_string(&path) else { continue };
-            let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&text) else { continue };
-            let Some(o) = v.as_object_mut() else { continue };
-            if !o.get("colors").map(|c| c.is_object()).unwrap_or(false) {
-                continue;
-            }
-            let id = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("custom")
-                .to_string();
-            o.entry("name")
-                .or_insert_with(|| serde_json::json!(id.clone()));
-            o.insert("id".into(), serde_json::json!(id));
-            o.insert("builtin".into(), serde_json::json!(false));
-            out.push(v);
-        }
-    }
-    Ok(out)
-}
-
-#[tauri::command]
-fn get_asset(state: State<'_, AppState>, sha: String) -> Result<Asset, String> {
-    let lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.find(&sha).cloned().ok_or_else(|| "库里找不到这张图".to_string())
-}
-
-#[tauri::command]
-fn list_assets(
-    state: State<'_, AppState>,
-    q: String,
-    group: Option<String>,
-    limit: Option<usize>,
-    sort: Option<String>,
-    filters: Option<String>,
-) -> Result<Vec<Asset>, String> {
-    let lib = state.lib.lock().map_err(|e| e.to_string())?;
-    let sort = sort.unwrap_or_default();
-    let filters_json = filters.and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-    if std::env::var("STICKERBOX_FILTER_DEBUG").is_ok() {
-        eprintln!("[filter-raw] {:?}", filters_json);
-    }
-    if std::env::var("STICKERBOX_FILTER_DEBUG").is_ok() {
-        eprintln!("[call] q={:?} group={:?} limit={:?} f={:?}", q, group, limit, filters_json);
-    }
-    let filters = parse_filters(filters_json);
-    if let Some(g) = group.as_deref() {
-        let query = q.trim().to_lowercase();
-        if g == "__star__" {
-            let list = lib.starred();
-            let list = lib.ordered("__star__", list);
-            let list = apply_query(list, &query, limit);
-            let list = apply_filters(list, &filters);
-            return Ok(sort_assets(list, &sort, limit));
-        }
-        if g == "__recent__" {
-            // 有筛选词时先取全量，再过滤，避免被 limit 截断后漏掉匹配项
-            let list = lib.recent(if query.is_empty() {
-                limit.unwrap_or(100)
-            } else {
-                usize::MAX
-            });
-            let list = apply_query(list, &query, limit);
-            let list = apply_filters(list, &filters);
-            return Ok(sort_assets(list, &sort, limit));
-        }
-    }
-    let fetch = if sort.is_empty() { limit.unwrap_or(500) } else { usize::MAX };
-    let list = lib.search(&q, group.as_deref(), fetch);
-    let list = match group.as_deref() {
-        Some(g) if !g.is_empty() && !g.starts_with("__") => lib.ordered(g, list),
-        _ => list,
-    };
-    let list = apply_filters(list, &filters);
-    Ok(sort_assets(list, &sort, limit))
-}
-
-fn sort_assets(mut list: Vec<Asset>, sort: &str, limit: Option<usize>) -> Vec<Asset> {
-    match sort {
-        "name" => list.sort_by(|a, b| {
-            a.name
-                .to_lowercase()
-                .cmp(&b.name.to_lowercase())
-                .then(b.added_at.cmp(&a.added_at))
-        }),
-        "added" => list.sort_by(|a, b| b.added_at.cmp(&a.added_at)),
-        "used" | "recent" => list.sort_by(|a, b| {
-            b.used_at
-                .cmp(&a.used_at)
-                .then(b.added_at.cmp(&a.added_at))
-        }),
-        _ => {}
-    }
-    if let Some(l) = limit {
-        list.truncate(l);
-    }
-    list
 }
 
 #[tauri::command]
@@ -596,32 +256,6 @@ fn selftest_report(
     let text = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
     std::fs::write(&path, text).map_err(|e| format!("写报告失败：{e}"))?;
     Ok(path.to_string_lossy().to_string())
-}
-
-#[tauri::command]
-fn source_stats(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
-    let lib = state.lib.lock().map_err(|e| e.to_string())?;
-    let mut map: std::collections::BTreeMap<String, (String, usize)> = Default::default();
-    for a in lib.assets() {
-        let key = source_key(a);
-        let label = match a.source.as_str() {
-            "folder" => "本地导入".to_string(),
-            "clipboard" => {
-                let app = std::path::Path::new(&a.source_ref)
-                    .file_name()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "剪贴板".to_string());
-                format!("剪贴板 · {}", friendly_app(&app))
-            }
-            other => other.to_string(),
-        };
-        let entry = map.entry(key).or_insert((label, 0));
-        entry.1 += 1;
-    }
-    Ok(map
-        .into_iter()
-        .map(|(key, (label, count))| serde_json::json!({"key": key, "label": label, "count": count}))
-        .collect())
 }
 
 #[tauri::command]
@@ -756,24 +390,6 @@ fn batch_delete(state: State<'_, AppState>, shas: Vec<String>) -> Result<usize, 
     Ok(n)
 }
 
-#[tauri::command]
-fn group_stats(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let lib = state.lib.lock().map_err(|e| e.to_string())?;
-    let groups: Vec<serde_json::Value> = lib
-        .group_stats()
-        .into_iter()
-        .map(|(name, count)| serde_json::json!({ "name": name, "count": count }))
-        .collect();
-    Ok(serde_json::json!({
-        "groups": groups,
-        "ungrouped": lib.ungrouped_count(),
-        "ungroupedNew": lib.ungrouped_new(),
-        "starred": lib.starred_count(),
-        "recent": lib.recent_count(),
-        "total": lib.assets().len(),
-    }))
-}
-
 /// 拖拽 / 选择器统一入口：目录递归扫描，文件直接入库
 #[tauri::command]
 async fn import_paths(
@@ -835,12 +451,6 @@ async fn import_paths(
     }
 
     Ok(stats)
-}
-
-#[tauri::command]
-fn library_stats(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let lib = state.lib.lock().map_err(|e| e.to_string())?;
-    serde_json::to_value(lib.stats()).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -932,7 +542,11 @@ fn delete_asset(state: State<'_, AppState>, sha: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn add_to_group(state: State<'_, AppState>, shas: Vec<String>, group: String) -> Result<(), String> {
+fn add_to_group(
+    state: State<'_, AppState>,
+    shas: Vec<String>,
+    group: String,
+) -> Result<(), String> {
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     lib.add_group(&shas, &group).map_err(|e| format!("{e:#}"))
 }
@@ -964,16 +578,6 @@ fn remove_group(
 fn mark_ungrouped_seen(state: State<'_, AppState>) -> Result<(), String> {
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     lib.mark_ungrouped_seen().map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
-fn tag_stats(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
-    let lib = state.lib.lock().map_err(|e| e.to_string())?;
-    Ok(lib
-        .tag_stats()
-        .into_iter()
-        .map(|(name, count)| serde_json::json!({ "name": name, "count": count }))
-        .collect())
 }
 
 #[tauri::command]
@@ -1058,18 +662,6 @@ fn trash_purge(state: State<'_, AppState>, permanent: Option<bool>) -> Result<us
     Ok(n)
 }
 
-fn settings_file(state: &State<'_, AppState>) -> Result<std::path::PathBuf, String> {
-    let lib = state.lib.lock().map_err(|e| e.to_string())?;
-    Ok(lib.root().join("settings.json"))
-}
-
-fn read_settings_value(path: &std::path::Path) -> serde_json::Value {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
-        .unwrap_or_else(|| serde_json::json!({}))
-}
-
 fn merge_json(base: &mut serde_json::Value, patch: &serde_json::Value) {
     match (base, patch) {
         (serde_json::Value::Object(b), serde_json::Value::Object(p)) => {
@@ -1101,38 +693,6 @@ fn apply_side_effects(state: &State<'_, AppState>, patch: &serde_json::Value) {
             let _ = autostart_apply(enabled, &exe.to_string_lossy());
         }
     }
-}
-
-#[tauri::command]
-fn get_settings(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let path = settings_file(&state)?;
-    let mut v = read_settings_value(&path);
-    let root = path
-        .parent()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default();
-    if let Some(obj) = v.as_object_mut() {
-        obj.insert("root".into(), serde_json::json!(root));
-        obj.insert(
-            "clipboardEnabled".into(),
-            serde_json::json!(!state.paused.load(Ordering::Relaxed)),
-        );
-        obj.insert("autostart".into(), serde_json::json!(autostart_enabled()));
-        obj.insert(
-            "version".into(),
-            serde_json::json!(env!("CARGO_PKG_VERSION")),
-        );
-        if let Ok(h) = state.hotkey.lock() {
-            obj.insert("hotkey".into(), serde_json::json!(*h));
-        }
-        if let Ok(h) = state.clip_hotkey.lock() {
-            obj.insert("clipHotkey".into(), serde_json::json!(*h));
-        }
-        if let Ok(b) = state.blacklist.lock() {
-            obj.insert("clipboardBlacklist".into(), serde_json::json!(*b));
-        }
-    }
-    Ok(v)
 }
 
 #[tauri::command]
@@ -1186,7 +746,10 @@ fn set_clipboard_enabled(state: State<'_, AppState>, enabled: bool) -> Result<()
     state.paused.store(!enabled, Ordering::Relaxed);
     let path = settings_file(&state)?;
     let mut cur = read_settings_value(&path);
-    merge_json(&mut cur, &serde_json::json!({ "clipboardEnabled": enabled }));
+    merge_json(
+        &mut cur,
+        &serde_json::json!({ "clipboardEnabled": enabled }),
+    );
     if let Some(obj) = cur.as_object_mut() {
         obj.remove("root");
         obj.remove("version");
@@ -1229,45 +792,6 @@ fn open_library_folder(state: State<'_, AppState>) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
-fn autostart_apply(enable: bool, exe: &str) -> std::io::Result<()> {
-    use std::os::windows::process::CommandExt;
-    const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
-    let mut cmd = std::process::Command::new("reg");
-    if enable {
-        cmd.args([
-            "add",
-            RUN_KEY,
-            "/v",
-            "StickerBox",
-            "/t",
-            "REG_SZ",
-            "/d",
-            &format!("\"{exe}\" --tray"),
-            "/f",
-        ]);
-    } else {
-        cmd.args(["delete", RUN_KEY, "/v", "StickerBox", "/f"]);
-    }
-    cmd.creation_flags(0x08000000);
-    let status = cmd.status()?;
-    if enable && !status.success() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "reg add 返回失败",
-        ));
-    }
-    Ok(())
-}
-
-fn autostart_enabled() -> bool {
-    use std::os::windows::process::CommandExt;
-    const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
-    let mut cmd = std::process::Command::new("reg");
-    cmd.args(["query", RUN_KEY, "/v", "StickerBox"]);
-    cmd.creation_flags(0x08000000);
-    cmd.output().map(|o| o.status.success()).unwrap_or(false)
-}
-
 #[tauri::command]
 fn hide_panel(window: tauri::WebviewWindow) -> Result<(), String> {
     window.hide().map_err(|e| e.to_string())
@@ -1292,7 +816,8 @@ fn main() {
     }
 
     // 诊断：打印每个候选目录能不能用（排查权限问题时用）
-    if args.len() >= 2 && args[1] == "diag" {        println!("USERPROFILE   = {:?}", std::env::var("USERPROFILE"));
+    if args.len() >= 2 && args[1] == "diag" {
+        println!("USERPROFILE   = {:?}", std::env::var("USERPROFILE"));
         println!("LOCALAPPDATA  = {:?}", std::env::var("LOCALAPPDATA"));
         println!("STICKERBOX_HOME = {:?}", std::env::var("STICKERBOX_HOME"));
         println!("cwd           = {:?}", std::env::current_dir());
@@ -1379,74 +904,9 @@ fn main() {
         .unwrap_or("")
         .to_string();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .register_uri_scheme_protocol("thumb", |ctx, request| {
-            let app = ctx.app_handle();
-            let sha = request.uri().path().trim_start_matches('/').to_string();
-            let want_raw = request
-                .uri()
-                .query()
-                .map(|q| q.split('&').any(|kv| kv == "raw=1"))
-                .unwrap_or(false);
-            let state = app.state::<AppState>();
-
-            let found = {
-                let lib = match state.lib.lock() {
-                    Ok(l) => l,
-                    Err(_) => return empty_404(),
-                };
-                let root = lib.root().to_path_buf();
-                if let Some(a) = lib.assets().iter().find(|a| a.sha == sha) {
-                    Some((root.clone(), lib.blob_path(&a.sha, &a.ext), a.ext.clone()))
-                } else if let Some(item) = lib.trash().into_iter().find(|i| i.asset.sha == sha) {
-                    let src = lib
-                        .trash_path()
-                        .join(format!("{}.{}", item.asset.sha, item.asset.ext));
-                    Some((root, src, item.asset.ext))
-                } else {
-                    None
-                }
-            };
-
-            let Some((root, src, ext)) = found else {
-                return empty_404();
-            };
-
-            if want_raw {
-                return match std::fs::read(&src) {
-                    Ok(bytes) => tauri::http::Response::builder()
-                        .header("Content-Type", mime_for(&ext))
-                        .header("Cache-Control", "public, max-age=3600")
-                        .body(std::borrow::Cow::Owned(bytes))
-                        .expect("raw response"),
-                    Err(_) => empty_404(),
-                };
-            }
-
-            match stickerbox_core::ensure_thumb_from(&root, &sha, &src) {
-                Ok(path) => match std::fs::read(&path) {
-                    Ok(bytes) => tauri::http::Response::builder()
-                        .header(
-                            "Content-Type",
-                            if path.extension().and_then(|e| e.to_str()) == Some("jpg") {
-                                "image/jpeg"
-                            } else {
-                                "image/webp"
-                            },
-                        )
-                        .header("Cache-Control", "public, max-age=31536000, immutable")
-                        .body(std::borrow::Cow::Owned(bytes))
-                        .expect("thumb response"),
-                    Err(_) => empty_404(),
-                },
-                Err(e) => {
-                    eprintln!("[thumb] {sha} ({ext}): {e:#}");
-                    empty_404()
-                }
-            }
-        })
         .manage(AppState {
             lib: Arc::new(Mutex::new(lib)),
             gate: Arc::new(clipboard::Gate::new()),
@@ -1456,11 +916,11 @@ fn main() {
             blacklist: blacklist.clone(),
         })
         .invoke_handler(tauri::generate_handler![
-            list_assets,
-            get_asset,
-            themes_list,
-            library_stats,
-            group_stats,
+            stickerbox_lib::commands::list_assets,
+            stickerbox_lib::commands::get_asset,
+            stickerbox_lib::commands::themes_list,
+            stickerbox_lib::commands::library_stats,
+            stickerbox_lib::commands::group_stats,
             scan_folder,
             import_paths,
             copy_asset,
@@ -1471,7 +931,7 @@ fn main() {
             set_window_size,
             set_hotkey,
             open_asset,
-            source_stats,
+            stickerbox_lib::commands::source_stats,
             set_clip_hotkey,
             selftest_mode,
             js_log,
@@ -1495,12 +955,12 @@ fn main() {
             rename_group,
             remove_group,
             mark_ungrouped_seen,
-            tag_stats,
+            stickerbox_lib::commands::tag_stats,
             trash_list,
             trash_restore,
             trash_delete,
             trash_purge,
-            get_settings,
+            stickerbox_lib::commands::get_settings,
             set_clipboard_enabled,
             set_autostart,
             open_library_folder,
@@ -1605,10 +1065,7 @@ fn main() {
             let item_panel = MenuItem::with_id(app, "panel", "快贴面板", true, None::<&str>)?;
             let item_clip = MenuItem::with_id(app, "clip", "暂停剪贴板捕获", true, None::<&str>)?;
             let item_quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(
-                app,
-                &[&item_show, &item_panel, &item_clip, &item_quit],
-            )?;
+            let menu = Menu::with_items(app, &[&item_show, &item_panel, &item_clip, &item_quit])?;
             let paused = app.state::<AppState>().paused.clone();
             let tray_icon = tauri::image::Image::new(include_bytes!("../icons/tray.rgba"), 32, 32);
 
@@ -1650,7 +1107,10 @@ fn main() {
 
             // 自测钩子：验证「复制出去不会被自己再收一遍」
             let selftest = std::env::var("STICKERBOX_SELFTEST").ok();
-            if matches!(selftest.as_deref(), Some("copy") | Some("file") | Some("files")) {
+            if matches!(
+                selftest.as_deref(),
+                Some("copy") | Some("file") | Some("files")
+            ) {
                 let st = app.state::<AppState>();
                 let lib = st.lib.clone();
                 let gate = st.gate.clone();
@@ -1719,7 +1179,8 @@ fn main() {
             );
 
             Ok(())
-        })
+        });
+    thumb::register(builder)
         .run(tauri::generate_context!())
         .expect("StickerBox 启动失败");
 }

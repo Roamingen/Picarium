@@ -9,9 +9,9 @@
 //!
 //! 只依赖两个系统能力：剪贴板序号 + 前台窗口进程名。
 
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use stickerbox_core::Library;
@@ -172,8 +172,8 @@ pub fn copy_paths_to_clipboard(paths: &[PathBuf]) -> Result<(), String> {
     use windows::Win32::System::DataExchange::{
         CloseClipboard, EmptyClipboard, OpenClipboard, SetClipboardData,
     };
-    use windows::Win32::System::Ole::CF_HDROP;
     use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
+    use windows::Win32::System::Ole::CF_HDROP;
     use windows::Win32::UI::Shell::DROPFILES;
 
     let mut wide: Vec<u16> = Vec::new();
@@ -289,11 +289,7 @@ fn foreground_app() -> (String, String) {
         }
 
         let path = String::from_utf16_lossy(&buf[..len as usize]);
-        let raw = path
-            .rsplit(['\\', '/'])
-            .next()
-            .unwrap_or(&path)
-            .to_string();
+        let raw = path.rsplit(['\\', '/']).next().unwrap_or(&path).to_string();
         (map_app(&raw), raw)
     }
 }

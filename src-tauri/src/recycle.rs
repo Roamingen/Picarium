@@ -8,8 +8,8 @@ use std::path::PathBuf;
 
 use windows::core::PCWSTR;
 use windows::Win32::UI::Shell::{
-    SHFileOperationW, SHFILEOPSTRUCTW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT,
-    FO_DELETE,
+    SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FO_DELETE,
+    SHFILEOPSTRUCTW,
 };
 
 pub fn move_to_recycle_bin(paths: &[PathBuf]) -> Result<(), String> {
