@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>StickerBox 移动端设计稿 v4</title>
+<style>
+  :root{
+    --bg:#14161a; --bg2:#1b1e24; --surface:#0f1115; --surface2:#232833; --surface3:#1c212a;
+    --line:#2a2f38; --line2:#333a47; --fg:#e8eaed; --dim:#8b93a1; --dim2:#5d6573;
+    --accent:#6ea8fe; --onAccent:#0d1420; --danger:#ff9aa2; --chip:#27303f; --btn:#222833;
+    --grad1:linear-gradient(150deg,#3b6ea8,#1d3550);
+    --grad2:linear-gradient(150deg,#7a4a86,#2c1f3b);
+    --grad3:linear-gradient(150deg,#3f6b5e,#1a2f2b);
+    --grad4:linear-gradient(150deg,#8a5a3a,#33231a);
+    --grad5:linear-gradient(150deg,#37566f,#182430);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#08090b;color:var(--fg);
+    font-family:"PingFang SC","Microsoft YaHei","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .canvas{padding:40px 44px 36px}
+  .head{text-align:center;margin-bottom:22px}
+  .head h1{margin:0;font-size:26px;font-weight:650}
+  .head p{margin:8px 0 0;font-size:13.5px;color:var(--dim)}
+  .row{display:flex;gap:28px;justify-content:center;align-items:flex-start}
+  .item{width:390px}
+  .phone{width:390px;height:844px;border-radius:46px;background:var(--bg);
+    border:9px solid #23272f;box-shadow:0 0 0 1px #343943,0 30px 60px rgba(0,0,0,.55);
+    overflow:hidden;position:relative;display:flex;flex-direction:column}
+  .cap{margin-top:16px;text-align:center}
+  .cap b{display:block;font-size:15px;font-weight:600}
+  .cap span{display:block;margin-top:5px;font-size:12.5px;color:var(--dim);line-height:1.5}
+  .status{height:54px;display:flex;align-items:flex-end;justify-content:space-between;
+    padding:0 28px 6px;font-size:13px;font-weight:600;color:#cfd5df;flex:0 0 auto}
+  .status .icons{display:flex;gap:5px}
+  .bar{width:18px;height:9px;border-radius:3px;background:#cfd5df;opacity:.9}
+  .appbar{display:flex;align-items:center;gap:10px;padding:6px 18px 8px;flex:0 0 auto}
+  .brand{font-size:20px;font-weight:700}
+  .brand small{display:block;font-size:11px;font-weight:400;color:var(--dim);margin-top:2px}
+  .spacer{flex:1}
+  .iconbtn{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    background:var(--surface2);color:#cfd5df;flex:0 0 auto}
+  .iconbtn.ghost{background:transparent}
+  .iconbtn svg{width:21px;height:21px}
+  .search{margin:2px 18px 10px;height:46px;border-radius:14px;background:var(--surface3);
+    border:1px solid var(--line);display:flex;align-items:center;gap:9px;padding:0 8px 0 14px;color:var(--dim);font-size:14px;flex:0 0 auto}
+  .search svg{width:18px;height:18px;flex:0 0 auto}
+  .search .fbtn{margin-left:auto;width:36px;height:36px;border-radius:10px;background:var(--surface2);
+    display:flex;align-items:center;justify-content:center;color:#cfd5df}
+  .search .fbtn.on{background:#2b3d5c;color:#cfe0f5}
+  .chips{display:flex;gap:9px;padding:0 18px 10px;overflow:hidden;flex:0 0 auto}
+  .chip{height:34px;border-radius:999px;background:var(--btn);border:1px solid var(--line);
+    display:flex;align-items:center;gap:8px;padding:0 14px;font-size:13.5px;color:var(--fg);white-space:nowrap}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:var(--onAccent);font-weight:650}
+  .chip em{font-style:normal;font-size:12px;color:var(--dim)}
+  .chip.on em{color:#233a5c}
+  .chip.fch{background:#1b2a3d;border-color:#2f4a6b;color:#cfe0f5;font-size:12.5px;height:30px;padding:0 11px}
+  .chip.fch b{font-weight:700;color:#e8f1ff}
+  .chip.fch span{color:#7f93ad}
+  /* 置顶分组条 */
+  .pinlbl{display:flex;align-items:center;padding:0 18px 6px;font-size:11.5px;color:var(--dim2);letter-spacing:.3px}
+  .pinlbl .mgt{margin-left:auto;color:var(--accent);font-size:11.5px;font-weight:600}
+  .pinrow{display:flex;gap:10px;padding:0 18px 12px;overflow:hidden}
+  .pin{width:78px;flex:0 0 auto;text-align:center}
+  .pc{height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:28px;
+    border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden}
+  .pc .gb{position:absolute;left:5px;bottom:5px;font-size:8px;font-weight:700;padding:2px 4px;border-radius:4px;
+    background:rgba(8,10,14,.66);color:#dfe6f2;letter-spacing:.4px}
+  .pn{font-size:11px;color:#c6cfdb;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pin.more .pc{background:transparent;border:1px dashed var(--line2);color:var(--dim);font-size:22px}
+  .pin.more .pn{color:var(--dim2)}
+  .grid{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 18px;align-content:start;overflow:hidden}
+  .card{position:relative;aspect-ratio:1/1;border-radius:16px;overflow:hidden;display:flex;
+    align-items:center;justify-content:center;font-size:44px;border:1px solid rgba(255,255,255,.05)}
+  .card .badge{position:absolute;left:8px;bottom:8px;font-size:9.5px;font-weight:700;letter-spacing:.6px;
+    padding:3px 6px;border-radius:6px;background:rgba(8,10,14,.62);color:#dfe6f2}
+  .card .star{position:absolute;right:8px;top:7px;font-size:12px;color:#ffd479}
+  .g1{background:var(--grad1)} .g2{background:var(--grad2)} .g3{background:var(--grad3)}
+  .g4{background:var(--grad4)} .g5{background:var(--grad5)}
+  .fab{position:absolute;right:18px;bottom:104px;width:56px;height:56px;border-radius:20px;
+    background:var(--accent);color:var(--onAccent);display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 24px rgba(110,168,254,.28)}
+  .fab svg{width:26px;height:26px}
+  .nav{height:74px;display:flex;border-top:1px solid var(--line);background:rgba(15,17,21,.96);padding-bottom:6px;flex:0 0 auto}
+  .nav div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;color:var(--dim2)}
+  .nav div svg{width:22px;height:22px}
+  .nav div.on{color:var(--accent);font-weight:600}
+  /* 分组页 */
+  .fgrid{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 18px;align-content:start;overflow:hidden}
+  .folder{border-radius:18px;overflow:hidden;background:var(--surface3);border:1px solid var(--line);position:relative;height:172px}
+  .cover{height:100%;position:relative;display:flex;align-items:center;justify-content:center;font-size:40px;overflow:hidden}
+  .cover:after{content:"";position:absolute;inset:auto 0 0 0;height:70px;background:linear-gradient(transparent,rgba(8,10,14,.88))}
+  .fbody{position:absolute;left:0;right:0;bottom:0;padding:8px 10px 9px;z-index:2}
+  .fname{font-size:13.5px;font-weight:650;display:flex;align-items:center;gap:5px}
+  .fname svg{width:14px;height:14px;color:#9fb0c7}
+  .fmeta{font-size:11px;color:#aab4c6;margin-top:2px}
+  .folder .edit{position:absolute;right:8px;top:8px;width:26px;height:26px;border-radius:9px;
+    background:rgba(8,10,14,.55);display:flex;align-items:center;justify-content:center;color:#dfe6f2;z-index:3}
+  .folder .edit svg{width:14px;height:14px}
+  .folder .animate{position:absolute;left:8px;top:8px;font-size:8.5px;font-weight:700;padding:2px 5px;border-radius:5px;
+    background:rgba(8,10,14,.6);color:#dfe6f2;letter-spacing:.4px;z-index:3}
+  .folder.new{border-style:dashed;background:transparent;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:6px;color:var(--dim);font-size:13px;height:172px}
+  .folder.new svg{width:26px;height:26px}
+  .hint{font-size:11px;color:var(--dim2);text-align:center;padding:8px 0 10px}
+  /* 筛选面板 */
+  .mask{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:5}
+  .sheet{position:absolute;left:0;right:0;bottom:0;height:706px;background:var(--bg2);
+    border-radius:22px 22px 0 0;z-index:6;display:flex;flex-direction:column;box-shadow:0 -20px 50px rgba(0,0,0,.6)}
+  .grab{width:40px;height:4px;border-radius:99px;background:#3a414e;margin:9px auto 2px}
+  .shead{display:flex;align-items:center;padding:6px 18px 4px;flex:0 0 auto}
+  .shead .t{font-size:16px;font-weight:650}
+  .shead .r{margin-left:auto;font-size:13px;color:var(--accent)}
+  .sbody{flex:1;overflow:hidden;padding:2px 18px 0;position:relative}
+  .sbody:after{content:"";position:absolute;left:0;right:0;bottom:0;height:26px;background:linear-gradient(transparent,var(--bg2))}
+  .sect{font-size:12px;color:var(--dim2);padding:10px 0 7px}
+  .opts{display:flex;flex-wrap:wrap;gap:7px}
+  .opt{height:32px;padding:0 13px;border-radius:10px;background:var(--btn);border:1px solid var(--line);
+    display:flex;align-items:center;font-size:13px;color:#cfd5df}
+  .opt.on{background:#2b3d5c;border-color:#3f5d86;color:#dce9fb;font-weight:600}
+  .opt.on:after{content:"✓";margin-left:6px;font-size:11px;color:var(--accent)}
+  .inp{margin-top:8px;height:40px;border-radius:12px;background:#191d24;border:1px solid var(--line);
+    display:flex;align-items:center;gap:9px;padding:0 12px;font-size:13px;color:var(--dim2)}
+  .inp svg{width:16px;height:16px}
+  .inp .caret{width:1.5px;height:16px;background:var(--accent);margin-left:-2px}
+  .inp.sel{color:#dfe6f2;justify-content:flex-start}
+  .sfoot{display:flex;gap:10px;padding:12px 18px 22px;border-top:1px solid var(--line);flex:0 0 auto}
+  .sfoot .btn{height:52px;border-radius:14px;background:var(--btn);border:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;font-size:15px;color:#cfd5df;flex:1}
+  .sfoot .btn.primary{flex:2;background:var(--accent);border-color:var(--accent);color:var(--onAccent);font-weight:700}
+  /* 回收站 */
+  .rbin .card{opacity:.72}
+  .rbin .card:after{content:"";position:absolute;inset:0;background:rgba(10,11,14,.35)}
+  .rbin .days{position:absolute;left:8px;top:8px;font-size:9px;padding:3px 6px;border-radius:5px;
+    background:rgba(10,11,14,.66);color:#ffc8c8;z-index:2}
+  .rbin .card .badge{display:none}
+  .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    color:var(--dim);font-size:13px;padding:0 40px;text-align:center;line-height:1.6}
+  .empty svg{width:40px;height:40px;color:var(--dim2)}
+  /* 我的 */
+  .setlist{flex:1;overflow:hidden;padding:2px 16px 0}
+  .sect2{font-size:12px;color:var(--dim2);padding:12px 4px 8px;letter-spacing:.4px}
+  .group{background:var(--surface3);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .srow{height:56px;display:flex;align-items:center;gap:12px;padding:0 14px;font-size:14.5px;border-bottom:1px solid #232730}
+  .srow:last-child{border-bottom:0}
+  .srow svg{width:19px;height:19px;color:#aab4c6;flex:0 0 auto}
+  .srow .val{margin-left:auto;color:var(--dim);font-size:13px}
+  .srow .chev{margin-left:auto;color:var(--dim2);font-size:16px}
+  .seg{margin-left:auto;display:flex;background:#191d24;border:1px solid var(--line);border-radius:10px;padding:2px}
+  .seg span{padding:5px 9px;border-radius:8px;font-size:11.5px;color:var(--dim)}
+  .seg span.on{background:var(--accent);color:var(--onAccent);font-weight:650}
+  .dots{display:flex;gap:6px;margin-left:auto}
+  .dot{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.18)}
+  .themerow{padding:12px 14px;border-bottom:1px solid #232730;display:flex;align-items:center;gap:10px}
+  .themerow:last-child{border-bottom:0}
+  .themerow .tt{font-size:14.5px}
+  .themerow .ts{font-size:11px;color:var(--dim);margin-top:2px}
+  .note{margin:12px 4px 0;font-size:11.5px;color:var(--dim2);line-height:1.6}
+  /* 桌面示意 */
+  .desk{margin:34px auto 0;width:1120px;border-radius:18px;background:#101216;border:1px solid #2a2f38;
+    box-shadow:0 20px 50px rgba(0,0,0,.5);overflow:hidden}
+  .dbar{height:38px;display:flex;align-items:center;gap:7px;padding:0 14px;background:#171a20;border-bottom:1px solid #232830}
+  .dbar i{width:10px;height:10px;border-radius:50%;background:#3a404b;display:block}
+  .dbar .dtitle{margin-left:10px;font-size:12px;color:#9aa3b2}
+  .dbody{display:flex;height:450px}
+  .dside{width:250px;border-right:1px solid #232830;padding:12px 10px;background:#0d0f13}
+  .dside .dh{font-size:11px;color:#6f7787;padding:2px 8px 10px;letter-spacing:.4px;display:flex}
+  .dside .dh span{margin-left:auto;color:#6ea8fe;font-size:11px}
+  .dgrp{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:10px;font-size:13px;color:#c8d0dc}
+  .dgrp.on{background:#1d2636}
+  .dgrp .dc{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex:0 0 auto}
+  .dgrp .dn{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dgrp .dcnt{font-size:11px;color:#6f7787}
+  .dmain{flex:1;padding:14px 18px}
+  .dmain .dtop{display:flex;align-items:center;gap:10px;font-size:14px;color:#dbe2ec;margin-bottom:12px}
+  .dmain .dtop .dsub{font-size:11.5px;color:#6f7787}
+  .dgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+  .dtile{aspect-ratio:1/1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;position:relative}
+  .dtile .badge{position:absolute;left:5px;bottom:5px;font-size:8px;font-weight:700;padding:2px 4px;border-radius:4px;background:rgba(8,10,14,.66);color:#dfe6f2}
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="head">
+    <h1>StickerBox 移动端 · 设计稿 v4</h1>
+    <p>2026-10-31 · 采纳 v2 的多选/大图/收到的提示/我的；新增置顶分组、分组搜索、筛选输入式、回收站 tab、主题预留；底部同步设计桌面端分组封面</p>
+  </div>
+  <div class="row">
+
+    <!-- ① 图库 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><div class="icons"><div class="bar"></div><div class="bar"></div></div></div>
+        <div class="appbar">
+          <div class="brand">StickerBox<small>161 张 · 2.4 GB</small></div>
+          <div class="spacer"></div>
+          <div class="iconbtn" title="搜索"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+          <div class="iconbtn ghost" title="设置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1z"/></svg></div>
+        </div>
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜名字 / 拼音 / 首字母
+          <div class="fbtn on" title="筛选"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div>
+        </div>
+        <div class="chips">
+          <div class="chip fch"><b>GIF</b><span>×</span></div>
+          <div class="chip fch"><b>来自微信</b><span>×</span></div>
+          <div class="chip fch">37 张 · 清空</div>
+        </div>
+        <div class="pinlbl">置顶分组 <span class="mgt">管理</span></div>
+        <div class="pinrow">
+          <div class="pin"><div class="pc g1"><span class="gb">GIF</span>🐟</div><div class="pn">蓝色大肥鱼</div></div>
+          <div class="pin"><div class="pc g2">🐱</div><div class="pn">猫猫</div></div>
+          <div class="pin"><div class="pc g3">🍵</div><div class="pn">摸鱼</div></div>
+          <div class="pin"><div class="pc g4">🎀</div><div class="pn">礼物</div></div>
+          <div class="pin more"><div class="pc">+</div><div class="pn">全部</div></div>
+        </div>
+        <div class="grid">
+          <div class="card g1"><span class="star">★</span><span class="badge">GIF</span>🐟</div>
+          <div class="card g2"><span class="badge">GIF</span>🐱</div>
+          <div class="card g3">🫧</div>
+          <div class="card g4">🍵</div>
+          <div class="card g5"><span class="badge">GIF</span>💢</div>
+          <div class="card g2"><span class="badge">GIF</span>😰</div>
+          <div class="card g3"><span class="badge">GIF</span>💤</div>
+          <div class="card g1"><span class="badge">GIF</span>🎀</div>
+          <div class="card g5">🐟</div>
+          <div class="card g4">☕</div>
+          <div class="card g3"><span class="badge">GIF</span>🌈</div>
+          <div class="card g1"><span class="badge">GIF</span>🔥</div>
+        </div>
+        <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+        <div class="nav">
+          <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>图库</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>分组</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>回收站</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b>① 图库（采纳 v2 + 置顶分组）</b><span>搜索/筛选 chips 保留；网格上方放「置顶分组」横条<br>可变数量，尾部「+ → 全部」进分组页；「最近」收进筛选</span></div>
+    </div>
+
+    <!-- ② 分组 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><div class="icons"><div class="bar"></div><div class="bar"></div></div></div>
+        <div class="appbar">
+          <div class="brand">分组<small>7 个分组 · 161 张</small></div>
+          <div class="spacer"></div>
+          <div class="iconbtn" title="新建分组"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+        </div>
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜分组名</div>
+        <div class="chips">
+          <div class="chip on">全部 7</div>
+          <div class="chip">置顶 4</div>
+          <div class="chip">最近更新</div>
+        </div>
+        <div class="fgrid">
+          <div class="folder">
+            <div class="cover g1"><span class="animate">GIF 封面</span>🐟</div>
+            <div class="edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+            <div class="fbody"><div class="fname">📌 蓝色大肥鱼</div><div class="fmeta">148 张 · 42 MB</div></div>
+          </div>
+          <div class="folder">
+            <div class="cover g2">🐱</div>
+            <div class="edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+            <div class="fbody"><div class="fname">猫猫</div><div class="fmeta">36 张 · 9 MB</div></div>
+          </div>
+          <div class="folder">
+            <div class="cover g3">🍵</div>
+            <div class="edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+            <div class="fbody"><div class="fname">摸鱼</div><div class="fmeta">21 张 · 6 MB</div></div>
+          </div>
+          <div class="folder">
+            <div class="cover g4">🎀</div>
+            <div class="edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+            <div class="fbody"><div class="fname">📌 礼物</div><div class="fmeta">18 张 · 5 MB</div></div>
+          </div>
+          <div class="folder">
+            <div class="cover g5">🫧</div>
+            <div class="fbody"><div class="fname">气泡</div><div class="fmeta">9 张 · 2 MB</div></div>
+          </div>
+          <div class="folder new">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            新建分组
+          </div>
+        </div>
+        <div class="hint">长按分组 = 换封面 / 置顶 / 重命名 / 删除（只删组，不删图）</div>
+        <div class="nav">
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>图库</div>
+          <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>分组</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>回收站</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b>② 分组（搜索 + 置顶 + 动图封面）</b><span>顶部搜索与图库同位置；置顶分组带 📌<br>封面=gif 时标「GIF 封面」；长按换封面/置顶</span></div>
+    </div>
+
+    <!-- ③ 筛选 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><div class="icons"><div class="bar"></div><div class="bar"></div></div></div>
+        <div class="appbar">
+          <div class="brand">StickerBox<small>161 张 · 2.4 GB</small></div>
+          <div class="spacer"></div>
+          <div class="iconbtn" title="搜索"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+        </div>
+        <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>搜名字 / 拼音 / 首字母</div>
+        <div class="grid" style="opacity:.5">
+          <div class="card g1"><span class="badge">GIF</span>🐟</div>
+          <div class="card g2"><span class="badge">GIF</span>🐱</div>
+          <div class="card g3">🫧</div>
+          <div class="card g4"><span class="badge">GIF</span>🍵</div>
+          <div class="card g5">💢</div>
+          <div class="card g2"><span class="badge">GIF</span>😰</div>
+        </div>
+        <div class="mask"></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div class="shead"><div class="t">筛选</div><div class="r">重置</div></div>
+          <div class="sbody">
+            <div class="sect">类型</div>
+            <div class="opts"><div class="opt on">GIF</div><div class="opt">静态图</div></div>
+            <div class="sect">收藏</div>
+            <div class="opts"><div class="opt on">只看收藏</div></div>
+            <div class="sect">分组</div>
+            <div class="inp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>输入分组名…<span class="caret"></span></div>
+            <div class="opts" style="margin-top:9px">
+              <div class="opt on">蓝色大肥鱼</div><div class="opt">未分组</div>
+            </div>
+            <div class="sect">标签</div>
+            <div class="inp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>输入标签名…</div>
+            <div class="opts" style="margin-top:9px"><div class="opt on">沙雕</div><div class="opt on">晚安</div></div>
+            <div class="sect">时间</div>
+            <div class="opts"><div class="opt">今天</div><div class="opt">7 天</div><div class="opt on">30 天</div><div class="opt">更早</div></div>
+            <div class="sect">排序</div>
+            <div class="opts"><div class="opt on">最新</div><div class="opt">最旧</div><div class="opt">最大</div><div class="opt">名称</div></div>
+          </div>
+          <div class="sfoot">
+            <div class="btn">重置</div>
+            <div class="btn primary">查看 37 张</div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b>③ 筛选（简约 + 可滚动）</b><span>分组/标签改成「输入即搜」，不再铺全部<br>面板内可上下滚；来源等分享标记做好后再加</span></div>
+    </div>
+
+    <!-- ④ 回收站 -->
+    <div class="item">
+      <div class="phone rbin">
+        <div class="status"><span>9:41</span><div class="icons"><div class="bar"></div><div class="bar"></div></div></div>
+        <div class="appbar">
+          <div class="brand">回收站<small>2 张 · 30 天后自动清理</small></div>
+          <div class="spacer"></div>
+          <div class="iconbtn ghost" style="color:var(--danger)" title="清空"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></div>
+        </div>
+        <div class="chips">
+          <div class="chip on">全部 2</div>
+          <div class="chip">即将清理 1</div>
+        </div>
+        <div class="grid" style="grid-template-columns:repeat(3,1fr);padding-top:4px">
+          <div class="card g2"><span class="days">剩 12 天</span>🐱</div>
+          <div class="card g5"><span class="days">剩 2 天</span>💢</div>
+          <div class="card g3"><span class="days">剩 27 天</span>🫧</div>
+        </div>
+        <div class="empty" style="flex:0 0 auto;padding-top:18px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>
+          <div>点图片可预览，长按多选后「恢复」或「彻底删除」；<br>回收站里的图不占网格、不参与搜索和分享。</div>
+        </div>
+        <div class="nav">
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>图库</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>分组</div>
+          <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>回收站</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b>④ 回收站（替代「最近」）</b><span>显示剩余保留天数；长按可多选恢复/彻底删除<br>「最近」不再单独占 tab，进入筛选里按时间看</span></div>
+    </div>
+
+    <!-- ⑤ 我的 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><div class="icons"><div class="bar"></div><div class="bar"></div></div></div>
+        <div class="appbar">
+          <div class="brand" style="font-size:18px">我的</div>
+          <div class="spacer"></div>
+        </div>
+        <div class="setlist">
+          <div class="sect2">外观（与电脑端同款主题）</div>
+          <div class="group">
+            <div class="themerow">
+              <div style="flex:1"><div class="tt">主题</div><div class="ts">跟随系统 / 深色 / 浅色</div></div>
+              <div class="seg"><span>跟随</span><span class="on">深色</span><span>浅色</span></div>
+            </div>
+            <div class="themerow">
+              <div style="flex:1"><div class="tt">配色</div><div class="ts">Catppuccin 四套 + 内置</div></div>
+              <div class="dots">
+                <div class="dot" style="background:#1e1e2e"></div>
+                <div class="dot" style="background:#f5e0dc"></div>
+                <div class="dot" style="background:#89b4fa"></div>
+                <div class="dot" style="background:#a6e3a1"></div>
+              </div>
+            </div>
+            <div class="themerow">
+              <div style="flex:1"><div class="tt">网格列数</div></div>
+              <div class="seg"><span class="on">3</span><span>4</span><span>5</span></div>
+            </div>
+          </div>
+          <div class="sect2">启动</div>
+          <div class="group">
+            <div class="srow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>打开时<div class="val">上次的视图</div><div class="chev">›</div></div>
+            <div class="srow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16v12H4z"/><path d="M8 10h8M8 14h5"/></svg>置顶分组<div class="val">4 个</div><div class="chev">›</div></div>
+          </div>
+          <div class="sect2">导入与数据</div>
+          <div class="group">
+            <div class="srow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="m21 16-5-5-9 9"/></svg>从手机相册导入<div class="chev">›</div></div>
+            <div class="srow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5h16v14H4z"/><path d="M8 11h8M8 15h5"/></svg>分享收件箱<div class="val">0 个待整理</div><div class="chev">›</div></div>
+            <div class="srow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 20h16"/></svg>导出备份<div class="val">zip</div><div class="chev">›</div></div>
+            <div class="srow" style="color:var(--danger)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="color:var(--danger)"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>清空回收站<div class="val">2 张</div><div class="chev">›</div></div>
+          </div>
+          <div class="sect2">关于</div>
+          <div class="group">
+            <div class="srow">版本<div class="val">0.2.0-m2</div></div>
+            <div class="srow">存储位置<div class="val">应用私有目录</div></div>
+          </div>
+          <div class="note">移动端无剪贴板/托盘/快捷键设置；相册权限只在「存相册」时申请。</div>
+        </div>
+        <div class="nav">
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.6"/></svg>图库</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>分组</div>
+          <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>回收站</div>
+          <div class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b>⑤ 我的（v2 采纳 + 主题预留）</b><span>主题/配色/启动视图与电脑端对齐；置顶分组数量可管理<br>「打开时」可设：图库 / 上次视图 / 指定分组</span></div>
+    </div>
+
+  </div>
+
+  <!-- 桌面端同步设计 -->
+  <div class="desk">
+    <div class="dbar"><i></i><i></i><i></i><div class="dtitle">StickerBox — 桌面端 · 分组封面（与手机共用同一个 index.json）</div></div>
+    <div class="dbody">
+      <div class="dside">
+        <div class="dh">分组 <span>+ 新建</span></div>
+        <div class="dgrp on"><div class="dc g1">🐟</div><div class="dn">蓝色大肥鱼</div><div class="dcnt">148</div></div>
+        <div class="dgrp"><div class="dc g2">🐱</div><div class="dn">猫猫</div><div class="dcnt">36</div></div>
+        <div class="dgrp"><div class="dc g3">🍵</div><div class="dn">摸鱼</div><div class="dcnt">21</div></div>
+        <div class="dgrp"><div class="dc g4">🎀</div><div class="dn">礼物</div><div class="dcnt">18</div></div>
+        <div class="dgrp"><div class="dc g5">🫧</div><div class="dn">气泡</div><div class="dcnt">9</div></div>
+        <div class="dgrp"><div class="dc" style="background:#1a1e26;border:1px dashed #333a47;color:#5d6573;font-size:16px">+</div><div class="dn" style="color:#5d6573">新建分组</div></div>
+      </div>
+      <div class="dmain">
+        <div class="dtop">蓝色大肥鱼 <span class="dsub">148 张 · 42 MB · 封面为组内图片，动图可直接当封面</span></div>
+        <div class="dgrid">
+          <div class="dtile g1"><span class="badge">GIF</span>🐟</div>
+          <div class="dtile g2"><span class="badge">GIF</span>🐱</div>
+          <div class="dtile g3">🫧</div>
+          <div class="dtile g4">🍵</div>
+          <div class="dtile g5"><span class="badge">GIF</span>💢</div>
+          <div class="dtile g2"><span class="badge">GIF</span>😰</div>
+          <div class="dtile g3"><span class="badge">GIF</span>💤</div>
+          <div class="dtile g1"><span class="badge">GIF</span>🎀</div>
+          <div class="dtile g5">🐟</div>
+          <div class="dtile g4">☕</div>
+          <div class="dtile g3"><span class="badge">GIF</span>🌈</div>
+          <div class="dtile g1"><span class="badge">GIF</span>🔥</div>
+          <div class="dtile g2">🐱</div>
+          <div class="dtile g5"><span class="badge">GIF</span>🫠</div>
+          <div class="dtile g3">🧋</div>
+          <div class="dtile g4">🍜</div>
+          <div class="dtile g1"><span class="badge">GIF</span>🦊</div>
+          <div class="dtile g2"><span class="badge">GIF</span>🐰</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="cap"><b>桌面端：分组封面（同步设计）</b><span>侧边栏分组行左侧显示封面小图（动图用缩略图首帧）；「右键分组 → 换封面」选组内任意一张<br>同一个 `group.cover = sha` 字段，手机和电脑读同一份；图片被删则回落到组内最近一张，再没有就显示默认图标</span></div>
+</div>
+</body>
+</html>
