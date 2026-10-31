@@ -46,8 +46,8 @@
 ```
 crates/core/        纯 Rust：索引、blob、搜索、排序、导入（桌面/安卓共用）
 src-tauri/          Tauri 2 壳（原 app/，已改名）
-  src/main.rs       桌面入口 + 全部命令（Windows 专属能力目前未拆分）
-  src/lib.rs        移动端 lib 入口（空壳，M2 阶段用）
+  src/main.rs       桌面入口 + Windows 专属命令（托盘/热键/剪贴板/写操作）
+  src/lib.rs        共享库入口；安卓 run() 在此，旁边是 platform/state/commands/thumb
   ui/               共享前端 HTML/CSS/JS（无框架）
   gen/android/      tauri android init 生成，别手改
 scripts/            accept.ps1 / perf.ps1 / install-release.ps1
@@ -105,3 +105,11 @@ npx tauri android build --debug --apk --target x86_64 --ci
 - 必须记录：稳定点、已完成、下一步第一批、验证命令与结果、已知坑、用户偏好；
 - 新对话第一句建议：
   > 读 `AGENTS.md` 和 `docs/交接-2026-10-31.md`，复述现状与下一步；只做第一批，做完停下等我审。
+
+## 8. 提交规范（Conventional Commits）
+
+- 格式：`<type>(<scope>): <摘要>`；摘要用中文、一行说清做什么。
+- 常用 type：`feat` 新功能、`fix` 修 bug、`refactor` 不改行为的重构、`chore` 构建/杂务、`docs` 文档、`test` 测试。
+- scope 用模块名：`android`、`core`、`ui`、`platform`、`git` 等。
+- 一批一个 commit；body 写「为什么 + 关键验证结果」，不写流水账。
+- 例：`feat(android): 只读命令层与 thumb 协议搬进 lib crate`
