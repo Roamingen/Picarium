@@ -1,7 +1,7 @@
-//! 只读命令层：桌面壳和安卓共用（列表、单张详情、主题、统计、设置读取）。
+//! 共享命令层：桌面壳和安卓共用（列表、详情、主题、统计、设置读取、分组元数据）。
 //!
-//! 这些命令只读库、不碰平台能力，所以能完整跑在安卓上。
-//! 写操作（导入/删除/分组/剪贴板）仍留在 `main.rs`，等后续批次再迁。
+//! 这里只碰库文件、不碰 Windows 平台能力，所以能完整跑在安卓上。
+//! 导入 / 删除 / 剪贴板等平台相关写操作仍留在 `main.rs`。
 
 use std::sync::atomic::Ordering;
 
@@ -497,4 +497,79 @@ pub fn trash_list(
             })
         })
         .collect())
+}
+
+// ---- 分组页：排序 / 封面 / 置顶 ----
+
+#[tauri::command]
+pub fn group_list(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let lib = state.lib.lock().map_err(|e| e.to_string())?;
+    let stats: std::collections::BTreeMap<String, usize> = lib.group_stats().into_iter().collect();
+    let pinned = lib.pinned_groups().to_vec();
+    let groups: Vec<serde_json::Value> = lib
+        .group_order()
+        .iter()
+        .map(|name| {
+            let cover = lib.group_cover(name).map(|s| s.to_string());
+            let animated = cover
+                .as_deref()
+                .and_then(|sha| lib.find(sha))
+                .map(|a| a.animated)
+                .unwrap_or(false);
+            serde_json::json!({
+                "name": name,
+                "count": stats.get(name).copied().unwrap_or(0),
+                "cover": cover,
+                "animated": animated,
+                "pinned": pinned.iter().any(|p| p == name),
+            })
+        })
+        .collect();
+    Ok(serde_json::json!({ "groups": groups, "pinned": pinned }))
+}
+
+#[tauri::command]
+pub fn set_group_cover(
+    state: State<'_, AppState>,
+    group: String,
+    sha: Option<String>,
+) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_group_cover(&group, sha.as_deref())
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn set_group_order(state: State<'_, AppState>, order: Vec<String>) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_group_order(&order).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn set_pinned_groups(state: State<'_, AppState>, groups: Vec<String>) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_pinned_groups(groups).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn create_group(state: State<'_, AppState>, name: String) -> Result<bool, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.create_group(&name).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn rename_group(state: State<'_, AppState>, old: String, new: String) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.rename_group(&old, &new).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn remove_group(
+    state: State<'_, AppState>,
+    name: String,
+    delete_assets: bool,
+) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.remove_group(&name, delete_assets)
+        .map_err(|e| format!("{e:#}"))
 }

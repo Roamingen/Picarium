@@ -96,6 +96,15 @@ struct IndexFile {
     /// 手动排序：key（分组名 / __star__）→ sha 顺序
     #[serde(default)]
     orders: std::collections::BTreeMap<String, Vec<String>>,
+    /// 分组顺序（用户拖拽调整）；不在表里的分组按名字排到后面
+    #[serde(default)]
+    group_order: Vec<String>,
+    /// 分组封面：分组名 → 组内某张图的 sha
+    #[serde(default)]
+    group_covers: std::collections::BTreeMap<String, String>,
+    /// 置顶分组（按置顶顺序）
+    #[serde(default)]
+    pinned_groups: Vec<String>,
 }
 
 pub struct Library {
@@ -105,6 +114,9 @@ pub struct Library {
     orders: std::collections::BTreeMap<String, Vec<String>>,
     seen: HashSet<String>,
     seen_ungrouped_at: String,
+    group_order: Vec<String>,
+    group_covers: std::collections::BTreeMap<String, String>,
+    pinned_groups: Vec<String>,
 }
 
 impl Library {
@@ -120,6 +132,10 @@ impl Library {
         let mut known_groups: Vec<String> = Vec::new();
         let mut orders: std::collections::BTreeMap<String, Vec<String>> =
             std::collections::BTreeMap::new();
+        let mut group_order: Vec<String> = Vec::new();
+        let mut group_covers: std::collections::BTreeMap<String, String> =
+            std::collections::BTreeMap::new();
+        let mut pinned_groups: Vec<String> = Vec::new();
 
         if index_path.exists() {
             let txt = fs::read_to_string(&index_path)?;
@@ -129,6 +145,9 @@ impl Library {
                     seen_ungrouped_at = f.seen_ungrouped_at;
                     known_groups = f.groups;
                     orders = f.orders;
+                    group_order = f.group_order;
+                    group_covers = f.group_covers;
+                    pinned_groups = f.pinned_groups;
                 }
                 _ => {
                     // 索引坏了不要紧：备份一份，按 blob 目录重建（后续里程碑）
@@ -214,6 +233,32 @@ impl Library {
             known_groups = known.into_iter().collect();
         }
 
+        // 分组顺序：老库没有顺序表时按名字排；表里缺的补到末尾
+        {
+            let known: std::collections::HashSet<String> = known_groups.iter().cloned().collect();
+            let mut ordered: Vec<String> = Vec::new();
+            for name in group_order.into_iter() {
+                if known.contains(&name) && !ordered.contains(&name) {
+                    ordered.push(name);
+                }
+            }
+            for name in &known_groups {
+                if !ordered.contains(name) {
+                    ordered.push(name.clone());
+                }
+            }
+            group_order = ordered;
+        }
+        // 封面只保留「图还在、而且确实在这个组里」的记录
+        group_covers.retain(|group, sha| {
+            known_groups.iter().any(|g| g == group)
+                && assets
+                    .iter()
+                    .any(|a| &a.sha == sha && a.groups.iter().any(|g| g == group))
+        });
+        pinned_groups.retain(|g| known_groups.iter().any(|x| x == g));
+        pinned_groups.dedup();
+
         let seen = assets.iter().map(|a| a.sha.clone()).collect();
         let lib = Self {
             root,
@@ -222,6 +267,9 @@ impl Library {
             orders,
             seen,
             seen_ungrouped_at,
+            group_order,
+            group_covers,
+            pinned_groups,
         };
         if migrated {
             let _ = lib.save();
@@ -756,6 +804,7 @@ impl Library {
         validate_group_name(g)?;
         if !self.known_groups.iter().any(|x| x == g) {
             self.known_groups.push(g.to_string());
+            self.group_order.push(g.to_string());
         }
         for a in self.assets.iter_mut() {
             if shas.iter().any(|s| s == &a.sha) && !a.groups.iter().any(|x| x == g) {
@@ -788,6 +837,21 @@ impl Library {
             }
         }
         self.known_groups = clean_list(std::mem::take(&mut self.known_groups));
+        for g in self.group_order.iter_mut() {
+            if g == old {
+                *g = new.to_string();
+            }
+        }
+        self.group_order = clean_list(std::mem::take(&mut self.group_order));
+        if let Some(sha) = self.group_covers.remove(old) {
+            self.group_covers.insert(new.to_string(), sha);
+        }
+        for g in self.pinned_groups.iter_mut() {
+            if g == old {
+                *g = new.to_string();
+            }
+        }
+        self.pinned_groups = clean_list(std::mem::take(&mut self.pinned_groups));
         let mut touched = 0;
         for a in &mut self.assets {
             let mut changed = false;
@@ -838,6 +902,71 @@ impl Library {
         self.save()
     }
 
+    /// 分组顺序（用户拖拽过就是拖拽顺序，否则按名字）
+    pub fn group_order(&self) -> &[String] {
+        &self.group_order
+    }
+
+    /// 按给定顺序重排分组；没提到的分组按现有顺序补在后面
+    pub fn set_group_order(&mut self, order: &[String]) -> Result<()> {
+        let mut ordered: Vec<String> = Vec::new();
+        for name in order {
+            if self.known_groups.iter().any(|g| g == name) && !ordered.contains(name) {
+                ordered.push(name.clone());
+            }
+        }
+        for name in &self.known_groups {
+            if !ordered.contains(name) {
+                ordered.push(name.clone());
+            }
+        }
+        self.known_groups = ordered.clone();
+        self.group_order = ordered;
+        self.save()
+    }
+
+    /// 分组封面（组内某张图的 sha）
+    pub fn group_cover(&self, name: &str) -> Option<&str> {
+        self.group_covers.get(name).map(|s| s.as_str())
+    }
+
+    pub fn set_group_cover(&mut self, name: &str, sha: Option<&str>) -> Result<()> {
+        if !self.known_groups.iter().any(|g| g == name) {
+            return Err(anyhow::anyhow!("分组不存在：{name}"));
+        }
+        match sha {
+            None => {
+                self.group_covers.remove(name);
+            }
+            Some(sha) => {
+                let ok = self
+                    .assets
+                    .iter()
+                    .any(|a| a.sha == sha && a.groups.iter().any(|g| g == name));
+                if !ok {
+                    return Err(anyhow::anyhow!("封面必须是这个分组里的图"));
+                }
+                self.group_covers.insert(name.to_string(), sha.to_string());
+            }
+        }
+        self.save()
+    }
+
+    pub fn pinned_groups(&self) -> &[String] {
+        &self.pinned_groups
+    }
+
+    pub fn set_pinned_groups(&mut self, pinned: Vec<String>) -> Result<()> {
+        let mut out: Vec<String> = Vec::new();
+        for name in pinned {
+            if self.known_groups.iter().any(|g| g == &name) && !out.contains(&name) {
+                out.push(name);
+            }
+        }
+        self.pinned_groups = out;
+        self.save()
+    }
+
     /// 新建分组（可以是空分组）
     pub fn create_group(&mut self, name: &str) -> Result<bool> {
         let name = name.trim();
@@ -847,6 +976,9 @@ impl Library {
         }
         self.known_groups.push(name.to_string());
         self.known_groups = clean_list(std::mem::take(&mut self.known_groups));
+        if !self.group_order.iter().any(|g| g == name) {
+            self.group_order.push(name.to_string());
+        }
         self.save()?;
         Ok(true)
     }
@@ -863,10 +995,18 @@ impl Library {
             for sha in shas {
                 self.remove(&sha)?;
             }
+            self.known_groups.retain(|g| g != name);
+            self.group_order.retain(|g| g != name);
+            self.group_covers.remove(name);
+            self.pinned_groups.retain(|g| g != name);
+            self.save()?;
             return Ok(n);
         }
 
         self.known_groups.retain(|g| g != name);
+        self.group_order.retain(|g| g != name);
+        self.group_covers.remove(name);
+        self.pinned_groups.retain(|g| g != name);
         let mut touched = 0;
         for a in &mut self.assets {
             if a.groups.iter().any(|g| g == name) {
@@ -925,6 +1065,9 @@ impl Library {
             assets: self.assets.clone(),
             seen_ungrouped_at: self.seen_ungrouped_at.clone(),
             groups: self.known_groups.clone(),
+            group_order: self.group_order.clone(),
+            group_covers: self.group_covers.clone(),
+            pinned_groups: self.pinned_groups.clone(),
             orders: self.orders.clone(),
         };
         let json = serde_json::to_string_pretty(&index)?;
@@ -1362,6 +1505,41 @@ mod tests {
         assert_eq!(lib.trash().len(), 0);
 
         std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn group_meta_roundtrip() {
+        let base = std::env::temp_dir().join(format!("sb-gmeta-{}", std::process::id()));
+        let src = base.join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        for i in 0..2u8 {
+            image::RgbaImage::from_pixel(2, 2, image::Rgba([i + 1, 2, 3, 255]))
+                .save(src.join(format!("g{i}.png")))
+                .unwrap();
+        }
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        lib.scan_folder(&src).unwrap();
+        let shas: Vec<String> = lib.assets().iter().map(|a| a.sha.clone()).collect();
+        lib.create_group("甲").unwrap();
+        lib.create_group("乙").unwrap();
+        lib.add_group(&shas[..1], "甲").unwrap();
+        lib.add_group(&shas[1..], "乙").unwrap();
+        lib.set_group_order(&["乙".to_string(), "甲".to_string()]).unwrap();
+        lib.set_group_cover("乙", Some(&shas[1])).unwrap();
+        assert!(lib.set_group_cover("乙", Some(&shas[0])).is_err());
+        lib.set_pinned_groups(vec!["甲".to_string()]).unwrap();
+
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        assert_eq!(lib.group_order(), &["乙".to_string(), "甲".to_string()]);
+        assert_eq!(lib.group_cover("乙"), Some(shas[1].as_str()));
+        assert_eq!(lib.pinned_groups(), &["甲".to_string()]);
+
+        lib.rename_group("乙", "丙").unwrap();
+        assert_eq!(lib.group_cover("丙"), Some(shas[1].as_str()));
+        assert!(lib.group_order().iter().any(|g| g == "丙"));
+        lib.remove_group("丙", false).unwrap();
+        assert!(lib.group_cover("丙").is_none());
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

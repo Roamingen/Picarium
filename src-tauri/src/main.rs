@@ -336,12 +336,6 @@ fn set_clip_hotkey(
 }
 
 #[tauri::command]
-fn create_group(state: State<'_, AppState>, name: String) -> Result<bool, String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.create_group(&name).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
 fn batch_star(state: State<'_, AppState>, shas: Vec<String>, on: bool) -> Result<(), String> {
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     lib.set_star(&shas, on).map_err(|e| format!("{e:#}"))
@@ -555,23 +549,6 @@ fn add_to_group(
 fn clear_groups(state: State<'_, AppState>, shas: Vec<String>) -> Result<(), String> {
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     lib.clear_groups(&shas).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
-fn rename_group(state: State<'_, AppState>, old: String, new: String) -> Result<usize, String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.rename_group(&old, &new).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
-fn remove_group(
-    state: State<'_, AppState>,
-    name: String,
-    delete_assets: bool,
-) -> Result<usize, String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.remove_group(&name, delete_assets)
-        .map_err(|e| format!("{e:#}"))
 }
 
 #[tauri::command]
@@ -887,7 +864,7 @@ fn main() {
             copy_asset,
             copy_asset_file,
             batch_star,
-            create_group,
+            stickerbox_lib::commands::create_group,
             copy_assets_files,
             set_window_size,
             set_hotkey,
@@ -913,8 +890,8 @@ fn main() {
             delete_asset,
             add_to_group,
             clear_groups,
-            rename_group,
-            remove_group,
+            stickerbox_lib::commands::rename_group,
+            stickerbox_lib::commands::remove_group,
             mark_ungrouped_seen,
             stickerbox_lib::commands::tag_stats,
             stickerbox_lib::commands::trash_list,

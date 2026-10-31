@@ -2,7 +2,7 @@
 //!
 //! - `platform`：平台能力边界（分享进出、相册、文件选择、打开）
 //! - `state`：跨平台共享状态 `AppState`
-//! - `commands`：只读命令层（列表/详情/统计/设置）
+//! - `commands`：共享命令层（列表/详情/统计/设置/分组元数据）
 //! - `thumb`：`thumb://` 缩略图协议
 //! - `clipboard` / `recycle`：Windows 专属
 
@@ -49,7 +49,14 @@ pub fn run() {
             commands::source_stats,
             commands::tag_stats,
             commands::trash_list,
-            commands::get_settings
+            commands::get_settings,
+            commands::group_list,
+            commands::set_group_cover,
+            commands::set_group_order,
+            commands::set_pinned_groups,
+            commands::create_group,
+            commands::rename_group,
+            commands::remove_group
         ]);
 
     thumb::register(builder)

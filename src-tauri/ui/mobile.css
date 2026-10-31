@@ -245,7 +245,7 @@ body { overflow-x: hidden; overflow-y: auto; }
 }
 
 .mgt {
-  margin-left: auto;
+  margin-left: 8px;
   border: 0;
   background: transparent;
   color: var(--accent);
@@ -254,6 +254,8 @@ body { overflow-x: hidden; overflow-y: auto; }
   font-family: inherit;
   padding: 2px 0;
 }
+
+.pinlbl .mgt:first-of-type { margin-left: auto; }
 
 .pinrow {
   display: flex;
@@ -502,3 +504,150 @@ body { overflow-x: hidden; overflow-y: auto; }
   z-index: 20;
   box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
 }
+
+/* ---------- 分组页 ---------- */
+
+.gview { padding-bottom: 12px; }
+
+.ghead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(12px + var(--safe-top)) 16px 8px;
+}
+
+.ghead .gtitle { font-size: 20px; font-weight: 700; }
+.ghead .gtitle small { font-size: 11.5px; color: var(--dim); font-weight: 400; margin-left: 5px; }
+.ghead .iconbtn { margin-left: auto; }
+.ghead .back { margin-left: 0; }
+
+.gsearch { margin: 2px 16px 10px; }
+
+.gmeta { padding: 0 16px 8px; font-size: 11.5px; color: var(--dim2); }
+
+.folders {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 4px 16px 16px;
+}
+
+.folder {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface3);
+  padding: 0;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  position: relative;
+}
+
+.folder .fc {
+  height: 118px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 38px;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface3);
+}
+
+.folder .fc img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.folder .pinmark {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  font-size: 10px;
+  background: rgba(8, 10, 14, .62);
+  border-radius: 6px;
+  padding: 1px 5px;
+  color: #dfe6f2;
+}
+
+.folder .fb { padding: 8px 10px 10px; }
+.folder .fname {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folder .fsub { display: block; font-size: 10.5px; color: var(--dim); margin-top: 2px; }
+
+.folder.new .fc { border-bottom: 1px dashed var(--line2); color: var(--dim); font-size: 24px; }
+
+.gempty { color: var(--dim); text-align: center; font-size: 13px; padding: 26px 0; }
+
+/* ---------- 底部弹层 ---------- */
+
+.sheetmask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+}
+
+.sheet {
+  width: 100%;
+  background: #191d24;
+  border-radius: 22px 22px 0 0;
+  padding: 10px 16px calc(16px + var(--safe-bottom));
+  max-height: 76dvh;
+  overflow-y: auto;
+}
+
+.sheet-h { font-size: 14px; font-weight: 600; text-align: center; padding: 6px 0 10px; }
+
+.menu { display: flex; flex-direction: column; }
+.menu button {
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 15px;
+  padding: 14px 6px;
+  border-radius: 12px;
+  text-align: left;
+}
+.menu button:active { background: var(--surface2); }
+.menu button.danger { color: #ff8a8a; }
+
+.minput {
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line2);
+  background: var(--surface3);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 15px;
+  padding: 0 12px;
+  margin: 6px 0 14px;
+}
+
+.sheet-actions { display: flex; gap: 10px; }
+.sheet-actions button {
+  flex: 1;
+  height: 46px;
+  border-radius: 14px;
+  border: 1px solid var(--line2);
+  background: var(--surface2);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 15px;
+}
+.sheet-actions button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+
+.coverpick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 6px 0 10px; }
+.coverpick button { border: 0; padding: 0; border-radius: 10px; overflow: hidden; aspect-ratio: 1 / 1; background: var(--surface3); position: relative; }
+.coverpick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.coverpick button.on { outline: 2px solid var(--accent); outline-offset: -2px; }
+.shnote { font-size: 11.5px; color: var(--dim); text-align: center; padding-bottom: 4px; }

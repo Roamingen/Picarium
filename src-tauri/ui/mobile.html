@@ -38,7 +38,7 @@
     </div>
 
     <section class="pins" id="pins-wrap" hidden>
-      <div class="pinlbl">置顶分组 <button class="mgt" id="pins-manage">管理</button></div>
+      <div class="pinlbl">置顶分组 <button class="mgt" id="pins-toggle">展开</button> <button class="mgt mgt2" id="pins-manage">管理</button></div>
       <div class="pinrow" id="pins"></div>
     </section>
 
@@ -66,6 +66,44 @@
         <span>我的</span>
       </button>
     </nav>
+
+    <!-- 分组页 -->
+    <section class="gview" id="groupsview" hidden>
+      <header class="ghead">
+        <div class="gtitle">分组<small id="gcount"></small></div>
+        <button class="iconbtn" id="btn-newgroup" title="新建分组">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </header>
+      <div class="search gsearch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="gq" placeholder="搜索分组" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="folders" id="folders"></div>
+    </section>
+
+    <!-- 分组详情 -->
+    <section class="gview" id="groupdetail" hidden>
+      <header class="ghead">
+        <button class="iconbtn back" id="btn-gback" title="返回">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg>
+        </button>
+        <div class="gtitle" id="gd-title"></div>
+        <button class="iconbtn" id="btn-gcover" title="换封面">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="m4 18 5-5 3 3 3-3 5 5"/></svg>
+        </button>
+      </header>
+      <div class="gmeta" id="gd-meta"></div>
+      <div class="grid gdgrid" id="gd-grid"></div>
+    </section>
+
+    <!-- 底部弹层：长按菜单 / 换封面 / 重命名 / 新建 / 确认 -->
+    <div class="sheetmask" id="sheetmask" hidden>
+      <div class="sheet" id="sheet">
+        <div class="sheet-h" id="sheet-title"></div>
+        <div class="sheet-body" id="sheet-body"></div>
+      </div>
+    </div>
 
     <section class="tabpage" id="tabpage" hidden>
       <div class="tabpage-inner">
