@@ -39,6 +39,7 @@
 
     <section class="pins" id="pins-wrap" hidden>
       <div class="pinlbl">置顶分组 <button class="mgt" id="pins-toggle">展开</button> <button class="mgt mgt2" id="pins-manage">管理</button></div>
+      <div class="pinhint" id="pins-hint" hidden>长按卡片可拖动排序</div>
       <div class="pinrow" id="pins"></div>
     </section>
 
@@ -47,6 +48,17 @@
     <button class="fab" id="fab" title="导入">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
     </button>
+
+    <div class="selbar" id="selbar" hidden>
+      <div class="selinfo"><b id="selcount">0</b> 个已选</div>
+      <div class="selacts">
+        <button data-sel="pin">置顶</button>
+        <button data-sel="unpin">取消置顶</button>
+        <button data-sel="cover">封面</button>
+        <button data-sel="rename">改名</button>
+        <button data-sel="delete" class="danger">删除</button>
+      </div>
+    </div>
 
     <nav class="nav" id="nav">
       <button data-tab="gallery" class="on">

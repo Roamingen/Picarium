@@ -1521,10 +1521,18 @@ function hideTip() {
 
 /* ---------- 分组 ---------- */
 
+let groupMeta = [];
+let dragGroup = null;
+let coverGroup = null;
+
 async function loadGroups() {
-  const data = await invoke('group_stats');
-  allGroups = data.groups.map((g) => g.name);
-  const tags = await invoke('tag_stats');
+  const [data, meta, tags] = await Promise.all([
+    invoke('group_stats'),
+    invoke('group_list'),
+    invoke('tag_stats'),
+  ]);
+  groupMeta = meta.groups;
+  allGroups = meta.groups.map((g) => g.name);
   allTags = tags.map((t) => t.name);
 
   $('c-all').textContent = data.total;
@@ -1543,24 +1551,57 @@ async function loadGroups() {
 
   const list = $('group-list');
   list.innerHTML = '';
-  for (const g of data.groups) {
+  for (const g of meta.groups) {
     const b = document.createElement('button');
     b.className = 'side-item' + (currentGroup === g.name ? ' active' : '');
     b.dataset.group = g.name;
-    b.innerHTML = `<span class="g-name">${escapeHtml(g.name)}</span><span>${g.count}</span>`;
+    b.draggable = true;
+    const cover = g.cover
+      ? `<img class="g-cover" src="${convertFileSrc(g.cover, 'thumb')}" alt="" loading="lazy" onerror="this.remove()">`
+      : icon('folder-plus', 14);
+    const pin = g.pinned ? `<span class="g-pin" title="已置顶到图库">${icon('pin', 12)}</span>` : '';
+    b.innerHTML = `<span class="g-thumb">${cover}</span><span class="g-name">${escapeHtml(g.name)}</span>${pin}<span class="g-count">${g.count}</span>`;
     b.addEventListener('click', () => selectGroup(g.name));
     b.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       openGroupMenu(g.name, e.clientX, e.clientY);
     });
+    b.addEventListener('dragstart', (e) => {
+      dragGroup = g.name;
+      b.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', g.name);
+    });
+    b.addEventListener('dragend', () => {
+      dragGroup = null;
+      cleanGroupDropMarks();
+    });
     b.addEventListener('dragover', (e) => {
       e.preventDefault();
+      if (dragGroup) {
+        e.dataTransfer.dropEffect = 'move';
+        const r = b.getBoundingClientRect();
+        const after = e.clientY > r.top + r.height / 2;
+        b.classList.toggle('drop-after', after);
+        b.classList.toggle('drop-before', !after);
+        return;
+      }
       e.dataTransfer.dropEffect = 'copy';
       b.classList.add('drop-target');
     });
-    b.addEventListener('dragleave', () => b.classList.remove('drop-target'));
+    b.addEventListener('dragleave', () => {
+      b.classList.remove('drop-target', 'drop-before', 'drop-after');
+    });
     b.addEventListener('drop', async (e) => {
       e.preventDefault();
+      if (dragGroup) {
+        const after = b.classList.contains('drop-after');
+        const from = dragGroup;
+        dragGroup = null;
+        cleanGroupDropMarks();
+        await reorderGroup(from, g.name, after);
+        return;
+      }
       b.classList.remove('drop-target');
       const shas = readDragShas(e);
       if (!shas.length) return;
@@ -1573,6 +1614,26 @@ async function loadGroups() {
   }
 
   renderPickers();
+}
+
+function cleanGroupDropMarks() {
+  document
+    .querySelectorAll('#group-list .drop-before, #group-list .drop-after, #group-list .drop-target, #group-list .dragging')
+    .forEach((el) => el.classList.remove('drop-before', 'drop-after', 'drop-target', 'dragging'));
+}
+
+async function reorderGroup(from, to, after) {
+  if (!from || !to || from === to) return;
+  const order = groupMeta.map((g) => g.name).filter((n) => n !== from);
+  const at = order.indexOf(to);
+  if (at < 0) return;
+  order.splice(after ? at + 1 : at, 0, from);
+  try {
+    await invoke('set_group_order', { order });
+    await loadGroups();
+  } catch (err) {
+    toast('调整顺序失败：' + err);
+  }
 }
 
 $('group-add').addEventListener('click', async (e) => {
@@ -1648,6 +1709,26 @@ async function groupAction(act) {
     return;
   }
 
+
+  if (act === 'cover') {
+    openCoverPicker(name);
+    return;
+  }
+
+  if (act === 'pin') {
+    const pinned = groupMeta.filter((g) => g.pinned).map((g) => g.name);
+    const on = !pinned.includes(name);
+    const next = on ? [...pinned, name] : pinned.filter((n) => n !== name);
+    try {
+      await invoke('set_pinned_groups', { groups: next });
+      await loadGroups();
+      toast(on ? `已置顶「${name}」到图库` : `已取消置顶「${name}」`);
+    } catch (err) {
+      toast('置顶失败：' + err);
+    }
+    return;
+  }
+
   if (act === 'clear') {
     const ok = await confirmDialog(`解散分组「${name}」？组里的表情会回到未分组，不会被删除。`);
     if (!ok) return;
@@ -1669,6 +1750,66 @@ async function groupAction(act) {
     toast(`已删除 ${n} 张`);
   }
 }
+
+let coverPickSeq = 0;
+
+async function openCoverPicker(name) {
+  coverGroup = name;
+  const meta = groupMeta.find((g) => g.name === name);
+  $('cover-title').textContent = `换封面 · ${name}`;
+  $('coverpick').hidden = false;
+  const grid = $('cover-grid');
+  grid.innerHTML = '<div class="picker-empty">加载中…</div>';
+  const seq = ++coverPickSeq;
+  try {
+    const items = await invoke('list_assets', { q: '', group: name, limit: 500 });
+    if (seq !== coverPickSeq) return;
+    if (!items.length) {
+      grid.innerHTML = '<div class="picker-empty">这个分组还没有图片</div>';
+      return;
+    }
+    const cur = meta && meta.cover;
+    grid.innerHTML = items
+      .map(
+        (a) =>
+          `<button class="cover-item${a.sha === cur ? ' on' : ''}" data-sha="${a.sha}">` +
+          `<img src="${convertFileSrc(a.sha, 'thumb')}" alt="" loading="lazy"></button>`
+      )
+      .join('');
+  } catch (err) {
+    if (seq === coverPickSeq) grid.innerHTML = `<div class="picker-empty">读取失败：${escapeHtml(String(err))}</div>`;
+  }
+}
+
+function closeCoverPicker() {
+  coverPickSeq++;
+  $('coverpick').hidden = true;
+  coverGroup = null;
+  $('cover-grid').innerHTML = '';
+}
+
+async function applyGroupCover(sha) {
+  const name = coverGroup;
+  closeCoverPicker();
+  if (!name) return;
+  try {
+    await invoke('set_group_cover', { group: name, sha });
+    await loadGroups();
+    toast(sha ? '封面已更新' : '已恢复默认封面');
+  } catch (err) {
+    toast('设置封面失败：' + err);
+  }
+}
+
+$('cover-grid').addEventListener('click', (e) => {
+  const b = e.target.closest('.cover-item');
+  if (b) applyGroupCover(b.dataset.sha);
+});
+$('cover-cancel').addEventListener('click', closeCoverPicker);
+$('cover-reset').addEventListener('click', () => applyGroupCover(null));
+$('coverpick').addEventListener('click', (e) => {
+  if (e.target === $('coverpick')) closeCoverPicker();
+});
 
 /* ---------- 编辑 ---------- */
 

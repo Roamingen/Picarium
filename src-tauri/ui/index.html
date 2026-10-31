@@ -129,9 +129,23 @@
   </div>
 
   <div id="gmenu" class="menu" hidden>
+    <button data-act="cover">换封面…</button>
+    <button data-act="pin">置顶到图库</button>
     <button data-act="rename">重命名分组…</button>
     <button data-act="clear">解散分组（表情保留）</button>
     <button data-act="delete" class="danger">删除分组及其中表情</button>
+  </div>
+
+  <div id="coverpick" class="modal-mask" hidden>
+    <div class="modal wide">
+      <div class="modal-head"><span class="modal-title" id="cover-title">换封面</span></div>
+      <div id="cover-grid" class="cover-grid"></div>
+      <div class="modal-actions">
+        <button id="cover-reset" class="btn small">恢复默认</button>
+        <div class="spacer"></div>
+        <button id="cover-cancel" class="btn">取消</button>
+      </div>
+    </div>
   </div>
 
   <div id="prompt" class="modal-mask" hidden>

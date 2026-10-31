@@ -22,6 +22,24 @@ const S = {
   loading: false,
 };
 
+const SVG = {
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></svg>',
+  folder:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>',
+};
+
+let selMode = false;
+const sel = new Set();
+let holdInfo = null;
+let holdTimer = 0;
+let dragCtx = null;
+let suppressClick = false;
+try {
+  S.pinsPerRow = Math.min(6, Math.max(3, +localStorage.getItem('sb.pinPerRow') || 4));
+  S.pinRows = Math.min(3, Math.max(1, +localStorage.getItem('sb.pinRows') || 2));
+} catch (_) { S.pinsPerRow = 4; S.pinRows = 2; }
+
 const TAB_INFO = {
   groups: {
     title: "分组",
@@ -174,18 +192,25 @@ function pinNames() {
   return S.groupList.map((g) => g.name);
 }
 
+function pinLimit() {
+  return S.pinsPerRow * S.pinRows;
+}
+
 function renderPins() {
   const total = pinNames();
-  const list = S.pinsOpen ? total : total.slice(0, 4);
+  const limit = pinLimit();
+  const list = S.pinsOpen ? total : total.slice(0, limit);
   $("pins-wrap").hidden = S.tab !== "gallery" || total.length === 0;
-  $("pins-toggle").textContent = S.pinsOpen ? "收起" : "展开";
-  $("pins-toggle").hidden = total.length <= 4;
+  $("pins-toggle").textContent = S.pinsOpen ? "收起" : "展开全部 " + total.length;
+  $("pins-toggle").hidden = total.length <= limit;
+  const hint = $("pins-hint");
+  if (hint) hint.hidden = !(S.pinsOpen && S.pinned.length > 1);
   if (total.length === 0) return;
 
   const card = (name) => {
     const g = S.groupList.find((x) => x.name === name) || { name, count: 0 };
     return `<button class="pin" data-group="${escapeAttr(name)}">
-      <div class="pc">${g.cover ? `<img src="${thumbUrl(g.cover, g.animated)}" alt="" loading="lazy" onerror="this.remove()">` : folderEmoji(g.count)}
+      <div class="pc">${g.cover ? `<img src="${thumbUrl(g.cover, g.animated)}" alt="" loading="lazy" onerror="this.remove()">` : folderIcon(g.name)}
         ${g.animated && g.cover ? '<span class="gb">GIF</span>' : ""}</div>
       <div class="pn">${escapeHtml(name)}</div>
     </button>`;
@@ -239,34 +264,56 @@ async function loadGroups() {
   if (S.tab === "groups" && !S.gview) renderFolders();
 }
 
-function folderEmojiG(name) {
+function hueOf(name) {
   let h = 0;
-  for (const ch of name) h = (h * 31 + ch.codePointAt(0)) % 997;
-  const list = ["🐟", "🐱", "🍵", "🎀", "🫧", "💤", "🌈", "🔥", "🍜", "🧋", "🐰", "⭐"];
-  return list[h % list.length];
+  for (const ch of name) h = (h * 31 + ch.codePointAt(0)) % 360;
+  return h;
+}
+
+function folderIcon(name) {
+  return `<span class="fico" style="--h:${hueOf(name)}">${SVG.folder}</span>`;
 }
 
 function folderCard(g) {
   const cover = g.cover
     ? `<img src="${thumbUrl(g.cover, g.animated)}" alt="" loading="lazy" onerror="this.remove()">`
-    : folderEmojiG(g.name);
-  return `<button class="folder" data-group="${escapeAttr(g.name)}">
-    <div class="fc">${cover}${g.animated && g.cover ? '<span class="gb">GIF</span>' : ""}${g.pinned ? '<span class="pinmark">📌 置顶</span>' : ""}</div>
+    : folderIcon(g.name);
+  const pinned = g.pinned ? `<span class="pinmark" title="已置顶">${SVG.pin}</span>` : "";
+  return `<button class="folder${sel.has(g.name) ? " sel" : ""}" data-group="${escapeAttr(g.name)}">
+    <span class="fcheck">${SVG.check}</span>
+    <div class="fc">${cover}${g.animated && g.cover ? '<span class="gb">GIF</span>' : ""}${pinned}</div>
     <div class="fb"><span class="fname">${escapeHtml(g.name)}</span><span class="fsub">${g.count} 张</span></div>
   </button>`;
 }
 
-function renderFolders() {
+function renderFolders(keepScroll) {
   const folderBox = $("folders");
   if (!folderBox) return;
   const q = S.gq.trim().toLowerCase();
   const list = S.groupList.filter((g) => !q || g.name.toLowerCase().includes(q));
-  $("gcount").textContent = ` ${S.groupList.length} 个`;
+  const y = keepScroll ? window.scrollY : null;
+  $("gcount").textContent = selMode ? ` 已选 ${sel.size} 个` : ` ${S.groupList.length} 个`;
+  $("btn-newgroup").innerHTML = selMode
+    ? SVG.check
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+  $("btn-newgroup").title = selMode ? "完成" : "新建分组";
+  $("selbar").hidden = !selMode;
+  if (selMode) $("selcount").textContent = String(sel.size);
   folderBox.innerHTML =
     list.map(folderCard).join("") +
-    `<button class="folder new" data-new="1"><div class="fc">＋</div><div class="fb"><span class="fname">新建分组</span><span class="fsub">把一堆图归到一起</span></div></button>`;
+    (selMode
+      ? ""
+      : `<button class="folder new" data-new="1"><div class="fc">＋</div><div class="fb"><span class="fname">新建分组</span><span class="fsub">把一堆图归到一起</span></div></button>`);
+  if (y !== null) window.scrollTo(0, y);
+  if (dragCtx) {
+    const src = folderBox.querySelector(`.folder[data-group="${cssEsc(dragCtx.name)}"]`);
+    if (src) src.classList.add("dragsrc");
+  }
 }
 
+function cssEsc(s) {
+  return String(s).replace(/["\\]/g, "\\$&");
+}
 async function openGroup(name) {
   S.gview = name;
   setTab("groups");
@@ -450,6 +497,372 @@ async function openCoverPicker(name) {
   }
 }
 
+
+/* ---------- 批 7：多选 / 拖拽 / 置顶管理 ---------- */
+
+function resetHold() {
+  clearTimeout(holdTimer);
+  if (holdInfo && holdInfo.card) holdInfo.card.classList.remove("lift");
+  holdInfo = null;
+}
+
+function armFolderHold() {
+  if (!holdInfo) return;
+  holdInfo.armed = true;
+  holdInfo.card.classList.add("lift");
+  if (navigator.vibrate) navigator.vibrate(12);
+}
+
+function finishFolderHold() {
+  const info = holdInfo;
+  if (!info) return;
+  clearTimeout(holdTimer);
+  if (dragCtx) {
+    endFolderDrag();
+    return;
+  }
+  info.card.classList.remove("lift");
+  holdInfo = null;
+  if (info.armed) {
+    suppressClick = true;
+    setTimeout(() => (suppressClick = false), 450);
+    if (!selMode) setSelMode(true);
+    toggleSel(info.name);
+  }
+}
+
+function setSelMode(on) {
+  selMode = on;
+  if (!on) sel.clear();
+  renderFolders(true);
+}
+
+function toggleSel(name) {
+  if (sel.has(name)) sel.delete(name);
+  else sel.add(name);
+  if (selMode && sel.size === 0) {
+    selMode = false;
+    renderFolders(true);
+    return;
+  }
+  renderFolders(true);
+}
+
+function captureFolderRects() {
+  const map = new Map();
+  document.querySelectorAll("#folders .folder[data-group]").forEach((el) => {
+    map.set(el.dataset.group, el.getBoundingClientRect());
+  });
+  return map;
+}
+
+function flipFolders(before) {
+  document.querySelectorAll("#folders .folder[data-group]").forEach((el) => {
+    const old = before.get(el.dataset.group);
+    if (!old) return;
+    const now = el.getBoundingClientRect();
+    const dx = old.left - now.left;
+    const dy = old.top - now.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    el.style.transition = "none";
+    el.style.transform = `translate(${dx}px, ${dy}px)`;
+    requestAnimationFrame(() => {
+      el.style.transition = "transform .24s cubic-bezier(.22,.85,.28,1)";
+      el.style.transform = "";
+    });
+  });
+}
+
+function beginFolderDrag(e) {
+  const info = holdInfo;
+  if (!info) return;
+  const r = info.card.getBoundingClientRect();
+  dragCtx = {
+    name: info.name,
+    offX: info.x - r.left,
+    offY: info.y - r.top,
+    w: r.width,
+    h: r.height,
+    ghost: info.card.cloneNode(true),
+    moved: false,
+  };
+  const g = dragCtx.ghost;
+  g.classList.remove("lift");
+  g.classList.add("ghost");
+  g.style.left = r.left + "px";
+  g.style.top = r.top + "px";
+  g.style.width = r.width + "px";
+  g.style.height = r.height + "px";
+  document.body.appendChild(g);
+  info.card.classList.add("dragsrc");
+  if (navigator.vibrate) navigator.vibrate(16);
+}
+
+function updateFolderDrag(e) {
+  const d = dragCtx;
+  if (!d) return;
+  d.moved = true;
+  d.ghost.style.left = e.clientX - d.offX + "px";
+  d.ghost.style.top = e.clientY - d.offY + "px";
+  if (S.gq.trim()) return;
+
+  const cards = [...document.querySelectorAll("#folders .folder[data-group]")].filter(
+    (c) => c.dataset.group !== d.name
+  );
+  if (!cards.length) return;
+  let best = 0;
+  let bestD = Infinity;
+  cards.forEach((c, i) => {
+    const r = c.getBoundingClientRect();
+    const dx = e.clientX - (r.left + r.width / 2);
+    const dy = e.clientY - (r.top + r.height / 2);
+    const dist = dx * dx + dy * dy;
+    if (dist < bestD) {
+      bestD = dist;
+      best = i;
+    }
+  });
+  const target = cards[best];
+  const r = target.getBoundingClientRect();
+  const after = e.clientX > r.left + r.width / 2;
+  const order = S.groupList.map((g) => g.name).filter((n) => n !== d.name);
+  const pos = order.indexOf(target.dataset.group) + (after ? 1 : 0);
+  order.splice(pos, 0, d.name);
+  if (order.join("\u0001") === S.groupList.map((g) => g.name).join("\u0001")) return;
+  const before = captureFolderRects();
+  S.groupList = order.map((n) => S.groupList.find((g) => g.name === n)).filter(Boolean);
+  renderFolders(true);
+  flipFolders(before);
+}
+
+async function endFolderDrag() {
+  const d = dragCtx;
+  dragCtx = null;
+  if (!d) return;
+  if (d.ghost) d.ghost.remove();
+  suppressClick = true;
+  setTimeout(() => (suppressClick = false), 450);
+  resetHold();
+  document.querySelectorAll("#folders .dragsrc").forEach((el) => el.classList.remove("dragsrc"));
+  if (!d.moved) return;
+  try {
+    await invokeRetry("set_group_order", { order: S.groupList.map((g) => g.name) });
+    await loadGroups();
+    toast("顺序已保存");
+  } catch (err) {
+    toast("保存顺序失败：" + String(err));
+  }
+}
+
+/* 置顶分组拖拽排序（展开时可用） */
+let pinDrag = null;
+
+function wirePinDrag() {
+  const pins = $("pins");
+  let timer = 0;
+  pins.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest(".pin[data-group]");
+    if (!b || !S.pinsOpen || S.pinned.length < 2) return;
+    const start = { x: e.clientX, y: e.clientY, name: b.dataset.group, card: b, armed: false };
+    pinDrag = start;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      start.armed = true;
+      const r = b.getBoundingClientRect();
+      start.offX = start.x - r.left;
+      start.w = r.width;
+      const g = b.cloneNode(true);
+      g.classList.add("ghost");
+      g.style.left = r.left + "px";
+      g.style.top = r.top + "px";
+      g.style.width = r.width + "px";
+      document.body.appendChild(g);
+      start.ghost = g;
+      b.classList.add("dragsrc");
+      if (navigator.vibrate) navigator.vibrate(12);
+    }, 320);
+  });
+  pins.addEventListener("pointermove", (e) => {
+    if (!pinDrag || !pinDrag.armed) {
+      if (pinDrag && (Math.abs(e.clientX - pinDrag.x) > 8 || Math.abs(e.clientY - pinDrag.y) > 8)) {
+        clearTimeout(timer);
+        pinDrag = null;
+      }
+      return;
+    }
+    e.preventDefault();
+    const d = pinDrag;
+    d.ghost.style.left = e.clientX - d.offX + "px";
+    d.ghost.style.top = e.clientY - 20 + "px";
+    const cards = [...document.querySelectorAll("#pins .pin[data-group]")].filter(
+      (c) => c.dataset.group !== d.name
+    );
+    if (!cards.length) return;
+    let best = 0;
+    let bestD = Infinity;
+    cards.forEach((c, i) => {
+      const r = c.getBoundingClientRect();
+      const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+      if (dist < bestD) { bestD = dist; best = i; }
+    });
+    const target = cards[best];
+    const r = target.getBoundingClientRect();
+    const after = e.clientX > r.left + r.width / 2;
+    const order = S.pinned.filter((n) => n !== d.name);
+    const pos = order.indexOf(target.dataset.group) + (after ? 1 : 0);
+    order.splice(pos, 0, d.name);
+    if (order.join("\u0001") === S.pinned.join("\u0001")) return;
+    S.pinned = order;
+    const before = new Map();
+    document.querySelectorAll("#pins .pin[data-group]").forEach((el) => {
+      before.set(el.dataset.group, el.getBoundingClientRect());
+    });
+    renderPins();
+    document.querySelectorAll("#pins .pin[data-group]").forEach((el) => {
+      const old = before.get(el.dataset.group);
+      if (!old) return;
+      const now = el.getBoundingClientRect();
+      const dx = old.left - now.left;
+      if (Math.abs(dx) < 1) return;
+      el.style.transition = "none";
+      el.style.transform = `translateX(${dx}px)`;
+      requestAnimationFrame(() => {
+        el.style.transition = "transform .22s cubic-bezier(.22,.85,.28,1)";
+        el.style.transform = "";
+      });
+    });
+  }, { passive: false });
+  pins.addEventListener("pointerup", async () => {
+    clearTimeout(timer);
+    const d = pinDrag;
+    pinDrag = null;
+    if (!d || !d.armed) return;
+    suppressClick = true;
+    setTimeout(() => (suppressClick = false), 450);
+    if (d.ghost) d.ghost.remove();
+    document.querySelectorAll("#pins .dragsrc").forEach((el) => el.classList.remove("dragsrc"));
+    try {
+      await invokeRetry("set_pinned_groups", { groups: S.pinned.filter((n) => S.groupList.some((g) => g.name === n)) });
+      await loadGroups();
+      toast("置顶顺序已保存");
+    } catch (err) {
+      toast("保存失败：" + String(err));
+    }
+  });
+  pins.addEventListener("pointercancel", () => {
+    clearTimeout(timer);
+    if (pinDrag && pinDrag.ghost) pinDrag.ghost.remove();
+    pinDrag = null;
+  });
+}
+
+/* 批量操作 */
+async function batchSetPin(on) {
+  const names = [...sel];
+  if (!names.length) return;
+  const rest = S.pinned.filter((n) => !names.includes(n));
+  const next = on ? [...rest, ...names] : rest;
+  try {
+    await invokeRetry("set_pinned_groups", { groups: next });
+    setSelMode(false);
+    await loadGroups();
+    toast(on ? `已置顶 ${names.length} 个分组` : `已取消置顶 ${names.length} 个`);
+  } catch (err) {
+    toast("操作失败：" + String(err));
+  }
+}
+
+async function batchDelete() {
+  const names = [...sel];
+  if (!names.length) return;
+  openSheet(
+    `删除 ${names.length} 个分组`,
+    `<div class="shnote">只解散分组，组里的图会回到「未分组」，不会被删除。</div>
+     ${sheetActions("删除", "batch-del")}`
+  );
+  $("sheet-cancel").onclick = closeSheet;
+  $("batch-del").onclick = async () => {
+    try {
+      for (const n of names) await invokeRetry("remove_group", { name: n, deleteAssets: false });
+      closeSheet();
+      setSelMode(false);
+      await loadGroups();
+      toast("已删除分组");
+    } catch (err) {
+      toast("删除失败：" + String(err));
+    }
+  };
+}
+
+function batchSingle(act) {
+  const names = [...sel];
+  if (names.length !== 1) return toast("这个操作一次选一个分组");
+  const name = names[0];
+  setSelMode(false);
+  if (act === "cover") openCoverPicker(name);
+  if (act === "rename") openRename(name);
+}
+
+/* 置顶管理：置顶哪些 + 显示几个 */
+function openPinManager() {
+  const row = (g) => {
+    const on = S.pinned.includes(g.name);
+    return `<button class="prow" data-pin="${escapeAttr(g.name)}">
+      <span class="pcheck${on ? " on" : ""}">${on ? SVG.check : ""}</span>
+      <span class="pname">${escapeHtml(g.name)}</span>
+      <span class="pcount">${g.count}</span>
+    </button>`;
+  };
+  openSheet(
+    "置顶分组",
+    `<div class="sect">图库顶部每行显示</div>
+     <div class="opts" id="pin-cols">
+       ${[4, 5, 6].map((n) => `<div class="opt${S.pinsPerRow === n ? " on" : ""}" data-cols="${n}">${n} 个</div>`).join("")}
+     </div>
+     <div class="sect">最多显示</div>
+     <div class="opts" id="pin-rows">
+       ${[1, 2, 3].map((n) => `<div class="opt${S.pinRows === n ? " on" : ""}" data-rows="${n}">${n} 行</div>`).join("")}
+     </div>
+     <div class="sect">置顶哪些分组（可多选）</div>
+     <div class="pinlist" id="pinlist">${S.groupList.map(row).join("")}</div>
+     <div class="shnote">置顶后，在图库顶部展开置顶条，长按卡片可以拖动排序。</div>`
+  );
+  $("sheet-body").onclick = async (e) => {
+    const c = e.target.closest("[data-cols]");
+    const r = e.target.closest("[data-rows]");
+    const p = e.target.closest("[data-pin]");
+    if (c) {
+      S.pinsPerRow = +c.dataset.cols;
+      try { localStorage.setItem("sb.pinPerRow", String(S.pinsPerRow)); } catch (_) {}
+      $("pin-cols").querySelectorAll(".opt").forEach((el) => el.classList.toggle("on", +el.dataset.cols === S.pinsPerRow));
+      renderPins();
+      return;
+    }
+    if (r) {
+      S.pinRows = +r.dataset.rows;
+      try { localStorage.setItem("sb.pinRows", String(S.pinRows)); } catch (_) {}
+      $("pin-rows").querySelectorAll(".opt").forEach((el) => el.classList.toggle("on", +el.dataset.rows === S.pinRows));
+      renderPins();
+      return;
+    }
+    if (p) {
+      const name = p.dataset.pin;
+      const on = !S.pinned.includes(name);
+      S.pinned = on ? [...S.pinned, name] : S.pinned.filter((n) => n !== name);
+      try {
+        await invokeRetry("set_pinned_groups", { groups: S.pinned });
+        await loadGroups();
+        p.querySelector(".pcheck").classList.toggle("on", on);
+        p.querySelector(".pcheck").innerHTML = on ? SVG.check : "";
+        p.querySelector(".pcheck").className = "pcheck" + (on ? " on" : "");
+      } catch (err) {
+        toast("设置失败：" + String(err));
+      }
+    }
+  };
+}
+
+
 /* ---------- tab ---------- */
 
 function setTab(tab) {
@@ -525,12 +938,14 @@ function wire() {
   $("pins").addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
+    if (suppressClick) { suppressClick = false; return; }
     if (b.dataset.all) {
       setTab("groups");
     } else if (b.dataset.group) {
       openGroup(b.dataset.group);
     }
   });
+  wirePinDrag();
 
   $("pins-toggle").addEventListener("click", () => {
     S.pinsOpen = !S.pinsOpen;
@@ -543,35 +958,55 @@ function wire() {
     renderFolders();
   });
 
-  // 分组页：点进分组；长按 500ms 打开菜单
-  let pressTimer = 0;
-  let longPressed = false;
+  // 分组页：轻点进组 / 长按多选 / 长按后拖动排序
   const folders = $("folders");
   folders.addEventListener("pointerdown", (e) => {
     const f = e.target.closest(".folder");
-    if (!f || f.dataset.new) return;
-    longPressed = false;
-    clearTimeout(pressTimer);
-    pressTimer = setTimeout(() => {
-      longPressed = true;
-      openGroupMenu(f.dataset.group);
-    }, 500);
+    if (!f || f.dataset.new || e.button > 0) return;
+    suppressClick = false;
+    holdInfo = { name: f.dataset.group, card: f, x: e.clientX, y: e.clientY, armed: false, moved: false };
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => armFolderHold(), 340);
+    try { f.setPointerCapture(e.pointerId); } catch (_) {}
   });
-  for (const ev of ["pointerup", "pointercancel", "pointermove", "pointerleave"]) {
-    folders.addEventListener(ev, () => clearTimeout(pressTimer));
-  }
+  folders.addEventListener("pointermove", (e) => {
+    if (!holdInfo) return;
+    const d = Math.hypot(e.clientX - holdInfo.x, e.clientY - holdInfo.y);
+    if (!holdInfo.armed) {
+      if (d > 8) resetHold();
+      return;
+    }
+    e.preventDefault();
+    if (!dragCtx && !selMode && d > 8) beginFolderDrag(e);
+    if (dragCtx) updateFolderDrag(e);
+  }, { passive: false });
+  folders.addEventListener("pointerup", () => {
+    clearTimeout(holdTimer);
+    finishFolderHold();
+  });
+  folders.addEventListener("pointercancel", () => { clearTimeout(holdTimer); resetHold(); });
   folders.addEventListener("click", (e) => {
     const f = e.target.closest(".folder");
     if (!f) return;
-    if (longPressed) {
-      longPressed = false;
-      return;
-    }
-    if (f.dataset.new) openNewGroup();
+    if (suppressClick) { suppressClick = false; return; }
+    if (f.dataset.new) { if (!selMode) openNewGroup(); return; }
+    if (selMode) toggleSel(f.dataset.group);
     else openGroup(f.dataset.group);
   });
 
-  $("btn-newgroup").addEventListener("click", openNewGroup);
+  $("btn-newgroup").addEventListener("click", () => {
+    if (selMode) setSelMode(false);
+    else openNewGroup();
+  });
+  $("selbar").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-sel]");
+    if (!b) return;
+    const act = b.dataset.sel;
+    if (act === "pin") batchSetPin(true);
+    else if (act === "unpin") batchSetPin(false);
+    else if (act === "delete") batchDelete();
+    else batchSingle(act);
+  });
   $("btn-gback").addEventListener("click", backGroups);
   $("btn-gcover").addEventListener("click", () => {
     if (S.gview) openCoverPicker(S.gview);
@@ -601,7 +1036,7 @@ function wire() {
   $("fab").addEventListener("click", () => toast("相册导入在后续批次"));
   $("btn-filter").addEventListener("click", () => toast("筛选面板下一批"));
   $("btn-settings").addEventListener("click", () => setTab("me"));
-  $("pins-manage").addEventListener("click", () => toast("长按分组卡片可以置顶 / 换封面"));
+  $("pins-manage").addEventListener("click", openPinManager);
   $("inbox-undo").addEventListener("click", () => ($("inbox").hidden = true));
 }
 
