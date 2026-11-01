@@ -558,12 +558,16 @@ async function openGroup(name) {
 
 /* ---------- 组内手动排序（单张拖拽） ---------- */
 
-function gdCanDrag() {
-  if (!S.gview || gdSelMode) return "";
+function gdManualReady() {
   if (S.gFilters.sort !== "manual") return "先切换到「手动排序」再拖拽";
   const filtering = !!(S.gFilters.type || S.gFilters.days || (S.gFilters.tags && S.gFilters.tags.length));
   if (gdQ || filtering) return "清空搜索/筛选后再拖拽";
   return "";
+}
+
+function gdCanDrag() {
+  if (!S.gview || gdSelMode) return "";
+  return gdManualReady();
 }
 
 function gdDropCleanup() {
@@ -574,6 +578,7 @@ function gdDropCleanup() {
   if (gdDrag) {
     if (gdDrag.ghost) gdDrag.ghost.remove();
     if (gdDrag.el) gdDrag.el.classList.remove("dragsrc");
+    if (gdDrag.els) for (const el of gdDrag.els) el.classList.remove("dragsel");
   }
   document.body.classList.remove("img-dragging");
 }
@@ -604,9 +609,71 @@ function beginGdDrag(sha, el, e) {
   document.body.appendChild(ghost);
   el.classList.add("dragsrc");
   gdDrag = {
+    mode: "single",
     sha,
     idx,
     el,
+    els: [el],
+    ghost,
+    startOrder: gdItems.map((a) => a.sha),
+    order: gdItems.map((a) => a.sha),
+    offsetX: r.width / 2,
+    offsetY: r.height / 2,
+    changed: false,
+  };
+  document.body.classList.add("img-dragging");
+  gdDropEl = document.createElement("div");
+  gdDropEl.id = "gddrop";
+  document.body.appendChild(gdDropEl);
+  updateGdDrag(e);
+  if (navigator.vibrate) navigator.vibrate(8);
+  return true;
+}
+
+// 多选整块拖拽：叠卡 ghost + 数量角标
+function buildGdStackGhost(els, r) {
+  const wrap = document.createElement("div");
+  wrap.className = "gdstack";
+  wrap.style.width = r.width + "px";
+  wrap.style.height = r.height + "px";
+  const n = Math.min(els.length, 3);
+  for (let i = n - 1; i >= 0; i--) {
+    const box = document.createElement("div");
+    box.className = "gdstack-card";
+    box.style.transform = "translate(" + i * 7 + "px," + i * 7 + "px)";
+    box.style.zIndex = String(n - i);
+    const clone = els[i].cloneNode(true);
+    clone.classList.remove("dragsrc", "dragsel");
+    box.appendChild(clone);
+    wrap.appendChild(box);
+  }
+  const count = document.createElement("div");
+  count.className = "gdstack-count";
+  count.textContent = String(els.length);
+  wrap.appendChild(count);
+  return wrap;
+}
+
+function beginGdGroupDrag(e) {
+  const reason = gdManualReady();
+  if (reason) {
+    toast(reason);
+    return false;
+  }
+  if (!gdSelMode || !gdSel.size) return false;
+  const items = gdItems.filter((a) => gdSel.has(a.sha));
+  const els = [...$("gd-grid").querySelectorAll(".card")].filter((c) => gdSel.has(c.dataset.sha));
+  if (!items.length || !els.length) return false;
+  const r = els[0].getBoundingClientRect();
+  const ghost = buildGdStackGhost(els, r);
+  ghost.style.left = e.clientX - r.width / 2 + "px";
+  ghost.style.top = e.clientY - r.height / 2 + "px";
+  document.body.appendChild(ghost);
+  for (const el of els) el.classList.add("dragsel");
+  gdDrag = {
+    mode: "group",
+    shas: items.map((a) => a.sha),
+    els,
     ghost,
     startOrder: gdItems.map((a) => a.sha),
     order: gdItems.map((a) => a.sha),
@@ -628,7 +695,10 @@ function updateGdDrag(e) {
   if (!d) return;
   d.ghost.style.left = e.clientX - d.offsetX + "px";
   d.ghost.style.top = e.clientY - d.offsetY + "px";
-  const cards = [...$("gd-grid").querySelectorAll(".card")].filter((c) => c !== d.el);
+  const groupSet = d.mode === "group" ? new Set(d.shas) : null;
+  const cards = [...$("gd-grid").querySelectorAll(".card")].filter((c) =>
+    d.mode === "group" ? !groupSet.has(c.dataset.sha) : c !== d.el
+  );
   let target = null;
   let best = Infinity;
   for (const c of cards) {
@@ -645,11 +715,21 @@ function updateGdDrag(e) {
   }
   const r = target.getBoundingClientRect();
   const after = e.clientX > r.left + r.width / 2;
-  const rest = d.order.filter((s) => s !== d.sha);
-  const at = rest.indexOf(target.dataset.sha);
-  if (at < 0) return;
-  rest.splice(after ? at + 1 : at, 0, d.sha);
-  d.order = rest;
+  if (d.mode === "group") {
+    const rest = d.order.filter((s) => !groupSet.has(s));
+    const block = d.order.filter((s) => groupSet.has(s));
+    const at = rest.indexOf(target.dataset.sha);
+    if (at < 0) return;
+    const next = [...rest];
+    next.splice(after ? at + 1 : at, 0, ...block);
+    d.order = next;
+  } else {
+    const rest = d.order.filter((s) => s !== d.sha);
+    const at = rest.indexOf(target.dataset.sha);
+    if (at < 0) return;
+    rest.splice(after ? at + 1 : at, 0, d.sha);
+    d.order = rest;
+  }
   d.changed = d.order.join("|") !== d.startOrder.join("|");
   if (gdDropEl) {
     gdDropEl.style.display = "block";
@@ -665,6 +745,8 @@ async function endGdDrag() {
   const key = gdParam(S.gview);
   const order = d.order;
   const changed = d.changed;
+  const mode = d.mode;
+  const count = (d.shas || []).length;
   gdDropCleanup();
   gdDrag = null;
   gdHoldFired = true;
@@ -672,8 +754,12 @@ async function endGdDrag() {
   if (!changed) return;
   try {
     await invokeRetry("set_asset_order", { key, shas: order });
+    if (mode === "group") {
+      setGdSelMode(false);
+      gdSel.clear();
+    }
     await loadGroup();
-    toast("顺序已保存");
+    toast(mode === "group" ? "已移动 " + count + " 张" : "顺序已保存");
   } catch (e) {
     toast("保存失败：" + String(e));
     loadGroup();
@@ -2176,11 +2262,12 @@ function wire() {
 
   const gdGrid = $("gd-grid");
   gdGrid.addEventListener("pointerdown", (e) => {
-    if (S.gview === null || gdSelMode) return;
+    if (S.gview === null) return;
     const c = e.target.closest(".card");
     if (!c || e.button > 0) return;
+    if (gdSelMode && !gdSel.has(c.dataset.sha)) return;
     gdHoldFired = false;
-    gdHoldInfo = { sha: c.dataset.sha, x: e.clientX, y: e.clientY, el: c, armed: false };
+    gdHoldInfo = { sha: c.dataset.sha, x: e.clientX, y: e.clientY, el: c, armed: false, group: gdSelMode };
     try { c.setPointerCapture(e.pointerId); } catch {}
     clearTimeout(gdHoldTimer);
     gdHoldTimer = setTimeout(() => {
@@ -2202,7 +2289,7 @@ function wire() {
     const info = gdHoldInfo;
     clearTimeout(gdHoldTimer);
     gdHoldInfo = null;
-    const ok = beginGdDrag(info.sha, info.el, e);
+    const ok = info.group ? beginGdGroupDrag(e) : beginGdDrag(info.sha, info.el, e);
     if (!ok) {
       gdHoldFired = true;
       setTimeout(() => { gdHoldFired = false; }, 450);
@@ -2214,6 +2301,11 @@ function wire() {
     const info = gdHoldInfo;
     clearTimeout(gdHoldTimer);
     gdHoldInfo = null;
+    if (info.armed && info.group) {
+      gdHoldFired = true;
+      setTimeout(() => { gdHoldFired = false; }, 600);
+      return;
+    }
     if (info.armed && S.gview !== FAV_NAME) {
       gdSel.add(info.sha);
       setGdSelMode(true);
