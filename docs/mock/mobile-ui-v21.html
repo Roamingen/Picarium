@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StickerBox · 框内粗环 + 中心倒计时 v21</title>
+<style>
+  :root{
+    --bg:#14161a;--surface:#0f1115;--surface3:#1c212a;--line:#2a2f38;--line2:#333a47;
+    --fg:#e8eaed;--dim:#8b93a1;--dim2:#5d6573;--accent:#6ea8fe;--on-accent:#0d1420;
+    --danger:#e5484d;--ok:#8bd49c;--nav-bg:rgba(15,17,21,.97);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#0b0d10;color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif}
+  body{padding:44px 0 70px}
+  .wrap{width:1320px;margin:0 auto}
+  .hero{display:flex;align-items:flex-end;justify-content:space-between;margin:0 18px 18px}
+  .hero h1{font-size:26px;line-height:1.25;margin:0 0 7px}
+  .hero p{margin:0;color:var(--dim);font-size:13px;line-height:1.7;max-width:1000px}
+  .tag{font-size:11px;color:var(--accent);border:1px solid rgba(110,168,254,.35);
+    background:rgba(110,168,254,.08);border-radius:999px;padding:4px 9px;white-space:nowrap}
+  .note{margin:0 18px 22px;border-left:2px solid var(--accent);padding:10px 14px;
+    background:rgba(110,168,254,.055);border-radius:0 10px 10px 0;color:var(--dim);
+    font-size:12.3px;line-height:1.75}
+  .note b{color:var(--fg);font-weight:600}
+  .flow{display:flex;align-items:center;justify-content:center;gap:7px;margin:0 18px 26px;flex-wrap:wrap}
+  .flow span{font-size:10.2px;color:var(--dim);border:1px solid var(--line);border-radius:999px;
+    background:#151920;padding:5px 9px}
+  .flow span.on{color:var(--accent);border-color:rgba(110,168,254,.45);background:rgba(110,168,254,.08)}
+  .flow i{color:#49515d;font-style:normal;font-size:11px}
+  .row{display:flex;gap:34px;justify-content:center;align-items:flex-start;margin-bottom:30px}
+  .item{width:390px}
+  .cap{margin:11px 2px 0;color:var(--dim);font-size:11.4px;line-height:1.65}
+  .cap b{display:block;color:var(--fg);font-size:12px;margin-bottom:3px}
+  .cap b i{font-style:normal;color:var(--accent);margin-right:5px}
+  .cap em{font-style:normal;color:#d7deea}
+
+  .phone{position:relative;width:390px;height:844px;border-radius:30px;overflow:hidden;
+    background:var(--bg);border:1px solid #2b3039;box-shadow:0 28px 70px rgba(0,0,0,.55)}
+  .status{height:36px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 17px;color:#cfd4dd;font-size:10.5px}
+  .status .r{font-size:10px;color:#aab1bd}
+
+  .banner{position:absolute;left:12px;right:12px;top:40px;z-index:26;border-radius:12px;
+    background:rgba(110,168,254,.12);border:1px solid rgba(110,168,254,.35);
+    padding:8px 11px;display:flex;align-items:center;gap:8px}
+  .banner b{font-size:11.5px;color:#e7ebf3;font-weight:650}
+  .banner span{margin-left:auto;color:var(--dim);font-size:9.2px}
+  .banner .bi{color:var(--accent);font-size:14px}
+
+  .selhead{display:flex;align-items:center;gap:8px;padding:5px 14px 8px}
+  .selhead .x{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.06);
+    display:flex;align-items:center;justify-content:center;font-size:18px;color:#eef1f6;flex:0 0 auto}
+  .selhead .count{flex:1;text-align:center;font-size:14.5px;font-weight:700}
+  .selhead .count b{color:var(--accent)}
+  .selhead .all{font-size:11px;color:var(--accent);font-weight:600}
+  .gdsearch{margin:0 14px 9px;height:36px;border-radius:11px;background:var(--surface3);
+    border:1px solid var(--line);display:flex;align-items:center;gap:7px;padding:0 11px;color:var(--dim2);font-size:11px}
+  .gdsearch .mag{font-size:14px;color:#aeb6c4}
+  .gdsearch .fb{margin-left:auto;width:26px;height:26px;border-radius:8px;background:rgba(255,255,255,.06);
+    display:flex;align-items:center;justify-content:center;color:#c8d0dd;font-size:12px}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 14px}
+  .tile{position:relative;aspect-ratio:1/1;border-radius:12px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;font-size:28px;
+    background:linear-gradient(150deg,var(--c1),var(--c2))}
+  .tile .heart{position:absolute;right:6px;bottom:5px;color:#ff4d5e;font-size:12.5px}
+  .tile .check{position:absolute;right:6px;top:6px;width:19px;height:19px;border-radius:50%;
+    background:var(--accent);color:var(--on-accent);font-size:10px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;z-index:3}
+  .tile.sel{box-shadow:0 0 0 2px var(--accent) inset}
+  .tile.new::after{content:"";position:absolute;inset:0;border:2px solid rgba(110,168,254,.75);border-radius:12px}
+
+  .stackghost{position:absolute;z-index:15;width:94px;height:94px;pointer-events:none}
+  .stackghost .sg{position:absolute;inset:0;border-radius:13px;border:1px solid rgba(255,255,255,.12);
+    background:linear-gradient(150deg,var(--c1),var(--c2));box-shadow:0 10px 24px rgba(0,0,0,.4)}
+  .stackghost .sg:nth-child(2){transform:translate(5px,6px) rotate(2deg);opacity:.68}
+  .stackghost .sg:nth-child(3){transform:translate(10px,12px) rotate(4deg);opacity:.4}
+  .stackghost .top{position:absolute;inset:0;border-radius:13px;border:1.5px solid var(--accent);
+    background:linear-gradient(150deg,var(--c1),var(--c2));display:flex;align-items:center;justify-content:center;font-size:29px}
+  .stackghost .count{position:absolute;right:-7px;top:-7px;min-width:23px;height:23px;border-radius:12px;
+    background:var(--accent);color:var(--on-accent);font-size:10.5px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;padding:0 6px;box-shadow:0 3px 8px rgba(0,0,0,.3)}
+
+  .ring{position:relative;width:38px;height:38px;border-radius:50%;flex:0 0 auto;
+    background:conic-gradient(var(--accent) 0 var(--p,250deg),rgba(255,255,255,.14) var(--p,250deg) 360deg);
+    display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.32)}
+  .ring::after{content:"";position:absolute;inset:5px;border-radius:50%;background:#171d26}
+  .ring span{position:relative;z-index:1;font-size:8px;font-weight:700;color:var(--accent)}
+  .ring.lg{width:44px;height:44px}.ring.lg::after{inset:6px}.ring.lg span{font-size:8.5px}
+  .bigring{position:absolute;left:50%;top:50%;width:150px;height:150px;border-radius:50%;
+    transform:translate(-50%,-50%);z-index:1;pointer-events:none;
+    background:conic-gradient(var(--accent) 0 var(--p,280deg),rgba(255,255,255,.16) var(--p,280deg));
+    -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 9px),#000 calc(100% - 8px));
+    mask:radial-gradient(farthest-side,transparent calc(100% - 9px),#000 calc(100% - 8px));
+    filter:drop-shadow(0 0 6px rgba(110,168,254,.35))}
+  .ringcount{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;
+    display:flex;align-items:baseline;gap:2px;color:var(--accent);pointer-events:none;
+    text-shadow:0 2px 10px rgba(6,8,12,.55)}
+  .ringcount b{font-size:31px;line-height:1;font-weight:800;letter-spacing:-.5px}
+  .ringcount span{font-size:13px;font-weight:750}
+  .gcard.hot .big{opacity:.16}
+  .rectring{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible}
+  .rectring rect{fill:none;stroke:var(--accent);stroke-width:4;stroke-linecap:round;
+    stroke-dasharray:68 32;filter:drop-shadow(0 0 5px rgba(110,168,254,.55))}
+  .dropbar .dtext{position:relative;z-index:2}
+
+  .dropbar{position:absolute;left:0;right:0;bottom:0;height:78px;background:var(--nav-bg);
+    border-top:1px solid var(--line);z-index:22;display:flex;align-items:center}
+  .dropframe{position:absolute;inset:8px 12px;border:1.4px dashed rgba(110,168,254,.55);
+    border-radius:14px;background:rgba(110,168,254,.07);display:flex;align-items:center;gap:9px;padding:0 12px}
+  .dropbar.hot .dropframe{border-color:var(--accent);background:rgba(110,168,254,.14);
+    box-shadow:0 0 0 3px rgba(110,168,254,.09)}
+  .dropbar b{display:block;font-size:11.5px;color:#e7edf7;font-weight:650}
+  .dropbar .sub{display:block;font-size:9px;color:var(--dim);margin-top:1px}
+  .dropbar .arrow{margin-left:auto;color:var(--accent);font-size:16px;font-weight:700}
+  .dropbar .count{margin-left:auto;color:var(--dim);font-size:8.5px}
+
+  .actbar{position:absolute;left:0;right:0;bottom:0;height:74px;background:var(--nav-bg);
+    border-top:1px solid var(--line);display:flex;z-index:20}
+  .act{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    color:var(--dim);font-size:9px;line-height:1.1}
+  .act .ic{font-size:17px;color:#c6cedb}
+  .act.danger{color:var(--danger)}.act.danger .ic{color:var(--danger)}
+  .act.on{color:var(--accent)}.act.on .ic{color:var(--accent)}
+
+  .gtitle{display:flex;align-items:baseline;gap:8px;padding:13px 16px 9px}
+  .gtitle h2{font-size:19px;margin:0;font-weight:750}
+  .gtitle small{font-size:11px;color:var(--dim);font-weight:500}
+  .gcards{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 14px}
+  .gcard{position:relative;height:180px;border-radius:16px;overflow:hidden;
+    background:linear-gradient(155deg,var(--c1),var(--c2));border:1px solid rgba(255,255,255,.055)}
+  .gcard .big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:40px}
+  .gcard .glabel{position:absolute;left:11px;right:11px;bottom:9px;z-index:3}
+  .gcard .gname{font-size:12px;font-weight:650;color:#fff}
+  .gcard .gsub{font-size:9.2px;color:rgba(255,255,255,.62);margin-top:1px}
+  .gcard .gpin{position:absolute;left:8px;top:8px;width:21px;height:21px;border-radius:50%;
+    background:rgba(6,8,11,.72);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;z-index:3}
+  .gcard.fav{background:linear-gradient(160deg,#ffe4e8,#ffd0d6 38%,#30222a 76%,#171216)}
+  .gcard.fav .gname{color:#2c1a1f}.gcard.fav .gsub{color:#8d4f5a}
+  .gcard.cur{opacity:.64}
+  .gcard .curtag{position:absolute;right:8px;top:8px;z-index:4;background:rgba(6,8,11,.7);
+    color:#cfd5df;font-size:8px;padding:3px 6px;border-radius:999px}
+  .enterframe{position:absolute;inset:8px;border:1.4px dashed rgba(110,168,254,.32);
+    border-radius:11px;z-index:2;pointer-events:none;
+    display:flex;align-items:flex-end;justify-content:flex-end;padding:7px;
+    color:rgba(110,168,254,.55);font-size:8px;letter-spacing:.3px}
+  .gcard.hot{border:2px solid var(--accent);box-shadow:0 0 0 3px rgba(110,168,254,.14),0 12px 26px rgba(0,0,0,.35)}
+  .gcard.hot .enterframe{border-color:var(--accent);background:rgba(110,168,254,.09);color:var(--accent)}
+  .gcard.hot .enterframe::after{content:"1 秒后进入";font-weight:750}
+  .gcard .ring{position:absolute;right:9px;top:9px;z-index:6;width:44px;height:44px}
+  .gcard .ring::after{background:#1a2029}
+  .hotlabel{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:7;
+    background:var(--accent);color:var(--on-accent);font-size:9px;font-weight:800;
+    border-radius:999px;padding:4px 9px;white-space:nowrap}
+  .cancelhint{position:absolute;left:0;right:0;bottom:16px;text-align:center;color:var(--dim2);font-size:9px;z-index:9}
+
+  .tdhead{padding:7px 14px 8px}
+  .tdtop{display:flex;align-items:center;gap:8px}
+  .back{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.07);
+    display:flex;align-items:center;justify-content:center;font-size:18px;color:#eef1f6;flex:0 0 auto}
+  .tdname{flex:1;font-size:19px;font-weight:750;line-height:1.2}
+  .tdname em{font-style:normal;color:var(--accent)}
+  .holdpill{font-size:8.5px;color:var(--accent);border:1px solid rgba(110,168,254,.35);
+    background:rgba(110,168,254,.08);border-radius:999px;padding:4px 7px;white-space:nowrap}
+  .holdpill.ok{color:var(--ok);border-color:rgba(139,212,156,.35);background:rgba(139,212,156,.08)}
+  .crumb{display:flex;align-items:center;gap:5px;color:var(--dim2);font-size:9.5px;margin-top:4px}
+  .crumb b{color:#cdd4df;font-weight:600}
+  .crumb .arr{color:var(--accent);font-size:10px}
+  .tdmeta{display:flex;align-items:center;gap:7px;padding:0 14px 9px;color:var(--dim);font-size:10px}
+  .tdsearch{flex:1;height:36px;border-radius:11px;background:var(--surface3);
+    border:1px solid var(--line);display:flex;align-items:center;gap:7px;padding:0 11px;color:var(--dim2);font-size:11px}
+  .tdsearch .mag{font-size:14px;color:#aeb6c4}
+
+  .dropline{position:absolute;width:3px;border-radius:2px;background:var(--accent);
+    box-shadow:0 0 12px rgba(110,168,254,.7);z-index:9}
+  .postag{position:absolute;z-index:10;background:#0d1118;border:1px solid #354052;
+    color:var(--accent);font-size:8.5px;border-radius:999px;padding:4px 7px;white-space:nowrap}
+  .hintbar{position:absolute;left:14px;right:14px;bottom:92px;z-index:8;
+    color:var(--dim);font-size:9.5px;text-align:center}
+
+  .nav{position:absolute;left:0;right:0;bottom:0;height:64px;background:var(--nav-bg);
+    border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-around;z-index:20}
+  .nav .ni{width:58px;text-align:center;color:var(--dim);font-size:8.5px;line-height:1.2}
+  .nav .ni .ic{font-size:16px;display:block;margin-bottom:2px;color:#aeb6c4}
+  .nav .ni.on{color:var(--accent)} .nav .ni.on .ic{color:var(--accent)}
+  .toast{position:absolute;left:50%;bottom:88px;transform:translateX(-50%);z-index:30;
+    background:#0d1118;border:1px solid #313947;color:#e8edf5;font-size:11px;
+    padding:10px 16px;border-radius:10px;white-space:nowrap;box-shadow:0 10px 24px rgba(0,0,0,.4)}
+  .toast b{color:var(--accent);font-weight:650}
+
+  .sethead{display:flex;align-items:center;gap:8px;padding:10px 14px 12px}
+  .sethead h2{font-size:19px;margin:0;font-weight:750}
+  .setgroup{margin:0 14px 12px;border:1px solid var(--line);border-radius:13px;overflow:hidden;background:#161a21}
+  .setrow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 13px;border-bottom:1px solid var(--line)}
+  .setrow:last-child{border-bottom:0}
+  .setrow .lab{font-size:11.5px;color:#dbe2ec}
+  .setrow .sub{font-size:9.3px;color:var(--dim);margin-top:2px;line-height:1.5}
+  .seg{display:flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden;flex:0 0 auto}
+  .seg span{padding:5px 9px;font-size:9.5px;color:var(--dim)}
+  .seg .on{background:var(--accent);color:var(--on-accent);font-weight:700}
+  .setnote{margin:0 14px;color:var(--dim2);font-size:9.4px;line-height:1.6}
+
+  .bugtag{position:absolute;left:14px;right:14px;bottom:92px;z-index:26;border-radius:12px;
+    background:rgba(229,72,77,.1);border:1px solid rgba(229,72,77,.4);padding:8px 11px;
+    display:flex;align-items:center;gap:8px;color:#ffd7d8;font-size:9.5px}
+  .bugtag b{color:#ff9da0;font-size:9px;letter-spacing:.4px}
+
+  .footer{width:1250px;margin:16px auto 0;color:#6f7785;font-size:11px;line-height:1.8;
+    border-top:1px solid #20252d;padding-top:14px}
+  .footer b{color:#aeb6c4;font-weight:600}
+  .footer .l{color:#9aa3b1}
+  @media (max-width:1360px){body{padding:26px 0 50px}.wrap{width:auto}.row{flex-wrap:wrap;gap:26px}
+    .hero,.note{margin-left:24px;margin-right:24px}.footer{width:auto;margin:12px 24px 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div>
+      <h1>粗环收进虚线框 · 中心 1s 倒计时 · v21</h1>
+      <p>按你刚指的两点改：目标卡环<b>收回虚线框内</b>（不越过投放区），环加粗到 8px，<b>中心加 1s 倒计时</b>；底栏圆角矩形环也加粗到 4px。虚线框仍是唯一定义“可放入”的边界。</p>
+    </div>
+    <span class="tag">仅设计稿 · 不改代码</span>
+  </div>
+
+  <div class="note">
+    <b>本版修正：</b>① 目标卡环<b>收进虚线框内</b>，不越过投放边界；环加粗到 <b>8px</b>；环中心加 <b>1s 倒计时</b>。② 底栏圆角矩形环加粗到 <b>4px</b>。其余仍按 v19：1s 转满才进组、收藏夹补多选、虚线框完全替代底栏、剪切/复制默认剪切、全选 6/6 仍显示、仍只出 mock。
+  </div>
+
+  <div class="flow">
+    <span class="on">① 源组选中 · 底栏圆角矩形环</span><i>→</i>
+    <span class="on">② 目标卡 · 框内粗环 + 倒计时</span><i>→</i>
+    <span class="on">③ 目标详情 · 蓝线</span><i>→</i>
+    <span class="on">④ 松手 · 剪切/复制</span>
+  </div>
+
+  <div class="row">
+    <!-- 1 源组拖动态 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="selhead">
+          <div class="x">×</div>
+          <div class="count">已选 <b>3</b> 张</div>
+          <div class="all">全选</div>
+        </div>
+        <div class="gdsearch"><span class="mag">⌕</span><span>搜组内图片</span><span class="fb">≡</span></div>
+        <div class="grid">
+          <div class="tile sel" style="--c1:#7a4a2e;--c2:#3a2418">🍓<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile sel" style="--c1:#356c55;--c2:#172f25">🌿<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#5b3b5f;--c2:#291c2c">🐰<i class="heart">♥</i></div>
+          <div class="tile sel" style="--c1:#3d5c9a;--c2:#202f4f">🐟<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6f7a38;--c2:#343a1c">🐼<i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6b3c3c;--c2:#2d1919">🐸<i class="heart">♥</i></div>
+        </div>
+        <div class="stackghost" style="left:236px;top:492px;--c1:#75415f;--c2:#39202e">
+          <div class="sg"></div><div class="sg"></div><div class="top">🍓</div><div class="count">3</div>
+        </div>
+        <div class="dropbar hot">
+          <div class="dropframe">
+            <svg class="rectring" viewBox="0 0 366 62" preserveAspectRatio="none" aria-hidden="true"><rect x="1.5" y="1.5" width="363" height="59" rx="14" pathLength="100"></rect></svg>
+            <div class="dtext"><b>拖到其他分组</b><span class="sub">按住 1 秒 · 整条底栏就是投递框</span></div>
+            <span class="arrow">↓</span>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b><i>①</i>源组拖动态：虚线框就是底栏</b>不再悬浮在底栏上方：选中 3 张后，底栏原位换成一条虚线投递框，<em>整条框就是圆角矩形计数环</em>，进度沿着底栏走满 1 秒才去分组页。动作栏先让位，不叠两层。</div>
+    </div>
+
+    <!-- 2 目标卡 1s -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="banner" style="top:40px"><span class="bi">▣</span><b>拖进组卡虚线框</b><span>转满 1 圈 · 不松手</span></div>
+        <div style="height:72px"></div>
+        <div class="gtitle"><h2>分组</h2><small>7 个 · 正在移动 3 张</small></div>
+        <div class="gcards">
+          <div class="gcard fav" style="--c1:#ffd6dc;--c2:#ffd0d6"><div class="big">♥</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">收藏夹</div><div class="gsub">6 张 · 特殊分组</div></div></div>
+          <div class="gcard cur" style="--c1:#6d4a30;--c2:#2c1e15"><div class="big">▣</div><div class="gpin">⌖</div><div class="curtag">当前组</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">猫猫</div><div class="gsub">6 张</div></div></div>
+          <div class="gcard hot" style="--c1:#6f46a0;--c2:#2f1e47"><div class="big">▣</div><div class="gpin">⌖</div><div class="bigring" style="--p:280deg"></div><div class="ringcount"><b>1</b><span>s</span></div><div class="enterframe"></div><div class="glabel"><div class="gname">摸鱼</div><div class="gsub">3 张</div></div></div>
+          <div class="gcard" style="--c1:#2f6b46;--c2:#142c1d"><div class="big">▣</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">蓝色大肥鱼</div><div class="gsub">4 张</div></div></div>
+          <div class="gcard" style="--c1:#6b3c3c;--c2:#2d1919"><div class="big">▣</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">测试组</div><div class="gsub">0 张</div></div></div>
+          <div class="gcard" style="--c1:#6d5a2e;--c2:#2d2512"><div class="big">▣</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">1</div><div class="gsub">0 张</div></div></div>
+        </div>
+        <div class="stackghost" style="left:158px;top:352px;--c1:#75415f;--c2:#39202e">
+          <div class="sg"></div><div class="sg"></div><div class="top">🍓</div><div class="count">3</div>
+        </div>
+        <div class="cancelhint">松手在虚线框外 = 取消 · 收藏夹也可作为目标</div>
+      </div>
+      <div class="cap"><b><i>②</i>目标卡：环收进虚线框 + 中心倒计时</b>环 150px、8px 粗，<em>正好收在 8px 虚线框内</em>；中心显示 1s 倒计时，进度满 1 秒才切到目标详情。虚线框是投放边界，环不再越过它。</div>
+    </div>
+
+    <!-- 3 目标 overlay -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="tdhead">
+          <div class="tdtop">
+            <div class="back">‹</div>
+            <div class="tdname">放入<em>「摸鱼」</em></div>
+            <div class="holdpill">保持按住</div>
+          </div>
+          <div class="crumb">猫猫 <span class="arr">→</span> <b>摸鱼</b> · 组内 3 张</div>
+        </div>
+        <div class="tdmeta"><div class="tdsearch"><span class="mag">⌕</span><span>搜「摸鱼」里的图</span></div></div>
+        <div class="grid">
+          <div class="tile" style="--c1:#3d5c9a;--c2:#202f4f">🐟<i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6f7a38;--c2:#343a1c">🐼<i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#7a4d4a;--c2:#382322">🍄<i class="heart">♥</i></div>
+        </div>
+        <div class="dropline" style="left:146px;top:244px;height:112px"></div>
+        <div class="postag" style="left:144px;top:216px">插入到第 2 位</div>
+        <div class="stackghost" style="left:198px;top:330px;--c1:#75415f;--c2:#39202e">
+          <div class="sg"></div><div class="sg"></div><div class="top">🍓</div><div class="count">3</div>
+        </div>
+        <div class="hintbar">松手 = 放到蓝线位置 · 继续下拖 = 回组页</div>
+        <div class="dropbar hot">
+          <div class="dropframe">
+            <svg class="rectring" viewBox="0 0 366 62" preserveAspectRatio="none" aria-hidden="true"><rect x="1.5" y="1.5" width="363" height="59" rx="14" pathLength="100"></rect></svg>
+            <div class="dtext"><b>返回分组</b><span class="sub">按住 1 秒 · 回组页再换目标</span></div>
+            <span class="arrow">↓</span>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b><i>③</i>目标详情：底栏原位，不再悬浮</b>overlay 里的底栏也换成同一条虚线框，<em>圆角矩形计数环沿整条底栏走</em>；蓝线是插入位。这根虚线框替代原底栏，不叠在导航之上。</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- 4 全选 6/6 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="bugtag"><b>BUG 修复态</b><span>全选 6/6 时虚线框仍在</span></div>
+        <div class="selhead">
+          <div class="x">×</div>
+          <div class="count">已选 <b>6</b> 张</div>
+          <div class="all">全选</div>
+        </div>
+        <div class="gdsearch"><span class="mag">⌕</span><span>搜组内图片</span><span class="fb">≡</span></div>
+        <div class="grid">
+          <div class="tile sel" style="--c1:#7a4a2e;--c2:#3a2418">🍓<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile sel" style="--c1:#356c55;--c2:#172f25">🌿<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile sel" style="--c1:#5b3b5f;--c2:#291c2c">🐰<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile sel" style="--c1:#3d5c9a;--c2:#202f4f">🐟<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile sel" style="--c1:#6f7a38;--c2:#343a1c">🐼<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile sel" style="--c1:#6b3c3c;--c2:#2d1919">🐸<i class="check">✓</i><i class="heart">♥</i></div>
+        </div>
+        <div class="dropbar hot">
+          <div class="dropframe">
+            <svg class="rectring" viewBox="0 0 366 62" preserveAspectRatio="none" aria-hidden="true"><rect x="1.5" y="1.5" width="363" height="59" rx="14" pathLength="100"></rect></svg>
+            <div class="dtext"><b>拖到其他分组</b><span class="sub">全选 6/6 · 依然显示，不因数量隐藏</span></div>
+            <span class="arrow">↓</span>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b><i>④</i>全选 6/6：预期态</b>你复现的是“6/6 时虚线框消失、5/6 才出现”。这版把显隐和选中数量彻底解绑：<em>只要在拖拽，底栏虚线框和圆角矩形环就在</em>。右图是修复后的目标态。</div>
+    </div>
+
+    <!-- 5 收藏夹多选 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="selhead">
+          <div class="x">×</div>
+          <div class="count">已选 <b>3</b> 张</div>
+          <div class="all">全选</div>
+        </div>
+        <div class="gdsearch"><span class="mag">⌕</span><span>搜收藏夹里的图</span><span class="fb">≡</span></div>
+        <div class="grid">
+          <div class="tile sel" style="--c1:#7a4a2e;--c2:#3a2418">🍓<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile sel" style="--c1:#5b3b5f;--c2:#291c2c">🐰<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#3d5c9a;--c2:#202f4f">🐟<i class="heart">♥</i></div>
+          <div class="tile sel" style="--c1:#6f7a38;--c2:#343a1c">🐼<i class="check">✓</i><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#7a4d4a;--c2:#382322">🍄<i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6b3c3c;--c2:#2d1919">🐸<i class="heart">♥</i></div>
+        </div>
+        <div class="actbar">
+          <div class="act"><span class="ic">↑</span>发送</div>
+          <div class="act"><span class="ic">◈</span>标签</div>
+          <div class="act"><span class="ic">＋</span>添加到</div>
+          <div class="act on"><span class="ic">♡</span>取消收藏</div>
+          <div class="act danger"><span class="ic">⌫</span>删除</div>
+        </div>
+      </div>
+      <div class="cap"><b><i>⑤</i>收藏夹补多选</b>长按或右上角进入多选；底栏 5 键，<em>“取消收藏”替代“移出当前分组”</em>。拖动这张图时，这条动作栏整体换成上面的虚线投递框。</div>
+    </div>
+
+    <!-- 6 设置 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="sethead"><div class="back">‹</div><h2>设置</h2></div>
+        <div class="setgroup">
+          <div class="setrow">
+            <div><div class="lab">拖到其他分组</div><div class="sub">剪切：从原组移除；复制：原组保留</div></div>
+            <div class="seg"><span class="on">剪切</span><span>复制</span></div>
+          </div>
+          <div class="setrow">
+            <div><div class="lab">新图加入分组</div><div class="sub">默认放在组内最前</div></div>
+            <div class="seg"><span class="on">最前</span><span>最后</span></div>
+          </div>
+          <div class="setrow">
+            <div><div class="lab">分组默认排序</div><div class="sub">手动排序可拖动调整</div></div>
+            <div class="seg"><span class="on">手动</span><span>最新</span></div>
+          </div>
+        </div>
+        <div class="setnote">剪切是默认项；只有明确选“复制”才保留原组。收藏夹同样适用：剪切 = 取消收藏，复制 = 保留收藏。</div>
+        <div class="nav">
+          <div class="ni"><span class="ic">▦</span>图库</div>
+          <div class="ni"><span class="ic">▣</span>分组</div>
+          <div class="ni"><span class="ic">♲</span>回收站</div>
+          <div class="ni on"><span class="ic">◯</span>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b><i>⑥</i>设置：剪切 / 复制</b>新增“拖到其他分组”，默认<em>剪切</em>；复制时源组保留。设置里同时保留“新图默认最前”“分组默认手动”。</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- 7 剪切成功 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="tdhead">
+          <div class="tdtop">
+            <div class="back">‹</div>
+            <div class="tdname">摸鱼</div>
+            <div class="holdpill ok">已剪切</div>
+          </div>
+          <div class="crumb">猫猫 <span class="arr" style="color:var(--ok)">→</span> <b>摸鱼</b> · 6 张</div>
+        </div>
+        <div class="tdmeta"><div class="tdsearch"><span class="mag">⌕</span><span>搜「摸鱼」里的图</span></div></div>
+        <div class="grid">
+          <div class="tile" style="--c1:#3d5c9a;--c2:#202f4f">🐟<i class="heart">♥</i></div>
+          <div class="tile new" style="--c1:#7a4a2e;--c2:#3a2418">🍓<i class="heart">♥</i></div>
+          <div class="tile new" style="--c1:#356c55;--c2:#172f25">🌿<i class="heart">♥</i></div>
+          <div class="tile new" style="--c1:#3d5c9a;--c2:#202f4f">🐟<i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#7a4d4a;--c2:#382322">🍄<i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6b3c3c;--c2:#2d1919">🐸<i class="heart">♥</i></div>
+        </div>
+        <div class="toast">已剪切 <b>3 张</b> 到「摸鱼」</div>
+        <div class="nav">
+          <div class="ni"><span class="ic">▦</span>图库</div>
+          <div class="ni on"><span class="ic">▣</span>分组</div>
+          <div class="ni"><span class="ic">♲</span>回收站</div>
+          <div class="ni"><span class="ic">◯</span>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b><i>⑦</i>剪切（默认）</b>目标 3→6，源组猫猫 6→3；组内蓝线插入位保留。toast 明确写“已剪切”，避免和复制混淆。</div>
+    </div>
+
+    <!-- 8 复制成功 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="tdhead">
+          <div class="tdtop">
+            <div class="back">‹</div>
+            <div class="tdname">摸鱼</div>
+            <div class="holdpill">已复制</div>
+          </div>
+          <div class="crumb">猫猫 <span class="arr">→</span> <b>摸鱼</b> · 6 张</div>
+        </div>
+        <div class="tdmeta"><div class="tdsearch"><span class="mag">⌕</span><span>搜「摸鱼」里的图</span></div></div>
+        <div class="grid">
+          <div class="tile" style="--c1:#3d5c9a;--c2:#202f4f">🐟<i class="heart">♥</i></div>
+          <div class="tile new" style="--c1:#7a4a2e;--c2:#3a2418">🍓<i class="heart">♥</i></div>
+          <div class="tile new" style="--c1:#356c55;--c2:#172f25">🌿<i class="heart">♥</i></div>
+          <div class="tile new" style="--c1:#3d5c9a;--c2:#202f4f">🐟<i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#7a4d4a;--c2:#382322">🍄<i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6b3c3c;--c2:#2d1919">🐸<i class="heart">♥</i></div>
+        </div>
+        <div class="toast">已复制 <b>3 张</b> 到「摸鱼」</div>
+        <div class="nav">
+          <div class="ni"><span class="ic">▦</span>图库</div>
+          <div class="ni on"><span class="ic">▣</span>分组</div>
+          <div class="ni"><span class="ic">♲</span>回收站</div>
+          <div class="ni"><span class="ic">◯</span>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b><i>⑧</i>复制（显式切换）</b>目标 3→6，源组猫猫仍 6；其余交互完全一样。默认不走这条，只有设置里选“复制”才保留源组。</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>状态机：</b>源组多选 → 底栏原位虚线框（圆角矩形环走满 1s）→ 分组页 → 目标卡（超大圆环走满 1s）→ 目标详情调蓝线 → 松手按设置剪切/复制。<br>
+    <b>本版关键改动：</b>v21 把目标卡环收进虚线框内（150px，8px 粗），并在环中心加 1s 倒计时；底栏三个圆角矩形环加粗到 4px。v19 的 1s、底栏原位、收藏夹多选、剪切/复制默认剪切、全选 6/6 仍保留。
+  </div>
+
+  <div class="footer">
+    <b>想确认：</b>① 入组/回组都用 <span class="l">1s 一圈</span> 可以吗？② 默认 <span class="l">剪切</span>、复制在设置里切，对吗？③ 收藏夹多选底栏用“取消收藏”替代“移出当前分组”，可以吗？④ 目标卡环 <span class="l">收进虚线框、8px 粗、中心倒计时</span>，这个比例可以吗？<br>
+    <b>实现注意：</b>目标卡环用 <span class="l">conic-gradient + radial mask</span> 只留 8px 环，虚线框 8px 不变；中心倒计时用 1 个大数字 + 小 s；底栏用 <span class="l">SVG rounded rect + stroke 4 + stroke-dasharray</span> 沿整条框走；底栏虚线框和真实底栏同高同位，拖动时整条替换；全选 6/6 的显隐跟拖拽状态走，不跟数量走；剪切用 `batch_ungroup`，复制保留源组；收藏夹多选底部动作用 `batch_star(false)`。<br>
+    <b>仍只做设计稿，不改代码；上一批跨组改动未提交。</b>
+  </div>
+</div>
+</body>
+</html>

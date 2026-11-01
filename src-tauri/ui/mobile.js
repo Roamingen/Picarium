@@ -61,6 +61,16 @@ let gdHoldTimer = 0;
 let gdHoldFired = false;
 let gdDrag = null;
 let gdDropEl = null;
+let gdDockEl = null;
+let gdDockTimer = 0;
+let dwellTextTimer = 0;
+let gdDockHot = false;
+let crossDrag = null;
+let crossHoverTimer = 0;
+let crossHoverName = "";
+let crossHoverEl = null;
+let crossScrollRaf = 0;
+let crossScrollDir = 0;
 let mergeTarget = "";
 try {
   S.pinsPerRow = Math.min(6, Math.max(3, +localStorage.getItem('sb.pinPerRow') || 4));
@@ -325,6 +335,13 @@ function folderIcon(name) {
 }
 
 const FAV_NAME = "收藏";
+const DEFAULT_DWELL = 1000;
+function dwellMs() {
+  const v = Number(localStorage.getItem("sb.dwell"));
+  return v === 2000 || v === 3000 ? v : DEFAULT_DWELL;
+}
+function dwellSec() { return Math.round(dwellMs() / 1000); }
+function dragMode() { return localStorage.getItem("sb.dragmode") === "copy" ? "copy" : "cut"; }
 function favCard(count, picked) {
   const cover = S.starredCover
     ? `<img class="favcover" src="${thumbUrl(S.starredCover)}" alt="" loading="lazy" onerror="this.remove()">`
@@ -389,6 +406,16 @@ function renderFolders(keepScroll) {
     (!selMode && !q ? favCard(starred, false) : "") +
     list.map((g) => folderCard(g)).join("") +
     empty;
+  if (crossDrag) {
+    folderBox.classList.add("crossing");
+    for (const el of folderBox.querySelectorAll(".folder[data-group]")) {
+      el.classList.add("cross-target");
+    }
+    const fav = folderBox.querySelector(".folder[data-fav]");
+    if (fav && crossDrag.source === FAV_NAME) fav.classList.add("cross-target");
+  } else {
+    folderBox.classList.remove("crossing");
+  }
   if (y !== null) window.scrollTo(0, y);
   if (dragCtx) {
     const src = folderBox.querySelector(`.folder[data-group="${cssEsc(dragCtx.name)}"]`);
@@ -509,7 +536,9 @@ async function loadGroup(opts = {}) {
   const baseMeta = bytes ? `${total} 张 · ${fmtSize(bytes)}` : `${total} 张`;
   $("gd-title").textContent = gdDisplayName(name);
   $("gd-pin").hidden = isFav || !(g && g.pinned);
-  $("btn-gdsel").hidden = isFav;
+  $("btn-gdsel").hidden = false;
+  const removeLabel = document.querySelector('#gdactbar [data-gdact="remove"] span');
+  if (removeLabel) removeLabel.textContent = isFav ? "取消收藏" : "移出当前分组";
   $("gd-meta").textContent = baseMeta;
   $("gd-grid").innerHTML = '<div class="spinner">正在读取…</div>';
   try {
@@ -571,16 +600,39 @@ function gdCanDrag() {
 }
 
 function gdDropCleanup() {
+  stopDwellText();
+  crossScrollStop();
+  clearTimeout(gdDockTimer);
+  gdDockTimer = 0;
+  clearTimeout(crossHoverTimer);
+  crossHoverTimer = 0;
+  crossHoverName = "";
+  if (crossHoverEl) crossHoverEl.classList.remove("cross-hot");
+  crossHoverEl = null;
+  gdUnbindGlobal();
   if (gdDropEl) {
     gdDropEl.remove();
     gdDropEl = null;
   }
+  if (gdDockEl) {
+    gdDockEl.remove();
+    gdDockEl = null;
+  }
+  document.querySelectorAll(".gdcrossring").forEach((el) => el.remove());
+  document.body.classList.remove("gdcrossbar");
   if (gdDrag) {
+    if (gdDrag.pointerId != null) {
+      try { document.body.releasePointerCapture(gdDrag.pointerId); } catch {}
+    }
     if (gdDrag.ghost) gdDrag.ghost.remove();
     if (gdDrag.el) gdDrag.el.classList.remove("dragsrc");
     if (gdDrag.els) for (const el of gdDrag.els) el.classList.remove("dragsel");
   }
+  const folders = $("folders");
+  if (folders) folders.classList.remove("crossing");
+  document.querySelectorAll(".folder.cross-hot, .folder.cross-source, .folder.cross-target").forEach((el) => el.classList.remove("cross-hot", "cross-source", "cross-target"));
   document.body.classList.remove("img-dragging");
+  document.body.classList.remove("cross-dragging");
 }
 
 function cancelGdDrag() {
@@ -615,16 +667,20 @@ function beginGdDrag(sha, el, e) {
     el,
     els: [el],
     ghost,
+    pointerId: e.pointerId,
     startOrder: gdItems.map((a) => a.sha),
     order: gdItems.map((a) => a.sha),
     offsetX: r.width / 2,
     offsetY: r.height / 2,
     changed: false,
   };
+  try { document.body.setPointerCapture(e.pointerId); } catch {}
   document.body.classList.add("img-dragging");
   gdDropEl = document.createElement("div");
   gdDropEl.id = "gddrop";
   document.body.appendChild(gdDropEl);
+  gdBindGlobal();
+  gdDockRender("继续往下拖 · 去其他分组", false);
   updateGdDrag(e);
   if (navigator.vibrate) navigator.vibrate(8);
   return true;
@@ -675,16 +731,20 @@ function beginGdGroupDrag(e) {
     shas: items.map((a) => a.sha),
     els,
     ghost,
+    pointerId: e.pointerId,
     startOrder: gdItems.map((a) => a.sha),
     order: gdItems.map((a) => a.sha),
     offsetX: r.width / 2,
     offsetY: r.height / 2,
     changed: false,
   };
+  try { document.body.setPointerCapture(e.pointerId); } catch {}
   document.body.classList.add("img-dragging");
   gdDropEl = document.createElement("div");
   gdDropEl.id = "gddrop";
   document.body.appendChild(gdDropEl);
+  gdBindGlobal();
+  gdDockRender("继续往下拖 · 去其他分组", false);
   updateGdDrag(e);
   if (navigator.vibrate) navigator.vibrate(8);
   return true;
@@ -693,8 +753,11 @@ function beginGdGroupDrag(e) {
 function updateGdDrag(e) {
   const d = gdDrag;
   if (!d) return;
+  d.lastX = e.clientX;
+  d.lastY = e.clientY;
   d.ghost.style.left = e.clientX - d.offsetX + "px";
   d.ghost.style.top = e.clientY - d.offsetY + "px";
+  if (!crossDrag) gdDockUpdate(e);
   const groupSet = d.mode === "group" ? new Set(d.shas) : null;
   const cards = [...$("gd-grid").querySelectorAll(".card")].filter((c) =>
     d.mode === "group" ? !groupSet.has(c.dataset.sha) : c !== d.el
@@ -737,6 +800,7 @@ function updateGdDrag(e) {
     gdDropEl.style.top = r.top + 8 + "px";
     gdDropEl.style.height = Math.max(24, r.height - 16) + "px";
   }
+  if (!crossDrag) gdDockUpdate(e);
 }
 
 async function endGdDrag() {
@@ -763,6 +827,445 @@ async function endGdDrag() {
   } catch (e) {
     toast("保存失败：" + String(e));
     loadGroup();
+  }
+}
+
+/* ---------- 分组间拖拽：底部投递 -> 进组 -> 松手提交 ---------- */
+
+function gdBindGlobal() {
+  gdUnbindGlobal();
+  window.addEventListener("pointermove", gdGlobalMove, { passive: false });
+  window.addEventListener("pointerup", gdGlobalUp);
+  window.addEventListener("pointercancel", gdGlobalCancel);
+  window.addEventListener("touchmove", gdGlobalTouch, { passive: false });
+}
+
+function gdUnbindGlobal() {
+  window.removeEventListener("pointermove", gdGlobalMove);
+  window.removeEventListener("pointerup", gdGlobalUp);
+  window.removeEventListener("pointercancel", gdGlobalCancel);
+  window.removeEventListener("touchmove", gdGlobalTouch);
+}
+
+function gdGlobalMove(e) {
+  if (!gdDrag && !crossDrag) return;
+  if (e.cancelable) e.preventDefault();
+  if (crossDrag) crossUpdate(e);
+  else if (gdDrag) updateGdDrag(e);
+}
+
+function gdGlobalUp() {
+  if (crossDrag) { endCrossDrag(); return; }
+  if (gdDrag) endGdDrag();
+}
+
+function gdGlobalCancel() {
+  if (crossDrag) {
+    cancelCrossDrag();
+    return;
+  }
+  if (gdDrag) cancelGdDrag();
+}
+
+function gdGlobalTouch(e) {
+  if (gdDrag) e.preventDefault();
+}
+
+function gdLineShow(r, after) {
+  if (!gdDropEl) {
+    gdDropEl = document.createElement("div");
+    gdDropEl.id = "gddrop";
+    document.body.appendChild(gdDropEl);
+  }
+  gdDropEl.style.display = "block";
+  gdDropEl.style.left = (after ? r.right + 3 : r.left - 6) + "px";
+  gdDropEl.style.top = r.top + 8 + "px";
+  gdDropEl.style.height = Math.max(24, r.height - 16) + "px";
+}
+
+function gdLineHide() {
+  if (gdDropEl) gdDropEl.style.display = "none";
+}
+
+function stopDwellText() {
+  if (dwellTextTimer) clearTimeout(dwellTextTimer);
+  dwellTextTimer = 0;
+}
+
+function startDwellText(el, ms, render) {
+  stopDwellText();
+  if (!el) return;
+  const started = performance.now();
+  const tick = () => {
+    const left = Math.max(0, ms - (performance.now() - started));
+    el.innerHTML = render(left);
+    if (left <= 0) {
+      dwellTextTimer = 0;
+      return;
+    }
+    dwellTextTimer = setTimeout(tick, 80);
+  };
+  tick();
+}
+
+function gdDockRender(text, hot) {
+  if (!gdDockEl) {
+    gdDockEl = document.createElement("div");
+    gdDockEl.id = "gdcrossdock";
+    gdDockEl.innerHTML = `<div class="gddock-frame"><svg class="gddock-ring" viewBox="0 0 366 62" preserveAspectRatio="none" aria-hidden="true"><rect x="1.5" y="1.5" width="363" height="59" rx="14" pathLength="100"></rect></svg><span class="gddock-ic">↓</span><span class="gddock-text"></span><span class="gddock-sub">按住 ${dwellSec()} 秒</span></div>`;
+    document.body.appendChild(gdDockEl);
+  }
+  gdDockEl.querySelector(".gddock-text").textContent = text;
+  const sub = gdDockEl.querySelector(".gddock-sub");
+  if (sub && !hot) sub.textContent = `按住 ${dwellSec()} 秒`;
+  gdDockEl.classList.add("show");
+  gdDockEl.classList.toggle("hot", !!hot);
+  document.body.classList.add("gdcrossbar");
+  gdDockHot = !!hot;
+}
+
+function gdDockHide() {
+  clearTimeout(gdDockTimer);
+  gdDockTimer = 0;
+  if (gdDockEl) {
+    gdDockEl.classList.remove("show", "hot");
+    gdDockEl.remove();
+    gdDockEl = null;
+  }
+  document.body.classList.remove("gdcrossbar");
+  gdDockHot = false;
+}
+
+function gdDockUpdate(e) {
+  if (!gdDrag || crossDrag) return;
+  if (S.gview === null) { gdDockHide(); return; }
+  const near = e.clientY >= window.innerHeight - 90;
+  gdDockRender("继续往下拖 · 去其他分组", near);
+  if (!near) {
+    clearTimeout(gdDockTimer);
+    gdDockTimer = 0;
+    stopDwellText();
+    return;
+  }
+  if (!gdDockTimer) {
+    gdDockTimer = setTimeout(() => {
+      gdDockTimer = 0;
+      stopDwellText();
+      crossStart();
+    }, dwellMs());
+    const sub = gdDockEl && gdDockEl.querySelector(".gddock-sub");
+    startDwellText(sub, dwellMs(), (left) => (left / 1000).toFixed(1) + "s");
+  }
+}
+
+function crossScrollStop() {
+  if (crossScrollRaf) cancelAnimationFrame(crossScrollRaf);
+  crossScrollRaf = 0;
+  crossScrollDir = 0;
+}
+
+function crossScrollTick() {
+  if (!crossDrag || crossDrag.phase !== "groups" || !crossScrollDir) {
+    crossScrollStop();
+    return;
+  }
+  window.scrollBy(0, crossScrollDir * 10);
+  crossScrollRaf = requestAnimationFrame(crossScrollTick);
+}
+
+function crossScrollUpdate(e) {
+  if (!crossDrag || crossDrag.phase !== "groups") {
+    crossScrollStop();
+    return;
+  }
+  const threshold = 90;
+  const dir = e.clientY < threshold ? -1 : e.clientY > window.innerHeight - threshold ? 1 : 0;
+  if (!dir) {
+    crossScrollStop();
+    return;
+  }
+  if (dir !== crossScrollDir) {
+    crossScrollDir = dir;
+    if (!crossScrollRaf) crossScrollRaf = requestAnimationFrame(crossScrollTick);
+  }
+}
+
+function crossRingShow(el) {
+  document.querySelectorAll(".gdcrossring").forEach((r) => r.remove());
+  if (!el) return;
+  const ring = document.createElement("div");
+  ring.className = "gdcrossring";
+  ring.innerHTML = `<svg viewBox="0 0 150 150" aria-hidden="true"><circle cx="75" cy="75" r="67" pathLength="100"></circle></svg><span class="gdcrosscount">${dwellSec()}<span>s</span></span>`;
+  el.appendChild(ring);
+}
+
+function crossRingReset() {
+  stopDwellText();
+  document.querySelectorAll(".gdcrossring").forEach((r) => r.remove());
+}
+
+function crossHoverReset() {
+  stopDwellText();
+  clearTimeout(crossHoverTimer);
+  crossHoverTimer = 0;
+  if (crossHoverEl) crossHoverEl.classList.remove("cross-hot");
+  crossHoverEl = null;
+  crossHoverName = "";
+  crossRingReset();
+}
+
+function crossHoverStart(el, name) {
+  crossHoverReset();
+  crossHoverEl = el;
+  crossHoverName = name;
+  el.classList.add("cross-hot");
+  crossRingShow(el);
+  const count = el.querySelector(".gdcrosscount");
+  startDwellText(count, dwellMs(), (left) => (left / 1000).toFixed(1) + "<span>s</span>");
+  crossHoverTimer = setTimeout(() => {
+    crossHoverTimer = 0;
+    if (!crossDrag || crossDrag.phase !== "groups") return;
+    crossEnterTarget(name);
+  }, dwellMs());
+}
+
+function crossStart() {
+  if (!gdDrag || crossDrag || S.gview === null) return;
+  const source = S.gview;
+  const shas = gdDrag.mode === "group" ? [...gdDrag.shas] : [gdDrag.sha];
+  if (!shas.length) return;
+  crossDrag = {
+    phase: "groups",
+    source,
+    shas,
+    target: null,
+    targetBase: [],
+    targetOrder: [],
+    lineVisible: false,
+  };
+  if (gdSelMode) setGdSelMode(false);
+  gdSel.clear();
+  crossScrollStop();
+  crossRingReset();
+  gdDockHide();
+  gdLineHide();
+  S.gview = null;
+  S.gq = "";
+  const q = $("gq");
+  if (q) q.value = "";
+  setTab("groups");
+  renderFolders();
+  document.body.classList.add("cross-dragging");
+}
+
+function hideCrossTarget() {
+  const el = $("gdcross");
+  if (el) el.remove();
+}
+
+function renderCrossTarget(name, items) {
+  hideCrossTarget();
+  const el = document.createElement("div");
+  el.id = "gdcross";
+  const bytes = items.reduce((n, a) => n + (a.bytes || 0), 0);
+  const same = crossDrag && crossDrag.source === name;
+  el.innerHTML = `<div class="gdcrosshead"><div><b>${gdDisplayName(name)}</b><small>${items.length} 张 · ${fmtSize(bytes)}</small></div><span>${same ? "松手调整" : "松手加入"}</span></div><div class="grid gdcrossgrid" id="gdcrossgrid">${items.map((a) => cardHtml(a, new Set())).join("")}</div>`;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("on"));
+}
+
+async function crossEnterTarget(name) {
+  if (!crossDrag || crossDrag.phase !== "groups" || !name) return;
+  crossHoverReset();
+  crossScrollStop();
+  const c = crossDrag;
+  c.phase = "target";
+  c.target = name;
+  c.targetBase = [];
+  c.targetOrder = [];
+  c.lineVisible = false;
+  gdDockHide();
+  gdLineHide();
+  let items = [];
+  try {
+    items = await invokeRetry("list_assets", {
+      group: gdParam(name), q: "", limit: 1000, sort: "manual", filters: "{}"
+    });
+  } catch {}
+  if (!crossDrag || crossDrag !== c || crossDrag.target !== name) return;
+  c.targetBase = items.map((a) => a.sha);
+  c.targetOrder = [...c.targetBase];
+  renderCrossTarget(name, items);
+  gdDockRender("继续往下拖 · 返回分组", false);
+  if (gdDrag && gdDrag.lastX != null) {
+    crossUpdate({ clientX: gdDrag.lastX, clientY: gdDrag.lastY });
+  }
+}
+
+function crossExitTarget() {
+  const c = crossDrag;
+  if (!c || c.phase !== "target") return;
+  crossScrollStop();
+  crossHoverReset();
+  crossRingReset();
+  clearTimeout(gdDockTimer);
+  gdDockTimer = 0;
+  c.phase = "groups";
+  c.target = null;
+  c.targetBase = [];
+  c.targetOrder = [];
+  c.lineVisible = false;
+  gdDockHide();
+  gdLineHide();
+  hideCrossTarget();
+  crossHoverReset();
+  const folders = $("folders");
+  if (folders) folders.classList.remove("crossing");
+  document.querySelectorAll(".folder.cross-source, .folder.cross-target, .folder.cross-hot").forEach((el) => el.classList.remove("cross-source", "cross-target", "cross-hot"));
+  if (!S.gview) renderFolders();
+}
+
+function crossUpdate(e) {
+  const c = crossDrag;
+  const d = gdDrag;
+  if (!c || !d) return;
+  d.lastX = e.clientX;
+  d.lastY = e.clientY;
+  d.ghost.style.left = e.clientX - d.offsetX + "px";
+  d.ghost.style.top = e.clientY - d.offsetY + "px";
+  const nearBottom = e.clientY >= window.innerHeight - 90;
+
+  if (c.phase === "groups") {
+    crossScrollUpdate(e);
+    gdDockHide();
+    gdLineHide();
+    c.lineVisible = false;
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    const f = hit && hit.closest ? hit.closest("#folders .folder") : null;
+    const name = f && f.dataset ? (f.dataset.group || (f.dataset.fav ? FAV_NAME : "")) : "";
+    if (!f || !name) {
+      crossHoverReset();
+      return;
+    }
+    const fr = f.getBoundingClientRect();
+    const pad = 8;
+    if (
+      e.clientX < fr.left + pad || e.clientX > fr.right - pad ||
+      e.clientY < fr.top + pad || e.clientY > fr.bottom - pad
+    ) {
+      crossHoverReset();
+      return;
+    }
+    if (name !== crossHoverName) crossHoverStart(f, name);
+    return;
+  }
+
+  // phase === "target"：在目标组详情里调插入位，或下拖回组页
+  crossScrollStop();
+  if (nearBottom) {
+    gdLineHide();
+    c.lineVisible = false;
+    c.targetOrder = [];
+    gdDockRender("继续往下拖 · 返回分组", true);
+    if (!gdDockTimer) {
+      gdDockTimer = setTimeout(() => {
+        gdDockTimer = 0;
+        crossExitTarget();
+      }, dwellMs());
+    }
+    return;
+  }
+
+  clearTimeout(gdDockTimer);
+  gdDockTimer = 0;
+  gdDockRender("继续往下拖 · 返回分组", false);
+
+  const grid = $("gdcrossgrid");
+  if (!grid) return;
+  const cards = [...grid.querySelectorAll(".card")];
+  if (!cards.length) {
+    const gr = grid.getBoundingClientRect();
+    c.targetOrder = [...c.shas];
+    c.lineVisible = true;
+    gdLineShow({ left: gr.left + 18, right: gr.left + 18, top: gr.top + 8, height: Math.min(96, gr.height - 16) }, false);
+    return;
+  }
+
+  let target = null;
+  let best = Infinity;
+  for (const card of cards) {
+    const r = card.getBoundingClientRect();
+    const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+    if (dist < best) {
+      best = dist;
+      target = card;
+    }
+  }
+  if (!target) {
+    gdLineHide();
+    c.lineVisible = false;
+    return;
+  }
+  const r = target.getBoundingClientRect();
+  const after = e.clientX > r.left + r.width / 2;
+  const base = c.targetBase.filter((s) => !c.shas.includes(s));
+  const at = base.indexOf(target.dataset.sha);
+  if (at < 0) {
+    gdLineHide();
+    c.lineVisible = false;
+    return;
+  }
+  const next = [...base];
+  next.splice(after ? at + 1 : at, 0, ...c.shas);
+  c.targetOrder = next;
+  c.lineVisible = true;
+  gdLineShow(r, after);
+}
+
+function cancelCrossDrag() {
+  hideCrossTarget();
+  gdDropCleanup();
+  gdDrag = null;
+  crossDrag = null;
+  gdHoldFired = true;
+  setTimeout(() => { gdHoldFired = false; }, 450);
+  if (!S.gview) renderFolders();
+}
+
+async function endCrossDrag() {
+  const c = crossDrag;
+  const target = c && c.target;
+  const shas = c ? [...c.shas] : [];
+  const order = c ? [...c.targetOrder] : [];
+  const source = c ? c.source : null;
+  const count = shas.length;
+  const commit = !!(c && c.phase === "target" && target && c.lineVisible && order.length);
+  gdDropCleanup();
+  hideCrossTarget();
+  gdDrag = null;
+  crossDrag = null;
+  gdHoldFired = true;
+  setTimeout(() => { gdHoldFired = false; }, 450);
+  if (!commit) {
+    if (!S.gview) renderFolders();
+    return;
+  }
+  try {
+    const mode = dragMode();
+    const same = source === target;
+    if (!same) await invokeRetry("add_to_group", { shas, group: target });
+    await invokeRetry("set_asset_order", { key: gdParam(target), shas: order });
+    if (!same && mode === "cut" && source) {
+      if (source === FAV_NAME) await invokeRetry("batch_star", { shas, on: false });
+      else await invokeRetry("batch_ungroup", { shas, group: source });
+    }
+    await loadGroups();
+    await openGroup(target);
+    toast(same ? `已调整 ${count} 张顺序` : `已${mode === "cut" ? "剪切" : "复制"} ${count} 张到「${gdDisplayName(target)}」`);
+  } catch (e) {
+    toast("加入失败：" + String(e));
+    await loadGroups();
+    if (source) await openGroup(source);
   }
 }
 
@@ -1046,16 +1549,24 @@ async function gdAction(act) {
     return;
   }
   if (act === "remove") {
-    const ok = await confirmSheet(`把 ${shas.length} 张图移出「${gdDisplayName(S.gview)}」？图片不会被删除。`, "移出当前分组", "移出");
+    const isFav = S.gview === FAV_NAME;
+    const ok = await confirmSheet(
+      isFav
+        ? `${shas.length} 张图会从收藏夹移除，图片不会被删除。`
+        : `把 ${shas.length} 张图移出「${gdDisplayName(S.gview)}」？图片不会被删除。`,
+      isFav ? "取消收藏" : "移出当前分组",
+      isFav ? "取消收藏" : "移出"
+    );
     if (!ok) return;
     try {
-      await invokeRetry("batch_ungroup", { shas, group: S.gview });
+      if (isFav) await invokeRetry("batch_star", { shas, on: false });
+      else await invokeRetry("batch_ungroup", { shas, group: S.gview });
       setGdSelMode(false);
       await loadGroup();
       await loadGroups();
-      toast(`已移出 ${shas.length} 张`);
+      toast(isFav ? `已取消收藏 ${shas.length} 张` : `已移出 ${shas.length} 张`);
     } catch (e) {
-      toast("移出失败：" + String(e));
+      toast((isFav ? "取消收藏失败：" : "移出失败：") + String(e));
     }
     return;
   }
@@ -1945,6 +2456,7 @@ function applyPrefs() {
   document.documentElement.dataset.fav = localStorage.getItem("sb.fav") || "heart";
   const cols = Number(localStorage.getItem("sb.cols")) || 3;
   document.documentElement.style.setProperty("--cols", String(cols));
+  document.documentElement.style.setProperty("--gd-dwell", dwellMs() + "ms");
 }
 
 function renderMe() {
@@ -1957,6 +2469,8 @@ function renderMe() {
   for (const b of document.querySelectorAll("#seg-cols button")) b.classList.toggle("on", b.dataset.cols === cols);
   const fav = localStorage.getItem("sb.fav") || "heart";
   for (const b of document.querySelectorAll("#seg-fav button")) b.classList.toggle("on", b.dataset.fav === fav);
+  for (const b of document.querySelectorAll("#seg-dwell button")) b.classList.toggle("on", Number(b.dataset.dwell) === dwellMs());
+  for (const b of document.querySelectorAll("#seg-dragmode button")) b.classList.toggle("on", b.dataset.dragmode === dragMode());
   for (const b of document.querySelectorAll("#seg-pinrow button")) b.classList.toggle("on", +b.dataset.pinrow === S.pinsPerRow);
   for (const b of document.querySelectorAll("#seg-pinrows button")) b.classList.toggle("on", +b.dataset.pinrows === S.pinRows);
 }
@@ -2158,6 +2672,7 @@ function wire() {
   // 分组页：轻点进组 / 长按多选 / 长按后拖动排序
   const folders = $("folders");
   folders.addEventListener("pointerdown", (e) => {
+    if (gdDrag || crossDrag) return;
     const f = e.target.closest(".folder");
     if (!f || !f.dataset.group || e.button > 0) return;
     suppressClick = false;
@@ -2190,6 +2705,8 @@ function wire() {
     else { clearTimeout(holdTimer); resetHold(); }
   });
   folders.addEventListener("click", (e) => {
+    if (gdDrag || crossDrag) return;
+    if (gdHoldFired) { gdHoldFired = false; return; }
     const f = e.target.closest(".folder");
     if (!f) return;
     if (suppressClick) { suppressClick = false; return; }
@@ -2262,13 +2779,12 @@ function wire() {
 
   const gdGrid = $("gd-grid");
   gdGrid.addEventListener("pointerdown", (e) => {
-    if (S.gview === null) return;
+    if (S.gview === null || gdDrag || crossDrag) return;
     const c = e.target.closest(".card");
     if (!c || e.button > 0) return;
     if (gdSelMode && !gdSel.has(c.dataset.sha)) return;
     gdHoldFired = false;
     gdHoldInfo = { sha: c.dataset.sha, x: e.clientX, y: e.clientY, el: c, armed: false, group: gdSelMode };
-    try { c.setPointerCapture(e.pointerId); } catch {}
     clearTimeout(gdHoldTimer);
     gdHoldTimer = setTimeout(() => {
       if (!gdHoldInfo) return;
@@ -2277,7 +2793,7 @@ function wire() {
     }, 340);
   });
   gdGrid.addEventListener("pointermove", (e) => {
-    if (gdDrag) { updateGdDrag(e); return; }
+    if (gdDrag || crossDrag) return;
     if (!gdHoldInfo) return;
     const dist = Math.hypot(e.clientX - gdHoldInfo.x, e.clientY - gdHoldInfo.y);
     if (dist <= 8) return;
@@ -2296,7 +2812,7 @@ function wire() {
     }
   });
   gdGrid.addEventListener("pointerup", () => {
-    if (gdDrag) { endGdDrag(); return; }
+    if (gdDrag || crossDrag) return;
     if (!gdHoldInfo) return;
     const info = gdHoldInfo;
     clearTimeout(gdHoldTimer);
@@ -2306,7 +2822,7 @@ function wire() {
       setTimeout(() => { gdHoldFired = false; }, 600);
       return;
     }
-    if (info.armed && S.gview !== FAV_NAME) {
+    if (info.armed) {
       gdSel.add(info.sha);
       setGdSelMode(true);
       gdHoldFired = true;
@@ -2314,14 +2830,17 @@ function wire() {
     }
   });
   gdGrid.addEventListener("pointercancel", () => {
-    if (gdDrag) { cancelGdDrag(); return; }
+    if (gdDrag || crossDrag) return;
     clearTimeout(gdHoldTimer);
     gdHoldInfo = null;
   });
   gdGrid.addEventListener("touchmove", (e) => {
     if (gdDrag || (gdHoldInfo && gdHoldInfo.armed)) e.preventDefault();
   }, { passive: false });
+  gdGrid.addEventListener("dragstart", (e) => e.preventDefault());
+  gdGrid.addEventListener("contextmenu", (e) => e.preventDefault());
   gdGrid.addEventListener("click", (e) => {
+    if (gdDrag || crossDrag) return;
     const c = e.target.closest(".card");
     if (!c) return;
     if (gdHoldFired) { gdHoldFired = false; return; }
@@ -2491,6 +3010,20 @@ $("seg-cols").addEventListener("click", (e) => {
   localStorage.setItem("sb.cols", b.dataset.cols);
   applyPrefs();
   renderMe();
+});
+$("seg-dwell").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-dwell]");
+  if (!b) return;
+  localStorage.setItem("sb.dwell", b.dataset.dwell);
+  applyPrefs();
+  renderMe();
+});
+$("seg-dragmode").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-dragmode]");
+  if (!b) return;
+  localStorage.setItem("sb.dragmode", b.dataset.dragmode);
+  renderMe();
+  toast(b.dataset.dragmode === "cut" ? "拖到其他分组：剪切" : "拖到其他分组：复制");
 });
 $("btn-purge").addEventListener("click", purgeTrash);
 let trashHold = null, trashHoldTimer = 0, trashHoldFired = false;
