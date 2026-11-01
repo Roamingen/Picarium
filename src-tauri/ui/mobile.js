@@ -22,6 +22,8 @@ const S = {
   sharedPaths: [],
   tags: [],
   filters: { type: "", days: 0, tags: [], sort: "" },
+  gFilters: { type: "", days: 0, tags: [], sort: "" },
+  tFilters: { type: "", days: 0, tags: [], sort: "" },
   loading: false,
 };
 
@@ -151,6 +153,8 @@ async function refresh() {
     renderChips();
     renderPins();
     renderGrid();
+    if (pruneSel()) paintImgSel();
+    syncSel();
     if (S.tab === "groups" && !S.gview) renderFolders();
   } catch (e) {
     $("grid").innerHTML = '<div class="empty">读取失败：' + String(e) + "</div>";
@@ -188,9 +192,6 @@ function renderChips() {
   if (!["all", "star", "ungrouped", "recent"].includes(S.view)) {
     html += `<button class="chip fch" data-clear="1"><b>分组：${escapeHtml(S.view)}</b> <span class="x">✕</span></button>`;
   }
-  if (S.q) {
-    html += `<button class="chip fch" data-qclear="1">搜：${escapeHtml(S.q)} <span class="x">✕</span></button>`;
-  }
   chips.innerHTML = html;
   $("btn-filter").classList.toggle("active", hasFilters());
   // 分组/搜索的 chip 排在最后，自动滚到右端让用户看见
@@ -198,25 +199,27 @@ function renderChips() {
   chips.scrollLeft = hasFilter ? chips.scrollWidth : 0;
 }
 
-function filterJson() {
+function filterJson(src) {
+  const src0 = src || S.filters;
   const f = {};
-  if (S.filters.type === "gif") f.exts = ["gif"];
-  else if (S.filters.type === "static") f.exts = ["png", "jpg", "jpeg", "webp", "bmp"];
-  if (S.filters.tags.length) f.tags = S.filters.tags.slice();
-  if (S.filters.days) {
+  if (src0.type === "gif") f.exts = ["gif"];
+  else if (src0.type === "static") f.exts = ["png", "jpg", "jpeg", "webp", "bmp"];
+  if (src0.tags.length) f.tags = src0.tags.slice();
+  if (src0.days) {
     const d = new Date();
-    d.setDate(d.getDate() - (S.filters.days - 1));
+    d.setDate(d.getDate() - (src0.days - 1));
     f.from = d.toISOString().slice(0, 10);
   }
   return Object.keys(f).length ? JSON.stringify(f) : null;
 }
 
-function sortParam() {
-  return S.filters.sort || "added";
+function sortParam(src) {
+  return (src || S.filters).sort || "added";
 }
 
-function hasFilters() {
-  return !!(S.filters.type || S.filters.days || S.filters.tags.length || S.filters.sort);
+function hasFilters(src) {
+  const f = src || S.filters;
+  return !!(f.type || f.days || f.tags.length || f.sort);
 }
 
 function pinNames() {
@@ -274,7 +277,7 @@ function cardHtml(a) {
   return `<button class="card${on ? " sel" : ""}" data-sha="${escapeAttr(a.sha)}" data-name="${escapeAttr(a.name)}">
     <img loading="lazy" src="${thumbUrl(a.sha)}" alt="" onerror="this.style.display='none'">
     ${a.animated ? '<span class="badge">GIF</span>' : ""}
-    ${a.starred ? '<span class="star">★</span>' : ""}
+    ${a.starred ? '<span class="fav"></span>' : ""}
     <span class="fcheck">${SVG.check || ""}</span>
   </button>`;
 }
@@ -306,11 +309,21 @@ function folderIcon(name) {
   return `<span class="fico" style="--h:${hueOf(name)}">${SVG.folder}</span>`;
 }
 
-function folderCard(g) {
+const FAV_NAME = "收藏";
+function favCard(count, picked) {
+  return `<button class="folder fav${picked ? " sel" : ""}" data-fav="1">
+    <span class="fcheck">${SVG.check}</span>
+    <div class="fc favfc">♥</div>
+    <div class="fb"><span class="fname">收藏夹</span><span class="fsub">${count} 张 · 特殊分组</span></div>
+  </button>`;
+}
+
+function folderCard(g, picked) {
+  const on = picked === undefined ? sel.has(g.name) : !!picked;
   const cover = g.cover
     ? `<img src="${thumbUrl(g.cover, g.animated)}" alt="" loading="lazy" onerror="this.remove()">`
     : folderIcon(g.name);
-  return `<button class="folder${sel.has(g.name) ? " sel" : ""}${g.pinned ? " pinned" : ""}" data-group="${escapeAttr(g.name)}">
+  return `<button class="folder${on ? " sel" : ""}${g.pinned ? " pinned" : ""}" data-group="${escapeAttr(g.name)}">
     ${g.pinned ? `<span class="gpin" title="已置顶">${SVG.pin}</span>` : ""}
     <span class="fcheck">${SVG.check}</span>
     <div class="fc">${cover}${g.animated && g.cover ? '<span class="gb">GIF</span>' : ""}</div>
@@ -341,8 +354,10 @@ function renderFolders(keepScroll) {
   $("btn-newgroup").title = selMode ? "完成" : "新建分组";
   $("selbar").hidden = !selMode;
   if (selMode) $("selcount").textContent = String(sel.size);
+  const starred = (S.stats && S.stats.starred) || 0;
   folderBox.innerHTML =
-    list.map(folderCard).join("") +
+    (q ? "" : favCard(starred, false)) +
+    list.map((g) => folderCard(g)).join("") +
     (selMode
       ? ""
       : `<button class="folder new" data-new="1"><div class="fc">＋</div><div class="fb"><span class="fname">新建分组</span><span class="fsub">把一堆图归到一起</span></div></button>`);
@@ -367,13 +382,15 @@ function syncGroupPin(name) {
 async function openGroup(name) {
   S.gview = name;
   setTab("groups");
+  syncGuard();
   const g = S.groupList.find((x) => x.name === name);
   $("gd-title").textContent = name;
   syncGroupPin(name);
   $("gd-meta").textContent = g ? `${g.count} 张 · 长按可换封面 / 重命名` : "";
+  $("btn-gfilter").classList.toggle("active", hasFilters(S.gFilters));
   $("gd-grid").innerHTML = '<div class="spinner">正在读取…</div>';
   try {
-    const items = await invokeRetry("list_assets", { q: "", group: name, limit: 500 });
+    const items = await invokeRetry("list_assets", { q: "", group: name, limit: 500, sort: sortParam(S.gFilters), filters: filterJson(S.gFilters) });
     $("gd-meta").textContent = `${items.length} 张 · 右上角可换封面`;
     $("gd-grid").innerHTML = items.length
       ? items.map(cardHtml).join("")
@@ -391,21 +408,64 @@ function paintImgSel() {
   });
 }
 
+// 选择态：原地切换（不搬 DOM、不弹面板）
+function selShas() { return (S.items || []).map((a) => a.sha); }
+
+function syncSel() {
+  const n = $("seln");
+  if (n) n.textContent = String(imgSel.size);
+  const list = selShas();
+  const full = list.length > 0 && list.every((s) => imgSel.has(s));
+  const b = $("sel-all");
+  if (b) { b.textContent = full ? "取消全选" : "全选"; b.classList.toggle("done", full); }
+  for (const btn of document.querySelectorAll("#actbar button")) btn.disabled = imgSel.size === 0;
+}
+
+// 搜索/筛选把已选图筛掉后，自动取消那些看不见的选中
+function pruneSel() {
+  if (!imgSelMode) return false;
+  const keep = new Set((S.items || []).map((a) => a.sha));
+  let changed = false;
+  for (const sha of [...imgSel]) {
+    if (!keep.has(sha)) { imgSel.delete(sha); changed = true; }
+  }
+  return changed;
+}
+
 function setImgSelMode(on) {
+  on = !!on;
   imgSelMode = on;
   if (!on) imgSel.clear();
-  $("imgsel").hidden = !on;
-  $("fab").hidden = on || trashSelMode;
-  $("imgn").textContent = String(imgSel.size);
+  document.body.classList.toggle("select", on);
+  $("selhead").hidden = !on;
+  $("actbar").hidden = !on;
+  $("fab").hidden = on || trashSelMode || S.tab !== "gallery";
   paintImgSel();
+  syncSel();
+  syncGuard();
+}
+
+
+// 通用：搜索框的 ✕ 清空
+function bindClear(inputId, clearId, after) {
+  const inp = $(inputId), btn = $(clearId);
+  if (!inp || !btn) return;
+  const sync = () => { btn.hidden = !inp.value; };
+  inp.addEventListener("input", sync);
+  btn.addEventListener("click", () => {
+    inp.value = "";
+    sync();
+    inp.focus();
+    if (after) after();
+  });
+  sync();
 }
 
 function toggleImgSel(sha) {
   if (imgSel.has(sha)) imgSel.delete(sha);
   else imgSel.add(sha);
-  if (!imgSel.size) return setImgSelMode(false);
-  $("imgn").textContent = String(imgSel.size);
   paintImgSel();
+  syncSel();
 }
 
 let vIndex = 0;
@@ -470,13 +530,15 @@ function openViewer(sha) {
   renderViewer();
   $("viewer").hidden = false;
   document.body.style.overflow = "hidden";
+  syncGuard();
 }
 
 function closeViewer() {
   $("viewer").hidden = true;
   $("v-img").removeAttribute("src");
   resetViewerTransform();
-  document.body.style.overflow = "";
+  if (!document.body.classList.contains("multi")) document.body.style.overflow = "";
+  syncGuard();
 }
 
 function stepViewer(delta) {
@@ -501,18 +563,51 @@ function backGroups() {
   $("groupdetail").hidden = true;
   $("groupsview").hidden = false;
   renderFolders();
+  syncGuard();
 }
+
+/* ---------- 返回分层：系统返回键先收最上面一层 ---------- */
+/* 返回键由原生层（MainActivity.onWebViewCreate 里的 OnBackPressedCallback）转给
+   window.__sbBack()：有层就收一层并返回 true；没有层返回 false，原生层才结束 Activity。 */
+function activeLayer() {
+  const shown = (id) => { const el = $(id); return el && !el.hidden; };
+  if (shown("lightbox")) return { close: () => closeLightbox() };
+  if (shown("sheetmask")) return { close: () => { if (sheetResolve) { sheetResolve(false); sheetResolve = null; } closeSheet(); } };
+  if (shown("filtermask")) return { close: () => { $("filtermask").hidden = true; syncGuard(); } };
+  if (shown("pickmask")) return { close: exitPicker };
+  if (imgSelMode) return { close: () => setImgSelMode(false) };
+  if (shown("viewer")) return { close: () => closeViewer() };
+  if (trashSelMode) return { close: () => setTrashSelMode(false) };
+  if (selMode) return { close: () => setSelMode(false) };
+  if (S.tab === "groups" && S.gview) return { close: () => backGroups() };
+  if (S.tab !== "gallery") return { close: () => setTab("gallery") };
+  return null;
+}
+
+// 各开关处都会调它；返回分层改由原生回调驱动后，这里不再需要压 history。
+function syncGuard() {}
+
+function sbBack() {
+  const layer = activeLayer();
+  if (!layer) return false;
+  try { layer.close(); } catch (_) {}
+  return true;
+}
+window.__sbBack = sbBack;
 
 /* ---------- 底部弹层 ---------- */
 
 function openSheet(title, bodyHtml) {
+  resetSheetHeight(document.querySelector("#sheetmask .sheet"));
   $("sheet-title").textContent = title;
   $("sheet-body").innerHTML = bodyHtml;
   $("sheetmask").hidden = false;
+  syncGuard();
 }
 function closeSheet() {
   $("sheetmask").hidden = true;
   $("sheet-body").innerHTML = "";
+  syncGuard();
 }
 let sheetResolve = null;
 
@@ -620,6 +715,7 @@ function openNewGroup() {
       await invokeRetry("create_group", { name: v });
       closeSheet();
       await loadGroups();
+      if (!$("pickmask").hidden) { pickSel = v; renderPicker(); }
       toast("分组已创建");
     } catch (e) {
       toast("创建失败：" + String(e));
@@ -722,6 +818,7 @@ function setSelMode(on) {
   selMode = on;
   if (!on) sel.clear();
   renderFolders(true);
+  syncGuard();
 }
 
 function toggleSel(name) {
@@ -991,70 +1088,6 @@ function batchSingle(act) {
 }
 
 /* 置顶管理：置顶哪些 + 显示几个 */
-function openPinManager() {
-  const row = (g) => {
-    const on = S.pinned.includes(g.name);
-    return `<button class="prow" data-pin="${escapeAttr(g.name)}">
-      <span class="pcheck${on ? " on" : ""}">${on ? SVG.check : ""}</span>
-      <span class="pname">${escapeHtml(g.name)}</span>
-      <span class="pcount">${g.count}</span>
-    </button>`;
-  };
-  openSheet(
-    "置顶分组",
-    `<div class="sect">图库顶部每行显示</div>
-     <div class="opts" id="pin-cols">
-       ${[4, 5, 6].map((n) => `<div class="opt${S.pinsPerRow === n ? " on" : ""}" data-cols="${n}">${n} 个</div>`).join("")}
-     </div>
-     <div class="sect">最多显示</div>
-     <div class="opts" id="pin-rows">
-       ${[1, 2, 3].map((n) => `<div class="opt${S.pinRows === n ? " on" : ""}" data-rows="${n}">${n} 行</div>`).join("")}
-     </div>
-     <div class="sect">置顶哪些分组（可多选）</div>
-     <div class="pinlist" id="pinlist">${S.groupList.map(row).join("")}</div>
-     <div class="shnote">置顶后，在图库顶部展开置顶条，长按卡片可以拖动排序。</div>`
-  );
-  $("sheet-body").onclick = async (e) => {
-    const c = e.target.closest("[data-cols]");
-    const r = e.target.closest("[data-rows]");
-    const p = e.target.closest("[data-pin]");
-    if (c) {
-      S.pinsPerRow = +c.dataset.cols;
-      try { localStorage.setItem("sb.pinPerRow", String(S.pinsPerRow)); } catch (_) {}
-      $("pin-cols").querySelectorAll(".opt").forEach((el) => el.classList.toggle("on", +el.dataset.cols === S.pinsPerRow));
-      renderPins();
-      return;
-    }
-    if (r) {
-      S.pinRows = +r.dataset.rows;
-      try { localStorage.setItem("sb.pinRows", String(S.pinRows)); } catch (_) {}
-      $("pin-rows").querySelectorAll(".opt").forEach((el) => el.classList.toggle("on", +el.dataset.rows === S.pinRows));
-      renderPins();
-      return;
-    }
-    if (p) {
-      const name = p.dataset.pin;
-      const on = !S.pinned.includes(name);
-      S.pinned = on ? [...S.pinned, name] : S.pinned.filter((n) => n !== name);
-      try {
-        await invokeRetry("set_pinned_groups", { groups: S.pinned });
-        await loadGroups();
-        p.querySelector(".pcheck").classList.toggle("on", on);
-        p.querySelector(".pcheck").innerHTML = on ? SVG.check : "";
-        p.querySelector(".pcheck").className = "pcheck" + (on ? " on" : "");
-      } catch (err) {
-        toast("设置失败：" + String(err));
-      }
-    }
-  };
-}
-
-
-/* ---------- tab ---------- */
-
-// ---- 回收站 ----
-let TRASH_DAYS = 7;
-
 function daysLeft(item) {
   const t = item.deleted_at ? new Date(item.deleted_at).getTime() : Date.now();
   return Math.max(0, TRASH_DAYS - Math.floor((Date.now() - t) / 86400000));
@@ -1065,12 +1098,13 @@ async function loadTrash() {
   grid.innerHTML = `<div class="empty">正在读取…</div>`;
   let items = [];
   try {
-    items = await invokeRetry("trash_list");
+    items = await invokeRetry("trash_list", { q: null, filters: filterJson(S.tFilters) });
   } catch (e) {
     grid.innerHTML = `<div class="empty">读取失败：${escapeHtml(String(e))}</div>`;
     return;
   }
   S.trashItems = items;
+  $("btn-tfilter").classList.toggle("active", hasFilters(S.tFilters));
   $("tcount").textContent = items.length ? ` ${items.length} 张` : "";
   $("trash-meta").textContent = `删除的图片会在这里保留 ${TRASH_DAYS} 天，期间可以恢复或彻底删除。`;
   if (!items.length) {
@@ -1202,6 +1236,7 @@ function resolveTheme() {
 function applyPrefs() {
   const theme = resolveTheme();
   document.documentElement.dataset.theme = theme;
+  document.documentElement.dataset.fav = localStorage.getItem("sb.fav") || "heart";
   const cols = Number(localStorage.getItem("sb.cols")) || 3;
   document.documentElement.style.setProperty("--cols", String(cols));
 }
@@ -1214,35 +1249,77 @@ function renderMe() {
   for (const b of document.querySelectorAll("#seg-theme button")) b.classList.toggle("on", b.dataset.theme === theme);
   const cols = String(Number(localStorage.getItem("sb.cols")) || 3);
   for (const b of document.querySelectorAll("#seg-cols button")) b.classList.toggle("on", b.dataset.cols === cols);
+  const fav = localStorage.getItem("sb.fav") || "heart";
+  for (const b of document.querySelectorAll("#seg-fav button")) b.classList.toggle("on", b.dataset.fav === fav);
+  for (const b of document.querySelectorAll("#seg-pinrow button")) b.classList.toggle("on", +b.dataset.pinrow === S.pinsPerRow);
+  for (const b of document.querySelectorAll("#seg-pinrows button")) b.classList.toggle("on", +b.dataset.pinrows === S.pinRows);
+}
+
+/* 同一个筛选组件，三种宿主：图库 / 分组详情 / 回收站 */
+let filterHost = "gallery"; // gallery | group | trash
+
+function hostFilters() {
+  return filterHost === "group" ? S.gFilters : filterHost === "trash" ? S.tFilters : S.filters;
+}
+
+function filterScope() {
+  return filterHost === "group" ? S.gview || "分组" : filterHost === "trash" ? "回收站" : "图库";
 }
 
 function renderFilterSheet() {
-  const gs = S.groupList || [];
-  $("f-groups").innerHTML =
-    `<button class="opt${S.view === "all" ? " on" : ""}" data-g="">全部分组</button>` +
-    `<button class="opt${S.view === "ungrouped" ? " on" : ""}" data-g="__none__">未分组</button>` +
-    `<button class="opt${S.view === "star" ? " on" : ""}" data-g="__star__">收藏</button>` +
-    gs.map((g) => `<button class="opt${S.view === g.name ? " on" : ""}" data-g="${escapeHtml(g.name)}">${escapeHtml(g.name)}</button>`).join("");
-  [...$("f-type").children].forEach((el) => el.classList.toggle("on", (el.dataset.type || "") === S.filters.type));
-  [...$("f-days").children].forEach((el) => el.classList.toggle("on", Number(el.dataset.days || 0) === S.filters.days));
-  [...$("f-sort").children].forEach((el) => el.classList.toggle("on", (el.dataset.sort || "") === S.filters.sort));
+  const f = hostFilters();
+  $("f-scope").textContent = filterScope();
+  $("fsec-groups").hidden = filterHost !== "gallery";
+  $("fsec-tags").hidden = filterHost === "trash";
+  $("fsec-sort").hidden = filterHost === "trash";
+  $("f-days-label").textContent = filterHost === "trash" ? "删除时间" : "时间";
+
+  if (filterHost === "gallery") {
+    const gs = S.groupList || [];
+    $("f-groups").innerHTML =
+      `<button class="opt${S.view === "all" ? " on" : ""}" data-g="">全部分组</button>` +
+      `<button class="opt${S.view === "ungrouped" ? " on" : ""}" data-g="__none__">未分组</button>` +
+      `<button class="opt${S.view === "star" ? " on" : ""}" data-g="__star__">收藏</button>` +
+      gs.map((g) => `<button class="opt${S.view === g.name ? " on" : ""}" data-g="${escapeHtml(g.name)}">${escapeHtml(g.name)}</button>`).join("");
+  }
+  [...$("f-type").children].forEach((el) => el.classList.toggle("on", (el.dataset.type || "") === f.type));
+  [...$("f-days").children].forEach((el) => el.classList.toggle("on", Number(el.dataset.days || 0) === f.days));
+  [...$("f-sort").children].forEach((el) => el.classList.toggle("on", (el.dataset.sort || "") === f.sort));
   $("f-tags").innerHTML = S.tags.length
     ? S.tags
-        .map((t) => `<button class="opt${S.filters.tags.includes(t.name) ? " on" : ""}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)} <em>${t.count}</em></button>`)
+        .map((t) => `<button class="opt${f.tags.includes(t.name) ? " on" : ""}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)} <em>${t.count}</em></button>`)
         .join("")
     : `<span class="fnote">还没有标签</span>`;
 }
 
-function openFilters() {
+function resetSheetHeight(sheet) {
+  if (!sheet) return;
+  sheet.classList.remove("tall");
+  sheet.style.removeProperty("--sheet-h");
+}
+
+function openFilters(host) {
+  filterHost = host || "gallery";
+  resetSheetHeight($("filtersheet"));
   renderFilterSheet();
   $("filtermask").hidden = false;
   updateFilterCount();
+  syncGuard();
 }
 
 function updateFilterCount() {
-  invokeRetry("list_assets", { q: S.q, group: groupParam(), limit: 2000, sort: sortParam(), filters: filterJson() })
-    .then((items) => { $("f-apply").textContent = `查看 ${items.length} 张`; })
-    .catch(() => {});
+  const f = hostFilters();
+  const p =
+    filterHost === "trash"
+      ? invokeRetry("trash_list", { q: null, filters: filterJson(f) })
+      : invokeRetry("list_assets", {
+          q: filterHost === "gallery" ? S.q : "",
+          group: filterHost === "group" ? S.gview : groupParam(),
+          limit: 2000,
+          sort: sortParam(f),
+          filters: filterJson(f),
+        });
+  p.then((items) => { $("f-apply").textContent = `查看 ${items.length} 张`; }).catch(() => {});
 }
 
 function setTab(tab) {
@@ -1277,6 +1354,7 @@ function setTab(tab) {
   if (tab !== "trash" && trashSelMode) setTrashSelMode(false);
   if (tab === "trash") loadTrash();
   if (tab === "me") renderMe();
+  syncGuard();
 }
 
 /* ---------- 事件 ---------- */
@@ -1284,12 +1362,21 @@ function setTab(tab) {
 function wire() {
   let t = 0;
   const q = $("q");
+  const syncQClear = () => { $("q-clear").hidden = !q.value; };
   q.addEventListener("input", () => {
+    syncQClear();
     clearTimeout(t);
     t = setTimeout(() => {
       S.q = q.value.trim();
       refresh();
     }, 220);
+  });
+  $("q-clear").addEventListener("click", () => {
+    q.value = "";
+    S.q = "";
+    syncQClear();
+    q.focus();
+    refresh();
   });
   q.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
@@ -1299,7 +1386,6 @@ function wire() {
     }
   });
 
-  $("btn-search").addEventListener("click", () => q.focus());
 
   $("chips").addEventListener("click", (e) => {
     const b = e.target.closest("button");
@@ -1382,6 +1468,13 @@ function wire() {
     if (!f) return;
     if (suppressClick) { suppressClick = false; return; }
     if (f.dataset.new) { if (!selMode) openNewGroup(); return; }
+    if (f.dataset.fav) {
+      if (selMode) { toast("收藏夹不能加入分组"); return; }
+      S.view = "star";
+      setTab("gallery");
+      refresh();
+      return;
+    }
     if (selMode) toggleSel(f.dataset.group);
     else openGroup(f.dataset.group);
   });
@@ -1480,17 +1573,28 @@ function wire() {
 
   $("fab").addEventListener("click", openImportSheet);
   $("btn-filter").addEventListener("click", openFilters);
-  $("btn-settings").addEventListener("click", () => setTab("me"));
-  $("pins-manage").addEventListener("click", openPinManager);
+  $("btn-inbox").addEventListener("click", () => {
+    if (!S.sharedPaths.length) return toast("分享收件箱是空的");
+    setTab("gallery");
+    $("inbox").hidden = false;
+    $("inbox").scrollIntoView({ block: "center", behavior: "smooth" });
+  });
+  $("btn-multi").addEventListener("click", () => {
+    if (!S.items.length) return toast("图库里还没有图");
+    if (S.tab !== "gallery") setTab("gallery");
+    setImgSelMode(true);
+  });
   $("inbox-undo").addEventListener("click", () => {
     S.sharedPaths = [];
     $("inbox").hidden = true;
+    syncInboxBadge();
   });
   $("inbox-import").addEventListener("click", async () => {
     if (!S.sharedPaths.length) return;
     const paths = S.sharedPaths;
     S.sharedPaths = [];
     $("inbox").hidden = true;
+    syncInboxBadge();
     toast(`正在导入 ${paths.length} 张…`);
     try {
       const r = await invokeRetry("import_paths_simple", { paths });
@@ -1506,6 +1610,13 @@ function wire() {
 
 /* ---------- 启动 ---------- */
 
+function syncInboxBadge() {
+  const n = S.sharedPaths.length;
+  const b = $("inbox-badge");
+  b.hidden = !n;
+  b.textContent = n > 9 ? "9+" : String(n);
+}
+
 async function checkShared() {
   try {
     const paths = await invokeRetry("take_shared_paths");
@@ -1513,6 +1624,7 @@ async function checkShared() {
       S.sharedPaths = paths;
       $("inbox-text").textContent = `收到 ${paths.length} 张图片`;
       $("inbox").hidden = false;
+      syncInboxBadge();
     }
   } catch (e) {
     /* 桌面没有分享入口，忽略 */
@@ -1532,8 +1644,16 @@ $("seg-theme").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-theme]");
   if (!b) return;
   localStorage.setItem("sb.theme", b.dataset.theme);
-
   applyPrefs();
+  renderMe();
+});
+$("seg-fav").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-fav]");
+  if (!b) return;
+  localStorage.setItem("sb.fav", b.dataset.fav);
+  applyPrefs();
+  renderMe();
+});
 (function watchKeyboard() {
   const vv = window.visualViewport;
   if (!vv) return;
@@ -1544,8 +1664,6 @@ $("seg-theme").addEventListener("click", (e) => {
   vv.addEventListener("resize", sync);
   vv.addEventListener("scroll", sync);
 })();
-  renderMe();
-});
 $("seg-cols").addEventListener("click", (e) => {
   const b = e.target.closest("button[data-cols]");
   if (!b) return;
@@ -1631,6 +1749,22 @@ $("me-inbox").addEventListener("click", () => {
     toast("分享收件箱是空的");
   }
 });
+$("seg-pinrow").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-pinrow]");
+  if (!b) return;
+  S.pinsPerRow = +b.dataset.pinrow;
+  try { localStorage.setItem("sb.pinPerRow", String(S.pinsPerRow)); } catch (_) {}
+  renderMe();
+  renderPins();
+});
+$("seg-pinrows").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-pinrows]");
+  if (!b) return;
+  S.pinRows = +b.dataset.pinrows;
+  try { localStorage.setItem("sb.pinRows", String(S.pinRows)); } catch (_) {}
+  renderMe();
+  renderPins();
+});
 $("seg-trash").addEventListener("click", async (e) => {
   const b = e.target.closest("button[data-days]");
   if (!b) return;
@@ -1645,32 +1779,41 @@ $("seg-trash").addEventListener("click", async (e) => {
   }
 });
 
-$("imgsel").addEventListener("click", async (e) => {
+$("sel-close").addEventListener("click", () => setImgSelMode(false));
+$("sel-all").addEventListener("click", () => {
+  const all = S.items || [];
+  if (!all.length) return;
+  const full = all.every((x) => imgSel.has(x.sha));
+  if (full) imgSel.clear();
+  else all.forEach((x) => imgSel.add(x.sha));
+  paintImgSel();
+  syncSel();
+});
+
+$("actbar").addEventListener("click", async (e) => {
   const b = e.target.closest("button[data-act]");
   if (!b) return;
   const shas = [...imgSel];
   const act = b.dataset.act;
-  if (act === "share") {
+  if (!shas.length) {
+    toast("先选几张图");
+    return;
+  }
+  if (act === "tag") {
+    toast("标签编辑下一批上线");
+    return;
+  }
+  if (act === "send") {
     try {
       await invoke("share_assets", { shas });
+      await markUsed(shas);
     } catch (err) {
       toast("分享失败：" + err);
     }
     return;
   }
-  if (act === "group") {
+  if (act === "add") {
     openMoveSheet(shas);
-    return;
-  }
-  if (act === "star") {
-    try {
-      await invoke("batch_star", { shas, on: true });
-      setImgSelMode(false);
-      toast("已收藏");
-      await refresh();
-    } catch (err) {
-      toast("收藏失败：" + err);
-    }
     return;
   }
   if (act === "delete") {
@@ -1686,6 +1829,61 @@ $("imgsel").addEventListener("click", async (e) => {
   }
 });
 
+/* 叠加层把手：跟手拖动，下拉超过 1/4 就关闭 */
+function sheetCloser(sheet) {
+  const wrap = sheet.parentElement;
+  const id = wrap && wrap.id;
+  if (id === "filtermask") return () => { $("filtermask").hidden = true; syncGuard(); };
+  if (id === "pickmask") return () => closeGroupPicker();
+  if (id === "sheetmask") return () => { if (sheetResolve) { sheetResolve(false); sheetResolve = null; } closeSheet(); };
+  return () => { if (wrap) wrap.hidden = true; syncGuard(); };
+}
+
+function bindSheetDrag(handle) {
+  const sheet = handle.closest(".sheet");
+  if (!sheet) return;
+  let startY = 0, startH = 0, dragging = false;
+  handle.addEventListener("pointerdown", (e) => {
+    dragging = true;
+    startY = e.clientY;
+    startH = sheet.getBoundingClientRect().height;
+    sheet.style.transition = "none";
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  handle.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    e.preventDefault();
+    const vh = window.innerHeight;
+    const h = Math.min(vh, Math.max(120, startH + (startY - e.clientY)));
+    // 用类上的 --sheet-h 控制高度：内联变量能压过 .tall，所以全屏也能往下拉
+    sheet.style.setProperty("--sheet-h", h + "px");
+  });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    const h = sheet.getBoundingClientRect().height;
+    const vh = window.innerHeight;
+    // 关面板的阈值按绝对高度算：从全屏往下拉应先回到 80%，只有拉到半屏以下才关
+    const close = h < vh * 0.45;
+    const tall = h > vh * 0.85;
+    sheet.style.transition = "";
+    sheet.style.removeProperty("--sheet-h");
+    sheet.classList.toggle("tall", tall);
+    if (close) sheetCloser(sheet)();
+  };
+  handle.addEventListener("pointerup", end);
+  handle.addEventListener("pointercancel", end);
+}
+
+// 用过一次就记进「最近」（分享 / 存相册 都会调用）
+async function markUsed(shas) {
+  try {
+    await invoke("mark_used", { shas });
+  } catch (_) {
+    /* 记录失败不影响主流程 */
+  }
+}
+
 async function afterMoveRefresh(sha) {
   await refresh();
   if (!$("viewer").hidden && sha) {
@@ -1697,45 +1895,131 @@ async function afterMoveRefresh(sha) {
   }
 }
 
-async function openMoveSheet(shas) {
-  const rows = S.groupList
-    .map(
-      (g) =>
-        `<button data-move="${escapeAttr(g.name)}">${escapeHtml(g.name)}<span class="muted">${g.count}</span></button>`
-    )
-    .join("");
-  openSheet(
-    "加入分组",
-    `<div class="menu">${rows || '<div class="gempty">还没有分组，先去分组页新建</div>'}
-      <button data-move-out="1" class="danger">移出全部分组</button>
-      <button data-move-cancel="1">取消</button>
-    </div>`
-  );
-  $("sheet-body").onclick = async (e) => {
-    const b = e.target.closest("button");
-    if (!b) return;
-    try {
-      if (b.dataset.move !== undefined) {
-        for (const sha of shas) await invokeRetry("add_to_group", { shas: [sha], group: b.dataset.move });
-        closeSheet();
-        setImgSelMode(false);
-        toast("已加入「" + b.dataset.move + "」");
-        await afterMoveRefresh(shas[0]);
-        await loadGroups();
-      } else if (b.dataset.moveOut !== undefined) {
-        await invoke("clear_groups", { shas });
-        closeSheet();
-        setImgSelMode(false);
-        toast("已移出分组");
-        await afterMoveRefresh(shas[0]);
-        await loadGroups();
-      } else {
-        closeSheet();
-      }
-    } catch (err) {
-      toast("操作失败：" + err);
-    }
+/* 加入分组：复用分组页的双列封面卡，80% 叠加层，单选 */
+let pickShas = [];
+let pickSel = "";
+
+function starredCount() { return (S.stats && S.stats.starred) || 0; }
+
+function renderPicker() {
+  const q = ($("pq").value || "").trim().toLowerCase();
+  const order = (a, b) => {
+    const pa = S.pinned.indexOf(a.name), pb = S.pinned.indexOf(b.name);
+    if (pa >= 0 && pb >= 0) return pa - pb;
+    if (pa >= 0) return -1;
+    if (pb >= 0) return 1;
+    return 0;
   };
+  const list = (S.groupList || [])
+    .filter((g) => !q || g.name.toLowerCase().includes(q))
+    .slice()
+    .sort(order);
+  $("pick-scope").textContent = `已选 ${pickShas.length} 张`;
+  $("pick-ok").textContent = !pickSel ? "未选择分组" : pickSel === FAV_NAME ? "加入收藏夹" : `加入「${pickSel}」`;
+  $("pick-ok").disabled = !pickSel;
+  const favHit = !q || FAV_NAME.includes(q) || "收藏夹".includes(q);
+  $("pick-folders").innerHTML =
+    (favHit ? favCard(starredCount(), pickSel === FAV_NAME) : "") +
+    (list.length ? list.map((g) => folderCard(g, pickSel === g.name)).join("") : "") +
+    (favHit || list.length ? "" : '<div class="pempty">没有匹配的分组</div>');
+}
+
+let pickNewMode = false;
+
+function setPickNewMode(on) {
+  pickNewMode = !!on;
+  const bar = $("pickbar"), row = $("pick-newrow");
+  if (bar) bar.hidden = pickNewMode;
+  if (row) row.hidden = !pickNewMode;
+  if (pickNewMode) {
+    $("pick-nq").value = "";
+    setTimeout(() => $("pick-nq").focus(), 30);
+  } else {
+    $("pick-nq").blur();
+  }
+}
+
+async function createPickGroup() {
+  const name = ($("pick-nq").value || "").trim();
+  if (!name) { toast("先写个分组名"); return; }
+  try {
+    await invokeRetry("create_group", { name });
+  } catch (e) {
+    toast("创建失败：" + e);
+    return;
+  }
+  await loadGroups();
+  pickSel = name;
+  setPickNewMode(false);
+  renderPicker();
+  toast(`已建「${name}」，点右下角加入`);
+}
+
+function exitPicker() {
+  closeGroupPicker();
+  setImgSelMode(false);
+}
+
+function openGroupPicker(shas) {
+  pickShas = (shas || []).slice();
+  pickSel = "";
+  $("pq").value = "";
+  setPickNewMode(false);
+  resetSheetHeight($("picksheet"));
+  renderPicker();
+  $("pickmask").hidden = false;
+  syncGuard();
+}
+
+function closeGroupPicker() {
+  setPickNewMode(false);
+  $("pickmask").hidden = true;
+  syncGuard();
+}
+
+async function pickerMoveIn() {
+  if (!pickSel) return toast("先选一个分组");
+  const name = pickSel;
+  if (name === FAV_NAME) {
+    try {
+      await invokeRetry("batch_star", { shas: pickShas, on: true });
+      closeGroupPicker();
+      setImgSelMode(false);
+      toast(`已收藏 ${pickShas.length} 张`);
+      await afterMoveRefresh(pickShas[0]);
+    } catch (err) {
+      toast("收藏失败：" + err);
+    }
+    return;
+  }
+  try {
+    await invokeRetry("add_to_group", { shas: pickShas, group: name });
+    closeGroupPicker();
+    setImgSelMode(false);
+    toast(`已加入「${name}」`);
+    await afterMoveRefresh(pickShas[0]);
+    await loadGroups();
+  } catch (err) {
+    toast("操作失败：" + err);
+  }
+}
+
+async function pickerMoveOut() {
+  try {
+    await invoke("clear_groups", { shas: pickShas });
+    closeGroupPicker();
+    setImgSelMode(false);
+    toast("已移出分组");
+    await afterMoveRefresh(pickShas[0]);
+    await loadGroups();
+  } catch (err) {
+    toast("操作失败：" + err);
+  }
+}
+
+// 兼容旧调用点：多选底栏「分组」原来开的是列名字弹层
+function openMoveSheet(shas) {
+  openGroupPicker(shas);
 }
 
 $("v-close").addEventListener("click", closeViewer);
@@ -1744,6 +2028,7 @@ $("v-share").addEventListener("click", async () => {
   if (!a.sha) return;
   try {
     await invoke("share_assets", { shas: [a.sha] });
+    await markUsed([a.sha]);
   } catch (err) {
     toast("分享失败：" + err);
   }
@@ -1754,6 +2039,7 @@ $("v-save").addEventListener("click", async () => {
   toast("正在存到相册…");
   try {
     await invoke("save_to_gallery", { sha: a.sha });
+    await markUsed([a.sha]);
     toast("已存到相册 Pictures/StickerBox");
   } catch (err) {
     toast("保存失败：" + err);
@@ -1933,22 +2219,23 @@ $("lb-close").addEventListener("click", closeLightbox);
   box.addEventListener("pointercancel", finish);
 })();
 
-// 筛选面板
+// 筛选面板（图库 / 分组详情 / 回收站 共用）
 $("filtersheet").addEventListener("click", (e) => {
   const b = e.target.closest("button");
   if (!b) return;
-  if (b.dataset.g !== undefined) {
+  const f = hostFilters();
+  if (b.dataset.g !== undefined && filterHost === "gallery") {
     const g = b.dataset.g;
     S.view = g === "" ? "all" : g === "__none__" ? "ungrouped" : g === "__star__" ? "star" : g;
   } else if (b.dataset.type !== undefined) {
-    S.filters.type = b.dataset.type;
+    f.type = b.dataset.type;
   } else if (b.dataset.days !== undefined) {
-    S.filters.days = Number(b.dataset.days) || 0;
+    f.days = Number(b.dataset.days) || 0;
   } else if (b.dataset.sort !== undefined) {
-    S.filters.sort = b.dataset.sort;
+    f.sort = b.dataset.sort;
   } else if (b.dataset.tag) {
     const t = b.dataset.tag;
-    S.filters.tags = S.filters.tags.includes(t) ? S.filters.tags.filter((x) => x !== t) : [...S.filters.tags, t];
+    f.tags = f.tags.includes(t) ? f.tags.filter((x) => x !== t) : [...f.tags, t];
   } else {
     return;
   }
@@ -1956,19 +2243,74 @@ $("filtersheet").addEventListener("click", (e) => {
   updateFilterCount();
 });
 $("f-reset").addEventListener("click", () => {
-  S.view = "all";
-  S.filters = { type: "", days: 0, tags: [], sort: "" };
+  if (filterHost === "gallery") S.view = "all";
+  const blank = () => ({ type: "", days: 0, tags: [], sort: "" });
+  if (filterHost === "group") S.gFilters = blank();
+  else if (filterHost === "trash") S.tFilters = blank();
+  else S.filters = blank();
   renderFilterSheet();
   updateFilterCount();
 });
-$("f-apply").addEventListener("click", () => {
+$("f-apply").addEventListener("click", async () => {
   $("filtermask").hidden = true;
-  refresh();
+  syncGuard();
+  if (filterHost === "group" && S.gview) {
+    await openGroup(S.gview);
+  } else if (filterHost === "trash") {
+    await loadTrash();
+  } else {
+    await refresh();
+  }
+});
+$("f-close").addEventListener("click", () => {
+  $("filtermask").hidden = true;
+  syncGuard();
 });
 $("filtermask").addEventListener("click", (e) => {
-  if (e.target === $("filtermask")) $("filtermask").hidden = true;
+  if (e.target === $("filtermask")) { $("filtermask").hidden = true; syncGuard(); }
+});
+
+// 分组详情 / 回收站 的筛选入口
+$("btn-gfilter").addEventListener("click", () => openFilters("group"));
+$("btn-tfilter").addEventListener("click", () => openFilters("trash"));
+
+// 加入分组选择面板
+$("pick-close").addEventListener("click", closeGroupPicker);
+$("pick-ok").addEventListener("click", pickerMoveIn);
+$("pick-out").addEventListener("click", pickerMoveOut);
+$("pick-new").addEventListener("click", () => setPickNewMode(true));
+$("pick-ncancel").addEventListener("click", () => setPickNewMode(false));
+$("pick-nok").addEventListener("click", createPickGroup);
+$("pick-nq").addEventListener("keydown", (e) => { if (e.key === "Enter") createPickGroup(); });
+$("pick-close").addEventListener("click", exitPicker);
+$("pq").addEventListener("input", renderPicker);
+$("pick-folders").addEventListener("click", (e) => {
+  const b = e.target.closest(".folder");
+  if (!b) return;
+  const name = b.dataset.fav ? FAV_NAME : b.dataset.group;
+  pickSel = pickSel === name ? "" : name;
+  renderPicker();
+});
+$("pickmask").addEventListener("click", (e) => {
+  if (e.target === $("pickmask")) closeGroupPicker();
 });
 
 applyPrefs();
 loadTrashDays();
 matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyPrefs);
+
+/* ---------- 键盘弹起：底栏整条收起，不跟着键盘往上飘 ---------- */
+let vhMax = window.innerHeight;
+function applyKbd() {
+  const h = window.innerHeight;
+  if (h > vhMax) vhMax = h;
+  document.body.classList.toggle("kbd", vhMax - h > 140);
+}
+window.addEventListener("resize", applyKbd);
+if (window.visualViewport) window.visualViewport.addEventListener("resize", applyKbd);
+
+/* ---------- 启动收尾：搜索清空 + 叠加层把手 ---------- */
+bindClear("q", "q-clear", () => { S.q = ""; refresh(); });
+bindClear("gq", "gq-clear", () => { S.gq = ""; renderFolders(); });
+bindClear("pq", "pq-clear", () => renderPicker());
+for (const h of document.querySelectorAll(".sheet .grab, .sheet .grabzone")) bindSheetDrag(h);

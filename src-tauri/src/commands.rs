@@ -816,3 +816,13 @@ pub fn clear_groups(state: State<'_, AppState>, shas: Vec<String>) -> Result<(),
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     lib.clear_groups(&shas).map_err(|e| format!("{e:#}"))
 }
+
+/// 把「用过」写进 used_at：分享 / 存相册 / 复制都会让图进「最近」
+#[tauri::command]
+pub fn mark_used(state: State<'_, AppState>, shas: Vec<String>) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    for sha in &shas {
+        lib.touch_used(sha).map_err(|e| format!("{e:#}"))?;
+    }
+    Ok(())
+}

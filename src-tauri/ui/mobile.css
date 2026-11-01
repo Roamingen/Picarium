@@ -937,3 +937,234 @@ body { overflow-x: hidden; overflow-y: auto; }
 .titem .tcheck svg { width: 13px; height: 13px; }
 .titem.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
 .titem.sel .tcheck { display: flex; }
+
+/* ---------- 批 10：多选 80% 面板 / 收藏标记 / 隐藏滚动条 ---------- */
+
+html { scrollbar-width: none; }
+*::-webkit-scrollbar { width: 0; height: 0; }
+body.multi { overflow: hidden; }
+
+.msmask {
+  position: fixed; inset: 0; z-index: 44;
+  background: rgba(0, 0, 0, .5);
+  animation: fadeIn .16s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+.msheet {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 80%;
+  z-index: 45;
+  background: var(--sheet-bg, #191d24);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -18px 50px rgba(0, 0, 0, .45);
+  display: flex; flex-direction: column;
+  padding-bottom: calc(10px + var(--safe-bottom));
+  animation: msIn .22s cubic-bezier(.22, .85, .28, 1);
+}
+@keyframes msIn { from { transform: translateY(20px); opacity: .55 } to { transform: none; opacity: 1 } }
+
+.msheet .grab {
+  width: 38px; height: 4px; border-radius: 99px; flex: 0 0 auto;
+  background: var(--line2); margin: 8px auto 2px;
+}
+.mstop { display: flex; align-items: center; gap: 10px; padding: 4px 16px 6px; flex: 0 0 auto; }
+.mstop .iconbtn {
+  width: 38px; height: 38px; border-radius: 50%; border: 0;
+  background: var(--surface2); color: var(--fg);
+  display: flex; align-items: center; justify-content: center;
+}
+.mstop .iconbtn svg { width: 18px; height: 18px; }
+.mscount { flex: 1; text-align: center; font-size: 15px; font-weight: 600; }
+.mscount b { font-size: 17px; font-weight: 700; }
+.mstop .mgt {
+  margin: 0; padding: 6px 2px; border: 0; background: transparent;
+  color: var(--accent); font: inherit; font-size: 13.5px; font-weight: 600;
+}
+.mssearch { flex: 0 0 auto; padding: 2px 16px 8px; }
+.mssearch .search { margin: 0; height: 44px; }
+.msgrid { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.msgrid .grid { padding: 4px 16px 12px; }
+.msbar {
+  flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 16px 2px; margin-top: 8px; border-top: 1px solid var(--line);
+}
+.msrow { display: flex; gap: 8px; }
+.msrow button {
+  flex: 1; min-width: 0; height: 46px; padding: 0 6px;
+  border-radius: 14px; border: 1px solid var(--line);
+  background: var(--surface2); color: var(--fg);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font: inherit; font-size: 13px;
+}
+.msrow button svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.msrow button:active { transform: scale(.98); }
+.msrow button.danger { color: var(--danger, #ff9aa2); }
+.msrow button.primary {
+  background: var(--accent); border-color: transparent;
+  color: var(--on-accent); font-weight: 600;
+}
+
+.card .fav {
+  position: absolute; right: 8px; bottom: 7px; z-index: 2;
+  font-size: 13px; line-height: 1; color: #ff5d6c;
+  text-shadow: 0 1px 5px rgba(0, 0, 0, .55);
+}
+.card .fav::before { content: "♥"; }
+html[data-fav="star"] .card .fav { color: #ffd479; }
+html[data-fav="star"] .card .fav::before { content: "★"; }
+
+/* ---------- 批 11：筛选叠加层复用 + 加入分组选择面板 ---------- */
+
+/* 两种叠加层共用：80% 高、头尾固定、中间滚动 */
+.fsheet, .pick {
+  display: flex; flex-direction: column;
+  height: var(--sheet-h, 80%); max-height: var(--sheet-h, 80%);
+  overflow: hidden;
+  padding-top: 6px;
+}
+/* 拉到顶：换成全屏骨架（状态栏并入、圆角取消、才出现 ✕） */
+.fsheet.tall, .pick.tall {
+  --sheet-h: 100%;
+  border-radius: 0;
+  padding-top: calc(var(--safe-top) + 4px);
+}
+.pick .fhead .iconbtn { display: none; }
+.pick.tall .fhead .iconbtn { display: flex; }
+/* 新建分组：内联输入行（替换搜索行） */
+.newrow { display: flex; gap: 8px; padding: 0 0 10px; flex: 0 0 auto; }
+.newrow input {
+  flex: 1 1 auto; height: 40px; border-radius: 12px;
+  border: 1px solid var(--accent); background: var(--surface2); color: var(--fg);
+  padding: 0 12px; font: inherit; font-size: 13px; outline: none;
+}
+.newrow .mini {
+  flex: 0 0 auto; height: 40px; padding: 0 14px; border-radius: 12px;
+  border: 0; background: var(--surface2); color: var(--dim);
+  font: inherit; font-size: 13px;
+}
+.newrow .mini.ok { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+/* 键盘弹起时底栏整条收起，不跟着往上飘 */
+body.kbd .ffoot { display: none; }
+.fhead { display: flex; align-items: center; gap: 8px; padding: 8px 0 10px; flex: 0 0 auto; }
+.fhead b { font-size: 16px; font-weight: 600; }
+.fscope {
+  font-size: 12px; color: var(--dim);
+  background: var(--surface3); border: 1px solid var(--line);
+  padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+  max-width: 45%; overflow: hidden; text-overflow: ellipsis;
+}
+.fhead .iconbtn { margin-left: auto; width: 34px; height: 34px; }
+.fhead .iconbtn svg { width: 18px; height: 18px; }
+.fbody { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.ffoot { flex: 0 0 auto; padding-top: 10px; padding-bottom: calc(2px + var(--safe-bottom)); }
+.ffoot button:disabled {
+  background: var(--surface2) !important;
+  color: var(--dim2) !important;
+  border-color: var(--line) !important;
+  box-shadow: none !important;
+  opacity: 1;
+}
+
+/* 加入分组 */
+.pickbar { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; padding-bottom: 10px; }
+.psearch { flex: 1 1 auto; margin: 0; }
+.newbtn {
+  flex: 0 0 auto; height: 42px; width: 46px; padding: 0; border-radius: 12px; font-size: 18px;
+  border: 1px dashed var(--line2); background: transparent;
+  color: var(--accent); font: inherit; font-size: 13px;
+}
+.newbtn:active { background: var(--surface2); }
+.picks { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; align-content: start; grid-auto-rows: max-content; padding: 0 2px 10px; }
+.picks .folder { align-self: start; }
+.ghead .iconbtn + .mgt { margin-left: 0; }
+.picks:empty::after,
+.picks .pempty {
+  content: "还没有分组，点右上角「＋ 新建」";
+  display: block; padding: 26px 8px; text-align: center;
+  color: var(--dim); font-size: 13px;
+}
+
+/* ---------- 批 12：顶栏收件箱角标 + 隐藏滚动条兜底 ---------- */
+.badgebtn { position: relative; }
+#inbox-badge {
+  position: absolute; top: 2px; right: 2px;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 999px; background: #ff5d6c; color: #fff;
+  font-size: 10px; line-height: 16px; text-align: center; font-weight: 700;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+
+/* ---------- 批 13：原地多选（无叠加层） ---------- */
+.selhead {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 18px 10px; flex: 0 0 auto;
+}
+.selhead .iconbtn { width: 40px; height: 40px; border-radius: 20px; }
+.selcount {
+  flex: 1; text-align: center; font-size: 16px; font-weight: 650; color: var(--fg);
+}
+.selcount b { color: var(--accent); font-weight: 700; }
+.allbtn {
+  border: 0; background: transparent; color: var(--accent);
+  font-size: 13px; font-weight: 650; font-family: inherit; padding: 6px 2px;
+}
+.allbtn.done { color: var(--dim); }
+
+/* 选择态：让位给网格 */
+body.select .appbar,
+body.select .chips,
+body.select #inbox,
+body.select #pins-wrap,
+body.select .fab,
+body.select #nav { display: none !important; }
+body.select #searchbox { margin-bottom: 8px; }
+body.select main.grid { padding-bottom: calc(96px + var(--safe-bottom)); }
+
+.actbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  height: calc(74px + var(--safe-bottom)); padding-bottom: var(--safe-bottom);
+  display: flex; border-top: 1px solid var(--line); background: var(--bg);
+}
+.actbar button {
+  flex: 1; border: 0; background: transparent; font-family: inherit;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; font-size: 11px; color: var(--icon); padding: 0;
+}
+.actbar button svg { width: 22px; height: 22px; }
+.actbar button.primary { color: var(--accent); font-weight: 600; }
+.actbar button.danger { color: var(--danger); }
+.actbar button[disabled] { opacity: .45; }
+
+/* 搜索框一键清空 */
+.clr {
+  width: 28px; height: 28px; flex: 0 0 28px; border: 0; border-radius: 50%;
+  background: var(--surface2); color: var(--dim2);
+  display: flex; align-items: center; justify-content: center; padding: 0;
+}
+.clr svg { width: 14px; height: 14px; }
+.clr[hidden] { display: none !important; }
+
+/* 滚动条：双重兜底（Android WebView 的覆盖条） */
+html, body { scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar,
+main::-webkit-scrollbar, .grid::-webkit-scrollbar { width: 0 !important; height: 0 !important; }
+
+/* 叠加层把手：拖动跟手 */
+.grab, .grabzone { touch-action: none; cursor: grab; }
+.sheet.dragging, .sheet.dragging * { transition: none !important; user-select: none; }
+
+/* 收藏夹卡（分组页 / 添加到面板） */
+.folder.fav { border-color: rgba(255, 93, 108, .42); background: linear-gradient(180deg, rgba(255, 93, 108, .10), transparent 62%); }
+.folder.fav .favfc { color: #ff6b7a; font-size: 34px; line-height: 1; background: linear-gradient(160deg, #ffe3e7, #ffd0d6); }
+.folder.fav .fsub { color: #ff8a95; }
+.folder.fav.sel { border-color: var(--accent); }
+
+/* 叠加层：高度过渡 + 拖动时不抖 */
+.sheet { transition: height .18s ease, max-height .18s ease; }
+
+
+/* 把手：可见且好按 */
+.grabzone { display: flex; justify-content: center; padding: 8px 0 10px; touch-action: none; }
+.grab { width: 38px; height: 4px; border-radius: 2px; background: var(--line2); touch-action: none; }
+.sheet .grabzone:active .grab { background: #6b7484; }

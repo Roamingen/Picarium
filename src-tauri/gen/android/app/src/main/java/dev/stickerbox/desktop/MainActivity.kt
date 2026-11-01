@@ -3,12 +3,20 @@ package dev.stickerbox.desktop
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
+import android.webkit.WebView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 
 class MainActivity : TauriActivity() {
+  // 返回键不交给 WebView 的历史（那套只能整页回退），改成问前端：
+  // window.__sbBack() 有层（弹层/多选/预览/分组详情）就收一层并返回 true，
+  // 没有层返回 false，这时才真的退出 App。
+  private var web: WebView? = null
+  private var backCallback: OnBackPressedCallback? = null
+
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
@@ -29,6 +37,38 @@ class MainActivity : TauriActivity() {
       insets
     }
     ViewCompat.requestApplyInsets(root)
+  }
+
+  override fun onWebViewCreate(webView: WebView) {
+    super.onWebViewCreate(webView)
+    web = webView
+    // 手机端不需要系统滚动条：WebView 会画一条贯穿全屏的细条，且和页面内容无关。
+    webView.isVerticalScrollBarEnabled = false
+    webView.isHorizontalScrollBarEnabled = false
+    webView.scrollBarStyle = WebView.SCROLLBARS_INSIDE_OVERLAY
+    if (backCallback != null) return
+    val cb = object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        val w = web
+        if (w == null) return finish()
+        w.evaluateJavascript("(window.__sbBack && window.__sbBack()) ? '1' : '0'") { r ->
+          // 前端手里没有可收的层，再交回系统：关掉本回调后重新走默认返回。
+          if (r != "\"1\"") {
+            this.isEnabled = false
+            onBackPressedDispatcher.onBackPressed()
+            this.isEnabled = true
+          }
+        }
+      }
+    }
+    backCallback = cb
+    onBackPressedDispatcher.addCallback(this, cb)
+  }
+
+  override fun onDestroy() {
+    backCallback = null
+    web = null
+    super.onDestroy()
   }
 
   override fun onNewIntent(intent: Intent) {

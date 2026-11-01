@@ -10,19 +10,31 @@
 <body>
   <div class="app">
     <div class="topwrap" id="topwrap">
-    <header class="appbar">
+    <header class="appbar" id="appbar">
       <div class="brand">StickerBox<small id="libline">…</small></div>
-      <button class="iconbtn" id="btn-search" title="搜索">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <button class="iconbtn ghost badgebtn" id="btn-inbox" title="分享收件箱">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+        <span class="badge" id="inbox-badge" hidden></span>
       </button>
-      <button class="iconbtn ghost" id="btn-settings" title="设置">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1z"/></svg>
+      <button class="iconbtn ghost" id="btn-multi" title="多选">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       </button>
+    </header>
+
+    <header class="selhead" id="selhead" hidden>
+      <button class="iconbtn" id="sel-close" aria-label="退出多选">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="selcount">已选 <b id="seln">0</b> 张</div>
+      <button class="allbtn" id="sel-all">全选</button>
     </header>
 
     <div class="search" id="searchbox">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="q" placeholder="搜名字 / 拼音 / 首字母" autocomplete="off" spellcheck="false" enterkeyhint="search" />
+      <button class="clr" id="q-clear" hidden aria-label="清空搜索">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
       <button class="fbtn" id="btn-filter" title="筛选">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
       </button>
@@ -39,7 +51,7 @@
     </div>
 
     <section class="pins" id="pins-wrap" hidden>
-      <div class="pinlbl">置顶分组 <button class="mgt" id="pins-toggle">展开</button> <button class="mgt mgt2" id="pins-manage">管理</button></div>
+      <div class="pinlbl">置顶分组 <button class="mgt" id="pins-toggle">展开</button></div>
       <div class="pinhint" id="pins-hint" hidden>长按卡片可拖动排序</div>
       <div class="pinrow" id="pins"></div>
     </section>
@@ -60,6 +72,27 @@
         <button data-sel="delete" class="danger">删除</button>
       </div>
     </div>
+
+
+    <!-- 选择态底栏：发送 / 标签 / 添加到 / 删除 -->
+    <nav class="actbar" id="actbar" hidden>
+      <button data-act="send" class="primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0 4 4m-4-4-4 4M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg>
+        <span>发送</span>
+      </button>
+      <button data-act="tag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>
+        <span>标签</span>
+      </button>
+      <button data-act="add">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M12 11v6m-3-3h6"/></svg>
+        <span>添加到</span>
+      </button>
+      <button data-act="delete" class="danger">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>
+        <span>删除</span>
+      </button>
+    </nav>
 
     <nav class="nav" id="nav">
       <button data-tab="gallery" class="on">
@@ -91,6 +124,9 @@
       <div class="search gsearch">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="gq" placeholder="搜索分组" autocomplete="off" spellcheck="false" />
+            <button class="clr" id="gq-clear" hidden aria-label="清空搜索">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
       </div>
       <div class="folders" id="folders"></div>
     </section>
@@ -102,6 +138,9 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg>
         </button>
         <div class="gtitle" id="gd-title"></div>
+        <button class="iconbtn" id="btn-gfilter" title="筛选">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        </button>
         <button class="iconbtn" id="btn-gpin" title="置顶到图库">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
         </button>
@@ -114,27 +153,6 @@
     </section>
 
     <!-- 底部弹层：长按菜单 / 换封面 / 重命名 / 新建 / 确认 -->
-    <div class="selbar" id="imgsel" hidden>
-      <div class="selinfo"><b id="imgn">0</b> 张已选</div>
-      <div class="selacts">
-        <button data-act="star" aria-label="收藏">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.3.9-4.5 4.4 1 6.1L12 17l-5.5 3 1-6.1L3 9.5l6.3-.9Z"/></svg>
-          <span>收藏</span>
-        </button>
-        <button data-act="group" aria-label="分组">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
-          <span>分组</span>
-        </button>
-        <button data-act="share" aria-label="分享">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0 4 4m-4-4-4 4M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></svg>
-          <span>分享</span>
-        </button>
-        <button data-act="delete" class="danger" aria-label="删除">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg>
-          <span>删除</span>
-        </button>
-      </div>
-    </div>
 
     <div class="selbar" id="trashsel" hidden>
       <div class="selinfo"><b id="trashn">0</b> 张已选</div>
@@ -189,35 +207,53 @@
       </div>
     </div>
 
-    <!-- 筛选面板 -->
+    <!-- 筛选叠加层：图库 / 分组详情 / 回收站 共用同一套分区，按宿主隐藏不用的 -->
     <div class="sheetmask" id="filtermask" hidden>
-      <div class="sheet" id="filtersheet">
-        <div class="sheet-h">筛选</div>
-        <div class="fsect">分组</div>
-        <div class="opts" id="f-groups"></div>
-        <div class="fsect">类型</div>
-        <div class="opts" id="f-type">
-          <button class="opt" data-type="">全部</button>
-          <button class="opt" data-type="gif">GIF</button>
-          <button class="opt" data-type="static">静态图</button>
+      <div class="sheet fsheet" id="filtersheet">
+          <div class="grabzone"><div class="grab"></div></div>
+        <div class="fhead">
+          <b>筛选</b><span class="fscope" id="f-scope">图库</span>
+          <button class="iconbtn ghost" id="f-close" title="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
         </div>
-        <div class="fsect">时间</div>
-        <div class="opts" id="f-days">
-          <button class="opt" data-days="0">全部</button>
-          <button class="opt" data-days="1">今天</button>
-          <button class="opt" data-days="7">7 天</button>
-          <button class="opt" data-days="30">30 天</button>
+        <div class="fbody">
+          <div class="fsec" id="fsec-groups">
+            <div class="fsect">分组</div>
+            <div class="opts" id="f-groups"></div>
+          </div>
+          <div class="fsec">
+            <div class="fsect">类型</div>
+            <div class="opts" id="f-type">
+              <button class="opt" data-type="">全部</button>
+              <button class="opt" data-type="gif">GIF</button>
+              <button class="opt" data-type="static">静态图</button>
+            </div>
+          </div>
+          <div class="fsec">
+            <div class="fsect" id="f-days-label">时间</div>
+            <div class="opts" id="f-days">
+              <button class="opt" data-days="0">全部</button>
+              <button class="opt" data-days="1">今天</button>
+              <button class="opt" data-days="7">7 天</button>
+              <button class="opt" data-days="30">30 天</button>
+            </div>
+          </div>
+          <div class="fsec" id="fsec-tags">
+            <div class="fsect">标签</div>
+            <div class="opts" id="f-tags"></div>
+          </div>
+          <div class="fsec" id="fsec-sort">
+            <div class="fsect">排序</div>
+            <div class="opts" id="f-sort">
+              <button class="opt" data-sort="">最新</button>
+              <button class="opt" data-sort="oldest">最旧</button>
+              <button class="opt" data-sort="size">最大</button>
+              <button class="opt" data-sort="name">名称</button>
+            </div>
+          </div>
         </div>
-        <div class="fsect">标签</div>
-        <div class="opts" id="f-tags"></div>
-        <div class="fsect">排序</div>
-        <div class="opts" id="f-sort">
-          <button class="opt" data-sort="">最新</button>
-          <button class="opt" data-sort="oldest">最旧</button>
-          <button class="opt" data-sort="size">最大</button>
-          <button class="opt" data-sort="name">名称</button>
-        </div>
-        <div class="sheet-actions" style="margin-top:20px">
+        <div class="sheet-actions ffoot">
           <button id="f-reset">重置</button>
           <button class="primary" id="f-apply">查看 0 张</button>
         </div>
@@ -233,6 +269,7 @@
 
     <div class="sheetmask" id="sheetmask" hidden>
       <div class="sheet" id="sheet">
+          <div class="grabzone"><div class="grab"></div></div>
         <div class="sheet-h" id="sheet-title"></div>
         <div class="sheet-body" id="sheet-body"></div>
       </div>
@@ -242,6 +279,9 @@
     <section class="gview" id="trashview" hidden>
       <header class="ghead">
         <div class="gtitle">回收站<small id="tcount"></small></div>
+        <button class="iconbtn" id="btn-tfilter" title="筛选">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        </button>
         <button class="mgt" id="btn-purge">清空</button>
       </header>
       <div class="gmeta" id="trash-meta">删除的图片会在这里保留 7 天，期间可以恢复或彻底删除。</div>
@@ -262,6 +302,18 @@
       <div class="merow"><span>网格列数</span><div class="seg" id="seg-cols">
         <button data-cols="3">3</button><button data-cols="4">4</button><button data-cols="5">5</button>
       </div></div>
+      <div class="merow"><span>收藏标记</span><div class="seg" id="seg-fav">
+        <button data-fav="heart">红心</button><button data-fav="star">黄星</button>
+      </div></div>
+      </div>
+      <div class="sect">置顶分组</div>
+      <div class="mcard">
+      <div class="merow"><span>每行显示</span><div class="seg" id="seg-pinrow">
+        <button data-pinrow="4">4 个</button><button data-pinrow="5">5 个</button><button data-pinrow="6">6 个</button>
+      </div></div>
+      <div class="merow"><span>最多显示</span><div class="seg" id="seg-pinrows">
+        <button data-pinrows="1">1 行</button><button data-pinrows="2">2 行</button><button data-pinrows="3">3 行</button>
+      </div></div>
       </div>
       <div class="sect">导入</div>
       <div class="mcard">
@@ -274,6 +326,39 @@
       <div class="merow"><span>存储位置</span><i class="ell" id="me-home">…</i></div>
       </div>
     </section>
+
+    <!-- 加入分组：复用分组页的双列封面卡，80% 叠加层 -->
+    <div class="sheetmask" id="pickmask" hidden>
+      <div class="sheet pick" id="picksheet">
+          <div class="grabzone"><div class="grab"></div></div>
+        <div class="fhead">
+          <b>添加到</b><span class="fscope" id="pick-scope">已选 0 张</span>
+          <button class="iconbtn ghost" id="pick-close" title="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="pickbar" id="pickbar">
+          <div class="search psearch">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="pq" placeholder="搜索分组" autocomplete="off" spellcheck="false" />
+            <button class="clr" id="pq-clear" hidden aria-label="清空搜索">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <button class="newbtn" id="pick-new" aria-label="新建分组" title="新建分组">＋</button>
+        </div>
+        <div class="newrow" id="pick-newrow" hidden>
+          <input id="pick-nq" placeholder="新分组名" autocomplete="off" spellcheck="false" />
+          <button class="mini" id="pick-ncancel">取消</button>
+          <button class="mini ok" id="pick-nok">创建</button>
+        </div>
+        <div class="folders picks" id="pick-folders"></div>
+        <div class="sheet-actions ffoot">
+          <button id="pick-out">移出全部分组</button>
+          <button class="primary" id="pick-ok">加入</button>
+        </div>
+      </div>
+    </div>
 
     <div class="toast" id="toast" hidden></div>
   </div>

@@ -819,6 +819,7 @@ fn main() {
             stickerbox_lib::commands::share_assets,
             stickerbox_lib::commands::add_to_group,
             stickerbox_lib::commands::clear_groups,
+            stickerbox_lib::commands::mark_used,
             stickerbox_lib::commands::rename_group,
             stickerbox_lib::commands::remove_group,
             mark_ungrouped_seen,

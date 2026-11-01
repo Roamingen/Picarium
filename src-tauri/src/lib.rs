@@ -62,6 +62,7 @@ pub fn run() {
         commands::add_to_group,
         commands::batch_ungroup,
         commands::clear_groups,
+        commands::mark_used,
             commands::set_group_order,
             commands::set_pinned_groups,
             commands::create_group,
