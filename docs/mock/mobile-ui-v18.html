@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StickerBox · 钻进钻出式跨组拖拽 v18</title>
+<style>
+  :root{
+    --bg:#14161a;--surface:#0f1115;--surface3:#1c212a;--line:#2a2f38;
+    --fg:#e8eaed;--dim:#8b93a1;--dim2:#5d6573;--accent:#6ea8fe;--on-accent:#0d1420;
+    --danger:#e5484d;--nav-bg:rgba(15,17,21,.97);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#0b0d10;color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif}
+  body{padding:44px 0 70px}
+  .wrap{width:1320px;margin:0 auto}
+  .hero{display:flex;align-items:flex-end;justify-content:space-between;margin:0 18px 18px}
+  .hero h1{font-size:26px;line-height:1.25;margin:0 0 7px}
+  .hero p{margin:0;color:var(--dim);font-size:13px;line-height:1.7;max-width:1000px}
+  .tag{font-size:11px;color:var(--accent);border:1px solid rgba(110,168,254,.35);
+    background:rgba(110,168,254,.08);border-radius:999px;padding:4px 9px;white-space:nowrap}
+  .note{margin:0 18px 22px;border-left:2px solid var(--accent);padding:10px 14px;
+    background:rgba(110,168,254,.055);border-radius:0 10px 10px 0;color:var(--dim);
+    font-size:12.3px;line-height:1.75}
+  .note b{color:var(--fg);font-weight:600}
+  .flow{display:flex;align-items:center;justify-content:center;gap:7px;margin:0 18px 26px;flex-wrap:wrap}
+  .flow span{font-size:10.2px;color:var(--dim);border:1px solid var(--line);border-radius:999px;
+    background:#151920;padding:5px 9px}
+  .flow span.on{color:var(--accent);border-color:rgba(110,168,254,.45);background:rgba(110,168,254,.08)}
+  .flow i{color:#49515d;font-style:normal;font-size:11px}
+  .row{display:flex;gap:34px;justify-content:center;align-items:flex-start;margin-bottom:30px}
+  .item{width:390px}
+  .cap{margin:11px 2px 0;color:var(--dim);font-size:11.4px;line-height:1.65}
+  .cap b{display:block;color:var(--fg);font-size:12px;margin-bottom:3px}
+  .cap b i{font-style:normal;color:var(--accent);margin-right:5px}
+
+  .phone{position:relative;width:390px;height:844px;border-radius:30px;overflow:hidden;
+    background:var(--bg);border:1px solid #2b3039;box-shadow:0 28px 70px rgba(0,0,0,.55)}
+  .status{height:36px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 17px;color:#cfd4dd;font-size:10.5px}
+  .status .r{font-size:10px;color:#aab1bd}
+  .banner{position:absolute;left:12px;right:12px;top:42px;z-index:26;border-radius:12px;
+    background:rgba(110,168,254,.12);border:1px solid rgba(110,168,254,.35);
+    padding:8px 11px;display:flex;align-items:center;gap:8px}
+  .banner b{font-size:11.5px;color:#e7ebf3;font-weight:650}
+  .banner span{margin-left:auto;color:var(--dim);font-size:9.2px}
+  .banner .bi{color:var(--accent);font-size:14px}
+
+  .gtitle{display:flex;align-items:baseline;gap:8px;padding:13px 16px 9px}
+  .gtitle h2{font-size:19px;margin:0;font-weight:750}
+  .gtitle small{font-size:11px;color:var(--dim);font-weight:500}
+  .gcards{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 14px}
+  .gcard{position:relative;height:190px;border-radius:16px;overflow:hidden;
+    background:linear-gradient(155deg,var(--c1),var(--c2));border:1px solid rgba(255,255,255,.055)}
+  .gcard .big{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:42px}
+  .gcard .glabel{position:absolute;left:11px;right:11px;bottom:9px;z-index:3}
+  .gcard .gname{font-size:12px;font-weight:650;color:#fff}
+  .gcard .gsub{font-size:9.2px;color:rgba(255,255,255,.62);margin-top:1px}
+  .gcard .gpin{position:absolute;left:8px;top:8px;width:21px;height:21px;border-radius:50%;
+    background:rgba(6,8,11,.72);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center;z-index:3}
+  .gcard.fav{background:linear-gradient(160deg,#ffe4e8,#ffd0d6 38%,#30222a 76%,#171216)}
+  .gcard.fav .gname{color:#2c1a1f}.gcard.fav .gsub{color:#8d4f5a}
+  .gcard.cur{opacity:.7}
+  .gcard .curtag{position:absolute;right:8px;top:8px;z-index:4;background:rgba(6,8,11,.7);
+    color:#cfd5df;font-size:8px;padding:3px 6px;border-radius:999px}
+  .enterframe{position:absolute;inset:8px;border:1.4px dashed rgba(110,168,254,.32);
+    border-radius:11px;z-index:2;pointer-events:none;
+    display:flex;align-items:flex-end;justify-content:flex-end;padding:7px;
+    color:rgba(110,168,254,.55);font-size:8px;letter-spacing:.3px}
+  .gcard.hot{border:2px solid var(--accent);box-shadow:0 0 0 3px rgba(110,168,254,.14),0 12px 26px rgba(0,0,0,.35)}
+  .gcard.hot .enterframe{border-color:var(--accent);background:rgba(110,168,254,.09);color:var(--accent)}
+  .gcard.hot .enterframe::after{content:"进入";font-weight:750}
+  .dwell{position:absolute;right:9px;top:9px;z-index:6;width:27px;height:27px;border-radius:50%;
+    background:conic-gradient(var(--accent) 0 230deg,rgba(255,255,255,.12) 230deg 360deg);
+    display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .dwell::after{content:"";width:19px;height:19px;border-radius:50%;background:#1a2029}
+  .dwell b{position:absolute;bottom:-14px;right:0;font-size:7.5px;color:var(--accent);font-weight:600;white-space:nowrap}
+  .hotlabel{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:7;
+    background:var(--accent);color:var(--on-accent);font-size:9px;font-weight:800;
+    border-radius:999px;padding:4px 9px;white-space:nowrap}
+
+  .stackghost{position:absolute;z-index:15;width:102px;height:102px;pointer-events:none}
+  .stackghost .sg{position:absolute;inset:0;border-radius:13px;border:1px solid rgba(255,255,255,.12);
+    background:linear-gradient(150deg,var(--c1),var(--c2));box-shadow:0 10px 24px rgba(0,0,0,.4)}
+  .stackghost .sg:nth-child(2){transform:translate(5px,6px) rotate(2deg);opacity:.68}
+  .stackghost .sg:nth-child(3){transform:translate(10px,12px) rotate(4deg);opacity:.4}
+  .stackghost .top{position:absolute;inset:0;border-radius:13px;border:1.5px solid var(--accent);
+    background:linear-gradient(150deg,var(--c1),var(--c2));display:flex;align-items:center;justify-content:center;font-size:31px}
+  .stackghost .count{position:absolute;right:-7px;top:-7px;min-width:23px;height:23px;border-radius:12px;
+    background:var(--accent);color:var(--on-accent);font-size:10.5px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;padding:0 6px;box-shadow:0 3px 8px rgba(0,0,0,.3)}
+  .stackghost .count::after{content:" 张"}
+
+  .tdhead{padding:7px 14px 8px}
+  .tdtop{display:flex;align-items:center;gap:8px}
+  .back{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.07);
+    display:flex;align-items:center;justify-content:center;font-size:18px;color:#eef1f6;flex:0 0 auto}
+  .tdname{flex:1;font-size:19px;font-weight:750;line-height:1.2}
+  .tdname em{font-style:normal;color:var(--accent)}
+  .holdpill{font-size:8.5px;color:var(--accent);border:1px solid rgba(110,168,254,.35);
+    background:rgba(110,168,254,.08);border-radius:999px;padding:4px 7px;white-space:nowrap}
+  .crumb{display:flex;align-items:center;gap:5px;color:var(--dim2);font-size:9.5px;margin-top:4px}
+  .crumb b{color:#cdd4df;font-weight:600}
+  .crumb .arr{color:var(--accent);font-size:10px}
+  .tdmeta{display:flex;align-items:center;gap:7px;padding:0 14px 9px;color:var(--dim);font-size:10px}
+  .tdmeta b{color:#cdd4df;font-weight:600}
+  .tdsearch{flex:1;height:36px;border-radius:11px;background:var(--surface3);
+    border:1px solid var(--line);display:flex;align-items:center;gap:7px;padding:0 11px;
+    color:var(--dim2);font-size:11px}
+  .tdsearch .mag{font-size:14px;color:#aeb6c4}
+
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 14px}
+  .tile{position:relative;aspect-ratio:1/1;border-radius:12px;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;font-size:31px;
+    background:linear-gradient(150deg,var(--c1),var(--c2))}
+  .tile .heart{position:absolute;right:6px;bottom:5px;color:#ff4d5e;font-size:12.5px}
+  .tile.new::after{content:"";position:absolute;inset:0;border:2px solid rgba(110,168,254,.75);border-radius:12px}
+  .dropline{position:absolute;width:3px;border-radius:2px;background:var(--accent);
+    box-shadow:0 0 12px rgba(110,168,254,.7);z-index:9}
+  .postag{position:absolute;z-index:10;background:#0d1118;border:1px solid #354052;
+    color:var(--accent);font-size:8.5px;border-radius:999px;padding:4px 7px;white-space:nowrap}
+  .hintbar{position:absolute;left:14px;right:14px;bottom:76px;z-index:8;
+    color:var(--dim);font-size:9.5px;text-align:center}
+  .exitdock{position:absolute;left:14px;right:14px;bottom:16px;height:50px;border-radius:13px;
+    border:1.4px dashed rgba(110,168,254,.5);background:rgba(110,168,254,.07);
+    display:flex;align-items:center;justify-content:center;gap:8px;z-index:12}
+  .exitdock b{font-size:10.5px;color:#dbe4f2;font-weight:600}
+  .exitdock span{font-size:9px;color:var(--dim)}
+  .exitdock.hot{border-color:var(--accent);background:rgba(110,168,254,.14);
+    box-shadow:0 0 0 3px rgba(110,168,254,.1)}
+  .exitdock .dwell{position:static;width:22px;height:22px;flex:0 0 auto}
+  .exitdock .dwell::after{width:15px;height:15px}
+  .exitdock .dwell b{display:none}
+  .nav{position:absolute;left:0;right:0;bottom:0;height:64px;background:var(--nav-bg);
+    border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-around;z-index:20}
+  .nav .ni{width:58px;text-align:center;color:var(--dim);font-size:8.5px;line-height:1.2}
+  .nav .ni .ic{font-size:16px;display:block;margin-bottom:2px;color:#aeb6c4}
+  .nav .ni.on{color:var(--accent)} .nav .ni.on .ic{color:var(--accent)}
+  .toast{position:absolute;left:50%;bottom:88px;transform:translateX(-50%);z-index:30;
+    background:#0d1118;border:1px solid #313947;color:#e8edf5;font-size:11px;
+    padding:10px 16px;border-radius:10px;white-space:nowrap;box-shadow:0 10px 24px rgba(0,0,0,.4)}
+  .toast b{color:var(--accent);font-weight:650}
+  .cancelhint{position:absolute;left:0;right:0;bottom:18px;text-align:center;color:var(--dim2);font-size:9px;z-index:9}
+
+  .footer{width:1250px;margin:16px auto 0;color:#6f7785;font-size:11px;line-height:1.8;
+    border-top:1px solid #20252d;padding-top:14px}
+  .footer b{color:#aeb6c4;font-weight:600}
+  @media (max-width:1360px){body{padding:26px 0 50px}.wrap{width:auto}.row{flex-wrap:wrap;gap:26px}
+    .hero,.note{margin-left:24px;margin-right:24px}.footer{width:auto;margin:12px 24px 0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div>
+      <h1>钻进钻出式跨组拖拽 · v18</h1>
+      <p>不是“松手丢进组”，是<b>全程不松手的连续钻入/钻出</b>：分组卡里虚线框 = 入口 → 进组后插入线 = 落点 → 底部虚线下拖 = 出口 → 回到分组页还能再进另一组。最后松手才提交。</p>
+    </div>
+    <span class="tag">仅设计稿 · 不改代码</span>
+  </div>
+  <div class="note">
+    <b>懂你的意思：</b>拖进某组的虚线框 → 进入该组详情（不松手）→ 在组内挪到想要的插入位置 → 如果反悔，继续往下拖出组 → 回到分组页再进另一组。全程一根手指、一次不松；松手才算数。
+  </div>
+  <div class="flow">
+    <span class="on">① 拖进组卡虚线框</span><i>→</i>
+    <span class="on">② 进组 · 保持按住</span><i>→</i>
+    <span class="on">③ 组内调插入位</span><i>→</i>
+    <span class="on">④ 下拖出组</span><i>→</i>
+    <span class="on">⑤ 回组页再进</span><i>→</i>
+    <span class="on">⑥ 松手提交</span>
+  </div>
+
+  <div class="row">
+    <!-- 1 分组页：虚线框入口 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="banner" style="top:36px"><span class="bi">▣</span><b>拖进虚线框 · 进入分组</b><span>停 0.25s 进组 · 不松手</span></div>
+        <div style="height:70px"></div>
+        <div class="gtitle"><h2>分组</h2><small>7 个 · 正在移动 3 张</small></div>
+        <div class="gcards">
+          <div class="gcard fav" style="--c1:#ffd6dc;--c2:#ffd0d6"><div class="big">♥</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">收藏夹</div><div class="gsub">6 张 · 特殊分组</div></div></div>
+          <div class="gcard cur" style="--c1:#6d4a30;--c2:#2c1e15"><div class="big">▣</div><div class="gpin">⌖</div><div class="curtag">当前组</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">猫猫</div><div class="gsub">6 张</div></div></div>
+          <div class="gcard hot" style="--c1:#6f46a0;--c2:#2f1e47"><div class="big">▣</div><div class="gpin">⌖</div><div class="dwell"><b>0.25s</b></div><div class="enterframe">进入</div><div class="glabel"><div class="gname">摸鱼</div><div class="gsub">3 张</div></div></div>
+          <div class="gcard" style="--c1:#2f6b46;--c2:#142c1d"><div class="big">▣</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">蓝色大肥鱼</div><div class="gsub">4 张</div></div></div>
+          <div class="gcard" style="--c1:#6b3c3c;--c2:#2d1919"><div class="big">▣</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">测试组</div><div class="gsub">0 张</div></div></div>
+          <div class="gcard" style="--c1:#6d5a2e;--c2:#2d2512"><div class="big">▣</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">1</div><div class="gsub">0 张</div></div></div>
+        </div>
+        <div class="stackghost" style="left:158px;top:342px;--c1:#75415f;--c2:#39202e">
+          <div class="sg"></div><div class="sg"></div><div class="top">🍓</div><div class="count">3</div>
+        </div>
+        <div class="cancelhint">松手在虚线框外 = 取消</div>
+      </div>
+      <div class="cap"><b><i>①</i>分组卡中间的虚线框</b>每个组卡内嵌虚线入口；手指进框出现进度环，停 0.25s 进入该组，不是松手投放。当前来源组标“当前组”。</div>
+    </div>
+
+    <!-- 2 进入目标组 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="tdhead">
+          <div class="tdtop">
+            <div class="back">‹</div>
+            <div class="tdname">放入<em>「摸鱼」</em></div>
+            <div class="holdpill">保持按住</div>
+          </div>
+          <div class="crumb">猫猫 <span class="arr">→</span> <b>摸鱼</b> · 组内还有 3 张</div>
+        </div>
+        <div class="tdmeta"><div class="tdsearch"><span class="mag">⌕</span><span>搜「摸鱼」里的图</span></div></div>
+        <div class="grid">
+          <div class="tile" style="--c1:#3d5c9a;--c2:#202f4f"><span>🐟</span><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6f7a38;--c2:#343a1c"><span>🐼</span><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#7a4d4a;--c2:#382322"><span>🍄</span><i class="heart">♥</i></div>
+        </div>
+        <div class="dropline" style="left:146px;top:242px;height:112px"></div>
+        <div class="postag" style="left:144px;top:214px">插入到第 2 位</div>
+        <div class="stackghost" style="left:198px;top:320px;--c1:#75415f;--c2:#39202e">
+          <div class="sg"></div><div class="sg"></div><div class="top">🍓</div><div class="count">3</div>
+        </div>
+        <div class="hintbar">松手 = 放到蓝线位置 · 继续往下拖 = 出组</div>
+        <div class="exitdock"><span>↓</span><b>继续往下拖 · 返回分组</b><span>停 0.25s</span></div>
+      </div>
+      <div class="cap"><b><i>②</i>进组：不松手，直接调位置</b>进入目标组详情，幽灵和 3 张选中还在手上；蓝线是插入光标，停在目标位。底部虚线出口提示“还能再出去”。</div>
+    </div>
+
+    <!-- 3 组内调位 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="tdhead">
+          <div class="tdtop">
+            <div class="back">‹</div>
+            <div class="tdname">放入<em>「摸鱼」</em></div>
+            <div class="holdpill">保持按住</div>
+          </div>
+          <div class="crumb">猫猫 <span class="arr">→</span> <b>摸鱼</b> · 组内还有 3 张</div>
+        </div>
+        <div class="tdmeta"><div class="tdsearch"><span class="mag">⌕</span><span>搜「摸鱼」里的图</span></div></div>
+        <div class="grid">
+          <div class="tile" style="--c1:#3d5c9a;--c2:#202f4f"><span>🐟</span><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6f7a38;--c2:#343a1c"><span>🐼</span><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#7a4d4a;--c2:#382322"><span>🍄</span><i class="heart">♥</i></div>
+        </div>
+        <div class="dropline" style="left:294px;top:242px;height:112px"></div>
+        <div class="postag" style="left:246px;top:214px">插入到第 3 位</div>
+        <div class="stackghost" style="left:270px;top:330px;--c1:#75415f;--c2:#39202e">
+          <div class="sg"></div><div class="sg"></div><div class="top">🍓</div><div class="count">3</div>
+        </div>
+        <div class="hintbar">不松手可以反复挪，蓝线跟着落点走</div>
+        <div class="exitdock"><span>↓</span><b>继续往下拖 · 返回分组</b><span>停 0.25s</span></div>
+      </div>
+      <div class="cap"><b><i>③</i>组内调位</b>仍然不松手，左右挪插入线，整组 3 张跟着换落点；上方显示“插入到第 X 位”。这一步已在目标组内部，但还没提交。</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- 4 下拖出组 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="tdhead">
+          <div class="tdtop">
+            <div class="back">‹</div>
+            <div class="tdname">放入<em>「摸鱼」</em></div>
+            <div class="holdpill">保持按住</div>
+          </div>
+          <div class="crumb">猫猫 <span class="arr">→</span> <b>摸鱼</b> · 组内还有 3 张</div>
+        </div>
+        <div class="tdmeta"><div class="tdsearch"><span class="mag">⌕</span><span>搜「摸鱼」里的图</span></div></div>
+        <div class="grid">
+          <div class="tile" style="--c1:#3d5c9a;--c2:#202f4f"><span>🐟</span><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6f7a38;--c2:#343a1c"><span>🐼</span><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#7a4d4a;--c2:#382322"><span>🍄</span><i class="heart">♥</i></div>
+        </div>
+        <div class="stackghost" style="left:170px;top:570px;--c1:#75415f;--c2:#39202e">
+          <div class="sg"></div><div class="sg"></div><div class="top">🍓</div><div class="count">3</div>
+        </div>
+        <div class="exitdock hot"><div class="dwell"></div><b>继续按住 · 返回分组</b><span>0.25s 后出组</span></div>
+      </div>
+      <div class="cap"><b><i>④</i>下拖出组</b>幽灵拖到最底部出口，进度环开始转；0.25s 后回到分组页——手仍然没松，整段移动没有提交。</div>
+    </div>
+
+    <!-- 5 回到组页 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="banner" style="top:36px"><span class="bi">↩</span><b>已回到分组 · 可进另一组</b><span>仍然按住</span></div>
+        <div style="height:70px"></div>
+        <div class="gtitle"><h2>分组</h2><small>7 个 · 正在移动 3 张</small></div>
+        <div class="gcards">
+          <div class="gcard fav" style="--c1:#ffd6dc;--c2:#ffd0d6"><div class="big">♥</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">收藏夹</div><div class="gsub">6 张 · 特殊分组</div></div></div>
+          <div class="gcard cur" style="--c1:#6d4a30;--c2:#2c1e15"><div class="big">▣</div><div class="gpin">⌖</div><div class="curtag">当前组</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">猫猫</div><div class="gsub">6 张</div></div></div>
+          <div class="gcard hot" style="--c1:#6f46a0;--c2:#2f1e47"><div class="big">▣</div><div class="gpin">⌖</div><div class="dwell"><b>0.25s</b></div><div class="enterframe">进入</div><div class="glabel"><div class="gname">摸鱼</div><div class="gsub">3 张</div></div></div>
+          <div class="gcard" style="--c1:#2f6b46;--c2:#142c1d"><div class="big">▣</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">蓝色大肥鱼</div><div class="gsub">4 张</div></div></div>
+          <div class="gcard" style="--c1:#6b3c3c;--c2:#2d1919"><div class="big">▣</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">测试组</div><div class="gsub">0 张</div></div></div>
+          <div class="gcard" style="--c1:#6d5a2e;--c2:#2d2512"><div class="big">▣</div><div class="enterframe">进入</div><div class="glabel"><div class="gname">1</div><div class="gsub">0 张</div></div></div>
+        </div>
+        <div class="stackghost" style="left:158px;top:342px;--c1:#75415f;--c2:#39202e">
+          <div class="sg"></div><div class="sg"></div><div class="top">🍓</div><div class="count">3</div>
+        </div>
+        <div class="cancelhint">松手在虚线框外 = 取消；进另一组会重新开始调位</div>
+      </div>
+      <div class="cap"><b><i>⑤</i>回到分组页，还能再进</b>出组后仍在拖拽态，组卡虚线框重新可选；可以换一个目标组再进。松手在框外则取消，来源组不变。</div>
+    </div>
+
+    <!-- 6 松手提交 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span class="r">LTE · 100%</span></div>
+        <div class="tdhead">
+          <div class="tdtop">
+            <div class="back">‹</div>
+            <div class="tdname">摸鱼</div>
+            <div class="holdpill" style="color:#8bd49c;border-color:rgba(139,212,156,.35);background:rgba(139,212,156,.08)">已加入</div>
+          </div>
+          <div class="crumb">猫猫 <span class="arr" style="color:#8bd49c">→</span> <b>摸鱼</b> · 6 张</div>
+        </div>
+        <div class="tdmeta"><div class="tdsearch"><span class="mag">⌕</span><span>搜「摸鱼」里的图</span></div></div>
+        <div class="grid">
+          <div class="tile" style="--c1:#3d5c9a;--c2:#202f4f"><span>🐟</span><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#6f7a38;--c2:#343a1c"><span>🐼</span><i class="heart">♥</i></div>
+          <div class="tile new" style="--c1:#7c5a34;--c2:#3b2a1d"><span>🐱</span><i class="heart">♥</i></div>
+          <div class="tile new" style="--c1:#8a54a0;--c2:#40264e"><span>🐰</span><i class="heart">♥</i></div>
+          <div class="tile new" style="--c1:#75415f;--c2:#39202e"><span>🍓</span><i class="heart">♥</i></div>
+          <div class="tile" style="--c1:#7a4d4a;--c2:#382322"><span>🍄</span><i class="heart">♥</i></div>
+        </div>
+        <div class="toast">已加入 <b>3 张</b> 到「摸鱼」 · 插在第 3 位</div>
+        <div class="nav">
+          <div class="ni"><span class="ic">▦</span>图库</div>
+          <div class="ni on"><span class="ic">▣</span>分组</div>
+          <div class="ni"><span class="ic">♲</span>回收站</div>
+          <div class="ni"><span class="ic">◯</span>我的</div>
+        </div>
+      </div>
+      <div class="cap"><b><i>⑥</i>松手才提交</b>停在目标组详情；3 张按蓝线位置插入并高亮，toast 确认，多选自动退出。原组猫猫的 3 张仍在，属于“加入”而非“移动”。</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>完整状态机：</b>按住拖动 → 组卡虚线框（0.25s）进组 → 组内蓝线调位 → 底部虚线出口（0.25s）回组 → 再进另一组 / 松手在框外取消 → 松手在目标组网格提交。中间任何一步都不松手、不落库；只有最后松手才写一次。
+  </div>
+
+  <div class="footer">
+    <b>想确认三点：</b>① 进组和出组各停 0.25s 合适吗（也可改成“一进框立刻进”，但容易误触）？② 最后松手在目标组 = 按蓝线位置“加入”并保留原组，对吗？③ 收藏夹也画了虚线框——要不要允许拖进收藏夹（等于加收藏）？<br>
+    <b>实现注意：</b>单选时 ghost 为单张，链路完全相同；v17 的「新图默认最前 / 分组默认手动」不变。需要全局拖拽层跨视图保留 ghost；进/出组做 0.25s 停留和进度环；松手才 `add_to_group`，并按插入位补目标组 `set_order`；Android 共享层目前缺 `set_order` 命令。仍只做设计稿，不改代码；上一批提交 `2920dab` 未 push。
+  </div>
+</div>
+</body>
+</html>

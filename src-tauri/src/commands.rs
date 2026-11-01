@@ -147,6 +147,16 @@ pub fn list_assets(
     Ok(sort_assets(list, &sort, limit))
 }
 
+#[tauri::command]
+pub fn set_asset_order(
+    state: State<'_, AppState>,
+    key: String,
+    shas: Vec<String>,
+) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_order(&key, shas).map_err(|e| format!("{e:#}"))
+}
+
 fn sort_assets(mut list: Vec<Asset>, sort: &str, limit: Option<usize>) -> Vec<Asset> {
     match sort {
         "name" => list.sort_by(|a, b| {

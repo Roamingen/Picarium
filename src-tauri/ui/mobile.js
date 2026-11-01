@@ -22,7 +22,7 @@ const S = {
   sharedPaths: [],
   tags: [],
   filters: { type: "", days: 0, tags: [], sort: "" },
-  gFilters: { type: "", days: 0, tags: [], sort: "" },
+  gFilters: { type: "", days: 0, tags: [], sort: "manual" },
   tFilters: { type: "", days: 0, tags: [], sort: "" },
   loading: false,
 };
@@ -59,6 +59,8 @@ let gdLoadSeq = 0;
 let gdHoldInfo = null;
 let gdHoldTimer = 0;
 let gdHoldFired = false;
+let gdDrag = null;
+let gdDropEl = null;
 let mergeTarget = "";
 try {
   S.pinsPerRow = Math.min(6, Math.max(3, +localStorage.getItem('sb.pinPerRow') || 4));
@@ -230,7 +232,7 @@ function sortParam(src) {
 
 function hasFilters(src) {
   const f = src || S.filters;
-  return !!(f.type || f.days || f.tags.length || f.sort);
+  return !!(f.type || f.days || f.tags.length || (f.sort && f.sort !== "manual"));
 }
 
 function pinNames() {
@@ -552,6 +554,130 @@ async function openGroup(name) {
   renderGdFilter();
   await loadGroup();
   syncGuard();
+}
+
+/* ---------- 组内手动排序（单张拖拽） ---------- */
+
+function gdCanDrag() {
+  if (!S.gview || gdSelMode) return "";
+  if (S.gFilters.sort !== "manual") return "先切换到「手动排序」再拖拽";
+  const filtering = !!(S.gFilters.type || S.gFilters.days || (S.gFilters.tags && S.gFilters.tags.length));
+  if (gdQ || filtering) return "清空搜索/筛选后再拖拽";
+  return "";
+}
+
+function gdDropCleanup() {
+  if (gdDropEl) {
+    gdDropEl.remove();
+    gdDropEl = null;
+  }
+  if (gdDrag) {
+    if (gdDrag.ghost) gdDrag.ghost.remove();
+    if (gdDrag.el) gdDrag.el.classList.remove("dragsrc");
+  }
+  document.body.classList.remove("img-dragging");
+}
+
+function cancelGdDrag() {
+  if (!gdDrag) return;
+  gdDropCleanup();
+  gdDrag = null;
+  gdHoldFired = true;
+  setTimeout(() => { gdHoldFired = false; }, 450);
+}
+
+function beginGdDrag(sha, el, e) {
+  const reason = gdCanDrag();
+  if (reason) {
+    toast(reason);
+    return false;
+  }
+  const idx = gdItems.findIndex((a) => a.sha === sha);
+  if (idx < 0) return false;
+  const r = el.getBoundingClientRect();
+  const ghost = el.cloneNode(true);
+  ghost.classList.add("ghost");
+  ghost.style.width = r.width + "px";
+  ghost.style.height = r.height + "px";
+  ghost.style.left = e.clientX - r.width / 2 + "px";
+  ghost.style.top = e.clientY - r.height / 2 + "px";
+  document.body.appendChild(ghost);
+  el.classList.add("dragsrc");
+  gdDrag = {
+    sha,
+    idx,
+    el,
+    ghost,
+    startOrder: gdItems.map((a) => a.sha),
+    order: gdItems.map((a) => a.sha),
+    offsetX: r.width / 2,
+    offsetY: r.height / 2,
+    changed: false,
+  };
+  document.body.classList.add("img-dragging");
+  gdDropEl = document.createElement("div");
+  gdDropEl.id = "gddrop";
+  document.body.appendChild(gdDropEl);
+  updateGdDrag(e);
+  if (navigator.vibrate) navigator.vibrate(8);
+  return true;
+}
+
+function updateGdDrag(e) {
+  const d = gdDrag;
+  if (!d) return;
+  d.ghost.style.left = e.clientX - d.offsetX + "px";
+  d.ghost.style.top = e.clientY - d.offsetY + "px";
+  const cards = [...$("gd-grid").querySelectorAll(".card")].filter((c) => c !== d.el);
+  let target = null;
+  let best = Infinity;
+  for (const c of cards) {
+    const r = c.getBoundingClientRect();
+    const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+    if (dist < best) {
+      best = dist;
+      target = c;
+    }
+  }
+  if (!target) {
+    if (gdDropEl) gdDropEl.style.display = "none";
+    return;
+  }
+  const r = target.getBoundingClientRect();
+  const after = e.clientX > r.left + r.width / 2;
+  const rest = d.order.filter((s) => s !== d.sha);
+  const at = rest.indexOf(target.dataset.sha);
+  if (at < 0) return;
+  rest.splice(after ? at + 1 : at, 0, d.sha);
+  d.order = rest;
+  d.changed = d.order.join("|") !== d.startOrder.join("|");
+  if (gdDropEl) {
+    gdDropEl.style.display = "block";
+    gdDropEl.style.left = (after ? r.right + 3 : r.left - 6) + "px";
+    gdDropEl.style.top = r.top + 8 + "px";
+    gdDropEl.style.height = Math.max(24, r.height - 16) + "px";
+  }
+}
+
+async function endGdDrag() {
+  const d = gdDrag;
+  if (!d) return;
+  const key = gdParam(S.gview);
+  const order = d.order;
+  const changed = d.changed;
+  gdDropCleanup();
+  gdDrag = null;
+  gdHoldFired = true;
+  setTimeout(() => { gdHoldFired = false; }, 450);
+  if (!changed) return;
+  try {
+    await invokeRetry("set_asset_order", { key, shas: order });
+    await loadGroup();
+    toast("顺序已保存");
+  } catch (e) {
+    toast("保存失败：" + String(e));
+    loadGroup();
+  }
 }
 
 /* ---------- 图片预览 / 多选 ---------- */
@@ -1051,12 +1177,13 @@ async function openFavCoverPicker() {
 
 function openSortSheet() {
   const opts = [
+    ["manual", "手动排序"],
     ["", "最新入库"],
     ["oldest", "最旧入库"],
     ["size", "大小（大→小）"],
     ["name", "名称 A→Z"],
   ];
-  const cur = S.gFilters.sort || "";
+  const cur = S.gFilters.sort == null ? "manual" : S.gFilters.sort;
   openSheet(
     "排序",
     `<div class="menu">${opts
@@ -2049,34 +2176,59 @@ function wire() {
 
   const gdGrid = $("gd-grid");
   gdGrid.addEventListener("pointerdown", (e) => {
-    if (S.gview === FAV_NAME) return;
+    if (S.gview === null || gdSelMode) return;
     const c = e.target.closest(".card");
     if (!c || e.button > 0) return;
     gdHoldFired = false;
-    gdHoldInfo = { sha: c.dataset.sha, x: e.clientX, y: e.clientY, el: c };
+    gdHoldInfo = { sha: c.dataset.sha, x: e.clientX, y: e.clientY, el: c, armed: false };
+    try { c.setPointerCapture(e.pointerId); } catch {}
     clearTimeout(gdHoldTimer);
     gdHoldTimer = setTimeout(() => {
       if (!gdHoldInfo) return;
-      gdHoldFired = true;
-      gdSel.add(gdHoldInfo.sha);
-      setGdSelMode(true);
-      gdHoldInfo.el.classList.add("lift");
-      setTimeout(() => gdHoldInfo && gdHoldInfo.el && gdHoldInfo.el.classList.remove("lift"), 160);
-      if (navigator.vibrate) navigator.vibrate(12);
-      gdHoldInfo = null;
-      setTimeout(() => { gdHoldFired = false; }, 600);
+      gdHoldInfo.armed = true;
+      if (navigator.vibrate) navigator.vibrate(8);
     }, 340);
   });
   gdGrid.addEventListener("pointermove", (e) => {
+    if (gdDrag) { updateGdDrag(e); return; }
     if (!gdHoldInfo) return;
-    if (Math.hypot(e.clientX - gdHoldInfo.x, e.clientY - gdHoldInfo.y) > 8) {
+    const dist = Math.hypot(e.clientX - gdHoldInfo.x, e.clientY - gdHoldInfo.y);
+    if (dist <= 8) return;
+    if (!gdHoldInfo.armed) {
       clearTimeout(gdHoldTimer);
       gdHoldInfo = null;
+      return;
+    }
+    const info = gdHoldInfo;
+    clearTimeout(gdHoldTimer);
+    gdHoldInfo = null;
+    const ok = beginGdDrag(info.sha, info.el, e);
+    if (!ok) {
+      gdHoldFired = true;
+      setTimeout(() => { gdHoldFired = false; }, 450);
     }
   });
-  const gdEndHold = () => { clearTimeout(gdHoldTimer); gdHoldInfo = null; };
-  gdGrid.addEventListener("pointerup", gdEndHold);
-  gdGrid.addEventListener("pointercancel", gdEndHold);
+  gdGrid.addEventListener("pointerup", () => {
+    if (gdDrag) { endGdDrag(); return; }
+    if (!gdHoldInfo) return;
+    const info = gdHoldInfo;
+    clearTimeout(gdHoldTimer);
+    gdHoldInfo = null;
+    if (info.armed && S.gview !== FAV_NAME) {
+      gdSel.add(info.sha);
+      setGdSelMode(true);
+      gdHoldFired = true;
+      setTimeout(() => { gdHoldFired = false; }, 600);
+    }
+  });
+  gdGrid.addEventListener("pointercancel", () => {
+    if (gdDrag) { cancelGdDrag(); return; }
+    clearTimeout(gdHoldTimer);
+    gdHoldInfo = null;
+  });
+  gdGrid.addEventListener("touchmove", (e) => {
+    if (gdDrag || (gdHoldInfo && gdHoldInfo.armed)) e.preventDefault();
+  }, { passive: false });
   gdGrid.addEventListener("click", (e) => {
     const c = e.target.closest(".card");
     if (!c) return;
@@ -2864,8 +3016,8 @@ $("filtersheet").addEventListener("click", (e) => {
 });
 $("f-reset").addEventListener("click", () => {
   if (filterHost === "gallery") S.view = "all";
-  const blank = () => ({ type: "", days: 0, tags: [], sort: "" });
-  if (filterHost === "group") S.gFilters = blank();
+  const blank = (sort = "") => ({ type: "", days: 0, tags: [], sort });
+  if (filterHost === "group") S.gFilters = blank("manual");
   else if (filterHost === "trash") S.tFilters = blank();
   else S.filters = blank();
   renderFilterSheet();

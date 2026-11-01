@@ -42,6 +42,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::list_assets,
+            commands::set_asset_order,
             commands::get_asset,
             commands::themes_list,
             commands::library_stats,
