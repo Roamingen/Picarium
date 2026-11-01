@@ -122,5 +122,5 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
 
 ## 9. 前端/UI 改动必须先进预览
 
-- 任何界面（PC 或手机）的改动，**先出 HTML 预览图**（放 `docs/mock/`，截图放 `.demo/`），给用户看完、点头后再写实现。
+- 任何界面（PC 或手机）的改动，**先出 HTML 预览**（放 `docs/mock/`），给用户看完、点头后再写实现。**默认只交 HTML，不主动出截图**；用户明确要看图时才用 Chrome headless 截到 `.demo/`。
 - 禁止"一拍脑袋"直接改 `mobile.js` / `app.js` / CSS 上线；小修（颜色、文案、间距）也要在汇报里说明改了什么，必要时附对比图。

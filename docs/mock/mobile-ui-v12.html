@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>移动端 v12 · 添加到面板（对齐版）</title>
+<style>
+  :root{
+    --bg:#14161a; --surface:#0f1115; --surface2:#232833; --surface3:#1c212a;
+    --line:#2a2f38; --line2:#3a4150; --fg:#e8ebf0; --dim:#9aa3b2; --dim2:#6b7484;
+    --accent:#6ea8fe; --on-accent:#0d1420;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:34px 0 70px;background:#08090b;color:var(--fg);
+    font:14px/1.5 -apple-system,"Segoe UI",system-ui,"PingFang SC","Microsoft YaHei",sans-serif}
+  .canvas{width:1250px;margin:0 auto}
+  .head{text-align:center;margin-bottom:24px}
+  h1{font-size:24px;margin:0 0 8px}
+  .head p{margin:0;color:var(--dim);font-size:13px}
+  .note{width:1080px;margin:0 auto 28px;padding:14px 18px;border:1px solid var(--line);
+    border-radius:12px;background:#101318;color:var(--dim);font-size:12.5px;line-height:1.8}
+  .note b{color:var(--fg)}
+  .del{color:#ff9aa2;text-decoration:line-through}
+  .row{display:flex;justify-content:center;gap:44px;margin-bottom:14px;flex-wrap:wrap}
+  .item{width:390px}
+  .cap{margin-top:12px;color:var(--dim);font-size:12px;line-height:1.7}
+  .cap b{color:var(--fg)}
+  .cap .bad{color:#ff9aa2}
+
+  .phone{width:390px;height:844px;border-radius:38px;background:var(--bg);position:relative;
+    overflow:hidden;border:1px solid #23262d;box-shadow:0 30px 60px rgba(0,0,0,.5)}
+  .status{height:44px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 22px;font-size:12px;font-weight:600;flex:0 0 auto}
+  .status .dots{display:flex;gap:5px}
+  .status i{width:14px;height:9px;border-radius:2px;background:#e8ebf0;opacity:.85;display:block}
+  .mask{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+
+  /* 选择态顶栏（面板块下面露出来的那层） */
+  .selhead{height:56px;display:flex;align-items:center;gap:10px;padding:0 16px;margin-top:44px}
+  .iconbtn{width:36px;height:36px;border-radius:50%;background:var(--surface2);
+    display:flex;align-items:center;justify-content:center;font-size:15px}
+  .selcount{flex:1;text-align:center;font-size:15px;font-weight:600}
+  .allbtn{color:var(--accent);font-size:13px;font-weight:600}
+
+  /* 面板 */
+  .sheet{position:absolute;left:0;right:0;bottom:0;height:80%;background:var(--surface);
+    border-radius:22px 22px 0 0;display:flex;flex-direction:column;
+    box-shadow:0 -20px 40px rgba(0,0,0,.45)}
+  .sheet.full{height:100%;border-radius:0;top:0}
+  .grabwrap{padding:8px 0 6px;display:flex;justify-content:center;flex:0 0 auto}
+  .grab{width:38px;height:4px;border-radius:2px;background:var(--line2)}
+  .grabwrap .hint{font-size:10px;color:var(--dim2);margin-left:8px}
+  .phead{display:flex;align-items:center;gap:10px;padding:2px 16px 8px;flex:0 0 auto}
+  .phead b{font-size:18px}
+  .scope{font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+  .pclose{margin-left:auto;width:30px;height:30px;border-radius:50%;background:var(--surface2);
+    display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:15px}
+  .pbar{display:flex;gap:8px;padding:0 16px 10px;flex:0 0 auto}
+  .psearch{flex:1;height:40px;border-radius:12px;background:var(--surface2);
+    display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--dim2);font-size:12.5px}
+  .newbtn{width:46px;height:40px;border-radius:12px;border:1px dashed var(--line2);
+    color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px}
+
+  /* 新建输入行（替换搜索行） */
+  .newrow{display:flex;gap:8px;padding:0 16px 10px;flex:0 0 auto}
+  .newrow input{flex:1;height:40px;border-radius:12px;border:1px solid var(--accent);
+    background:var(--surface2);color:var(--fg);padding:0 12px;font:inherit;font-size:13px;outline:none}
+  .newrow .mini{height:40px;padding:0 14px;border-radius:12px;background:var(--surface2);
+    color:var(--dim);font-size:13px;display:flex;align-items:center}
+  .newrow .mini.ok{background:var(--accent);color:var(--on-accent);font-weight:600}
+
+  .plist{flex:1 1 auto;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;
+    gap:10px;padding:0 16px;align-content:start;grid-auto-rows:max-content}
+  .folder{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface3)}
+  .folder .fc{height:110px;display:flex;align-items:center;justify-content:center;font-size:30px;position:relative}
+  .folder .fb{padding:7px 10px 9px;display:flex;gap:6px;align-items:baseline}
+  .fname{font-size:12.5px;font-weight:600}
+  .fsub{font-size:10.5px;color:var(--dim)}
+  .favcard{border-color:#ffb3bd}
+  .favcard .fc{background:linear-gradient(160deg,#ffe3e7,#ffd0d6)}
+  .favcard .fsub{color:#ff8a95}
+  .pin{position:absolute;top:7px;right:7px;width:20px;height:20px;border-radius:50%;
+    background:rgba(255,255,255,.92);color:#14161a;font-size:10px;display:flex;align-items:center;justify-content:center}
+  .pick{position:absolute;top:7px;right:7px;width:20px;height:20px;border-radius:50%;
+    background:var(--accent);color:var(--on-accent);font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .pfoot{display:flex;gap:10px;padding:10px 16px 22px;flex:0 0 auto}
+  .btn{flex:1;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    font-size:14px;font-weight:600;background:var(--surface2)}
+  .btn.primary{background:var(--accent);color:var(--on-accent)}
+  .btn.disabled{color:var(--dim2);font-weight:500}
+
+  .kbd{position:absolute;left:0;right:0;bottom:0;height:290px;background:#cfd4dc;
+    padding:8px 6px 10px;display:flex;flex-direction:column;gap:6px;flex:0 0 auto}
+  .krow{display:flex;justify-content:center;gap:5px}
+  .key{flex:1;max-width:38px;height:40px;border-radius:6px;background:#fff;color:#1b1e24;
+    display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 1px 0 #9aa0aa}
+  .krow.wide .key{max-width:99px;font-size:13px}
+  .tagline{text-align:center;color:var(--dim);font-size:12px;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="head">
+    <h1>移动端 v12 · 添加到面板（对齐版）</h1>
+    <p>按你三条改：80% 不要 ✕ / 全屏能往下拉 / 新建要真输入框（键盘为它弹）</p>
+  </div>
+
+  <div class="note">
+    <b>这一版的三条规则：</b><br>
+    ① <b>80% 常态不出现 ✕</b>：收面板靠下拉把手 / 点遮罩 / 系统返回，三个就够了，右上留空。<br>
+    ② <b>全屏形态才出现 ✕</b>（且只关掉面板回 80%，不退出选择态）—— 不然全屏时下拉和返回都在，容易误退。<br>
+    ③ 把手<b>任何时候都能上下拉</b>：80% ↔ 全屏，往下超过一定距离才关闭。<br>
+    ④ <span class="del">＋ 新建直接没反应</span> → 点 ＋ 后搜索行原地变成「输入新组名」行（取消 / 创建），键盘为它弹起，底栏整条收起。
+  </div>
+
+  <!-- 行 1 -->
+  <div class="row">
+    <div class="item">
+      <div class="phone">
+        <div class="mask"></div>
+        <div class="selhead"><div class="iconbtn">✕</div><div class="selcount">已选 <b>3</b> 张</div><div class="allbtn">全选</div></div>
+        <div class="sheet">
+          <div class="grabwrap"><div class="grab"></div></div>
+          <div class="phead"><b>添加到</b><span class="scope">已选 3 张</span></div>
+          <div class="pbar"><div class="psearch">🔍 搜索分组</div><div class="newbtn">＋</div></div>
+          <div class="plist">
+            <div class="folder favcard"><div class="fc">❤️</div><div class="fb"><span class="fname">收藏夹</span><span class="fsub">6 张 · 特殊分组</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#4b2f63,#7a4a8e)">📁<span class="pin">钉</span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">6 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">📁<span class="pin">钉</span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">3 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">📁</div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">4 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#2a3a58,#43567e)">📁</div><div class="fb"><span class="fname">表情包</span><span class="fsub">8 张</span></div></div>
+          </div>
+          <div class="pfoot"><div class="btn">移出全部分组</div><div class="btn disabled">未选择分组</div></div>
+        </div>
+      </div>
+      <div class="cap"><b>① 80% 常态</b>：右上<b>没有 ✕</b>；底键「未选择分组」淡色不可点。下拉把手 / 点遮罩 / 返回 都能收面板。</div>
+    </div>
+
+    <div class="item">
+      <div class="phone">
+        <div class="sheet full">
+          <div class="status"><span>9:41</span><span class="dots"><i></i><i></i></span></div>
+          <div class="grabwrap" style="padding-top:0"><div class="grab"></div></div>
+          <div class="phead"><b>添加到</b><span class="scope">已选 3 张</span><span class="pclose">✕</span></div>
+          <div class="pbar"><div class="psearch">🔍 搜索分组</div><div class="newbtn">＋</div></div>
+          <div class="plist">
+            <div class="folder favcard"><div class="fc">❤️</div><div class="fb"><span class="fname">收藏夹</span><span class="fsub">6 张 · 特殊分组</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#4b2f63,#7a4a8e)">📁<span class="pin">钉</span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">6 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">📁<span class="pin">钉</span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">3 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">📁</div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">4 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#2a3a58,#43567e)">📁</div><div class="fb"><span class="fname">表情包</span><span class="fsub">8 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#3d5a2c,#5d7a3a)">📁</div><div class="fb"><span class="fname">1</span><span class="fsub">0 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#5a3a52,#7a4a6e)">📁</div><div class="fb"><span class="fname">测试组</span><span class="fsub">0 张</span></div></div>
+          </div>
+          <div class="pfoot"><div class="btn">移出全部分组</div><div class="btn disabled">未选择分组</div></div>
+        </div>
+      </div>
+      <div class="cap"><b>② 全屏形态（拉到顶）</b>：圆角取消、状态栏并入；<b>这时才有 ✕</b>，点它只回 80%。把手<b>照样能往下拉</b>，拉过 85% 退 80%，再拉才能关。</div>
+    </div>
+  </div>
+
+  <!-- 行 2 -->
+  <div class="row">
+    <div class="item">
+      <div class="phone">
+        <div class="mask"></div>
+        <div class="selhead"><div class="iconbtn">✕</div><div class="selcount">已选 <b>3</b> 张</div><div class="allbtn">全选</div></div>
+        <div class="sheet" style="height:100%">
+          <div class="status"><span>9:41</span><span class="dots"><i></i><i></i></span></div>
+          <div class="grabwrap" style="padding-top:0"><div class="grab"></div></div>
+          <div class="phead"><b>添加到</b><span class="scope">已选 3 张</span><span class="pclose">✕</span></div>
+          <div class="newrow">
+            <input value="新分组名" readonly />
+            <div class="mini">取消</div><div class="mini ok">创建</div>
+          </div>
+          <div class="plist">
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#5a3a52,#7a4a6e)">📁</div><div class="fb"><span class="fname">测试组</span><span class="fsub">0 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#4b2f63,#7a4a8e)">📁<span class="pin">钉</span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">6 张</span></div></div>
+          </div>
+          <div class="kbd">
+            <div class="krow"><div class="key">Q</div><div class="key">W</div><div class="key">E</div><div class="key">R</div><div class="key">T</div><div class="key">Y</div><div class="key">U</div><div class="key">I</div><div class="key">O</div><div class="key">P</div></div>
+            <div class="krow"><div class="key">A</div><div class="key">S</div><div class="key">D</div><div class="key">F</div><div class="key">G</div><div class="key">H</div><div class="key">J</div><div class="key">K</div><div class="key">L</div></div>
+            <div class="krow wide"><div class="key">⇧</div><div class="key">Z</div><div class="key">X</div><div class="key">C</div><div class="key">V</div><div class="key">B</div><div class="key">N</div><div class="key">M</div><div class="key">⌫</div></div>
+            <div class="krow wide"><div class="key">123</div><div class="key">☺</div><div class="key" style="max-width:180px"></div><div class="key">换行</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b>③ 点 ＋ 新建</b>：搜索行原地变成输入行（取消 / 创建），键盘是为<b>它</b>弹的；此时底栏整条收起，不飘。回车或「创建」= 建好并<b>自动选中</b>这个新分组。</div>
+    </div>
+
+    <div class="item">
+      <div class="phone">
+        <div class="mask"></div>
+        <div class="selhead"><div class="iconbtn">✕</div><div class="selcount">已选 <b>3</b> 张</div><div class="allbtn">全选</div></div>
+        <div class="sheet">
+          <div class="grabwrap"><div class="grab"></div></div>
+          <div class="phead"><b>添加到</b><span class="scope">已选 3 张</span></div>
+          <div class="pbar"><div class="psearch">🔍 搜索分组</div><div class="newbtn">＋</div></div>
+          <div class="plist">
+            <div class="folder favcard"><div class="fc">❤️</div><div class="fb"><span class="fname">收藏夹</span><span class="fsub">6 张 · 特殊分组</span></div></div>
+            <div class="folder" style="border-color:var(--accent)"><div class="fc" style="background:linear-gradient(150deg,#4b2f63,#7a4a8e)">📁<span class="pick">✓</span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">6 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">📁</div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">3 张</span></div></div>
+            <div class="folder"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">📁</div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">4 张</span></div></div>
+          </div>
+          <div class="pfoot"><div class="btn">移出全部分组</div><div class="btn primary">加入「猫猫」</div></div>
+        </div>
+      </div>
+      <div class="cap"><b>④ 选中一张后</b>：卡片加蓝框＋勾；底键变主题蓝「加入「猫猫」」；键盘收起后底栏滑回。</div>
+    </div>
+  </div>
+
+  <div class="tagline">卡片行高、上下间距按真实分组页（110px 封面 + 一行文字），不再有大空洞。</div>
+</div>
+</body>
+</html>
