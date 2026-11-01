@@ -906,6 +906,9 @@ impl Library {
         if let Some(sha) = self.group_covers.remove(old) {
             self.group_covers.insert(new.to_string(), sha);
         }
+        if let Some(order) = self.orders.remove(old) {
+            self.orders.insert(new.to_string(), order);
+        }
         for g in self.pinned_groups.iter_mut() {
             if g == old {
                 *g = new.to_string();
@@ -1083,6 +1086,7 @@ impl Library {
             self.known_groups.retain(|g| g != name);
             self.group_order.retain(|g| g != name);
             self.group_covers.remove(name);
+            self.orders.remove(name);
             self.pinned_groups.retain(|g| g != name);
             self.save()?;
             return Ok(n);
@@ -1091,6 +1095,7 @@ impl Library {
         self.known_groups.retain(|g| g != name);
         self.group_order.retain(|g| g != name);
         self.group_covers.remove(name);
+        self.orders.remove(name);
         self.pinned_groups.retain(|g| g != name);
         let mut touched = 0;
         for a in &mut self.assets {

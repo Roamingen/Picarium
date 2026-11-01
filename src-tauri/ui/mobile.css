@@ -566,7 +566,7 @@ body { overflow-x: hidden; overflow-y: auto; }
 
 .folders {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(var(--gcols, 2), 1fr);
   gap: 16px 12px;
   padding: 4px 16px calc(96px + var(--safe-bottom));
 }
@@ -584,7 +584,7 @@ body { overflow-x: hidden; overflow-y: auto; }
 }
 
 .folder .fc {
-  height: 170px;
+  height: var(--gcover, 170px);
   line-height: 1;
   display: flex;
   align-items: center;

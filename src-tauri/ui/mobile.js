@@ -342,6 +342,11 @@ function dwellMs() {
 }
 function dwellSec() { return Math.round(dwellMs() / 1000); }
 function dragMode() { return localStorage.getItem("sb.dragmode") === "copy" ? "copy" : "cut"; }
+function groupCols() {
+  const v = Number(localStorage.getItem("sb.gcols"));
+  return v === 3 || v === 4 ? v : 2;
+}
+function groupNewPos() { return localStorage.getItem("sb.gnew") === "back" ? "back" : "front"; }
 function favCard(count, picked) {
   const cover = S.starredCover
     ? `<img class="favcover" src="${thumbUrl(S.starredCover)}" alt="" loading="lazy" onerror="this.remove()">`
@@ -1787,10 +1792,15 @@ function openSortSheet() {
       .map(([v, label]) => `<button data-sort="${v}" class="${v === cur ? "on" : ""}">${label}</button>`)
       .join("")}</div><div class="snote">排序只影响组内图片，不改变分组顺序。</div>`
   );
-  $("sheet-body").onclick = (e) => {
+  $("sheet-body").onclick = async (e) => {
     const b = e.target.closest("button[data-sort]");
     if (!b) return;
-    S.gFilters.sort = b.dataset.sort;
+    const next = b.dataset.sort;
+    if (cur === "manual" && next !== "manual") {
+      const ok = await confirmSheet("切换后手动排序顺序仍会保留，切回手动时恢复。", "切换排序", "切换");
+      if (!ok) return;
+    }
+    S.gFilters.sort = next;
     closeSheet();
     loadGroup();
     renderGdFilter();
@@ -2457,6 +2467,9 @@ function applyPrefs() {
   const cols = Number(localStorage.getItem("sb.cols")) || 3;
   document.documentElement.style.setProperty("--cols", String(cols));
   document.documentElement.style.setProperty("--gd-dwell", dwellMs() + "ms");
+  const gcols = groupCols();
+  document.documentElement.style.setProperty("--gcols", String(gcols));
+  document.documentElement.style.setProperty("--gcover", gcols === 2 ? "170px" : gcols === 3 ? "118px" : "88px");
 }
 
 function renderMe() {
@@ -2471,6 +2484,8 @@ function renderMe() {
   for (const b of document.querySelectorAll("#seg-fav button")) b.classList.toggle("on", b.dataset.fav === fav);
   for (const b of document.querySelectorAll("#seg-dwell button")) b.classList.toggle("on", Number(b.dataset.dwell) === dwellMs());
   for (const b of document.querySelectorAll("#seg-dragmode button")) b.classList.toggle("on", b.dataset.dragmode === dragMode());
+  for (const b of document.querySelectorAll("#seg-gcols button")) b.classList.toggle("on", +b.dataset.gcols === groupCols());
+  for (const b of document.querySelectorAll("#seg-gnew button")) b.classList.toggle("on", b.dataset.gnew === groupNewPos());
   for (const b of document.querySelectorAll("#seg-pinrow button")) b.classList.toggle("on", +b.dataset.pinrow === S.pinsPerRow);
   for (const b of document.querySelectorAll("#seg-pinrows button")) b.classList.toggle("on", +b.dataset.pinrows === S.pinRows);
 }
@@ -3025,6 +3040,20 @@ $("seg-dragmode").addEventListener("click", (e) => {
   renderMe();
   toast(b.dataset.dragmode === "cut" ? "拖到其他分组：剪切" : "拖到其他分组：复制");
 });
+$("seg-gcols").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-gcols]");
+  if (!b) return;
+  localStorage.setItem("sb.gcols", b.dataset.gcols);
+  applyPrefs();
+  renderMe();
+});
+$("seg-gnew").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-gnew]");
+  if (!b) return;
+  localStorage.setItem("sb.gnew", b.dataset.gnew);
+  renderMe();
+  toast(b.dataset.gnew === "front" ? "新图将放在最前" : "新图将放在最后");
+});
 $("btn-purge").addEventListener("click", purgeTrash);
 let trashHold = null, trashHoldTimer = 0, trashHoldFired = false;
 $("trash-grid").addEventListener("pointerdown", (e) => {
@@ -3336,12 +3365,26 @@ function closeGroupPicker() {
   syncGuard();
 }
 
+async function prioritizePicked(name) {
+  if (groupNewPos() !== "front") return;
+  try {
+    const key = gdParam(name);
+    const res = await invokeRetry("list_assets", { q: "", group: key, limit: 2000, sort: "manual", filters: "" });
+    const list = Array.isArray(res) ? res : (res && res.items) || [];
+    const all = list.map((a) => a.sha);
+    const front = pickShas.filter((s) => all.includes(s));
+    const rest = all.filter((s) => !front.includes(s));
+    if (front.length) await invokeRetry("set_asset_order", { key, shas: [...front, ...rest] });
+  } catch {}
+}
+
 async function pickerMoveIn() {
   if (!pickSel) return toast("先选一个分组");
   const name = pickSel;
   if (name === FAV_NAME) {
     try {
       await invokeRetry("batch_star", { shas: pickShas, on: true });
+      await prioritizePicked(name);
       closeGroupPicker();
       if (S.gview) {
         setGdSelMode(false);
@@ -3359,6 +3402,7 @@ async function pickerMoveIn() {
   }
   try {
     await invokeRetry("add_to_group", { shas: pickShas, group: name });
+    await prioritizePicked(name);
     closeGroupPicker();
     if (S.gview) {
       setGdSelMode(false);
