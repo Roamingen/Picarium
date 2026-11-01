@@ -1260,12 +1260,67 @@ function flipFolders(before) {
   });
 }
 
+let folderDropEl = null;
+
+function folderZone(name) {
+  const pinned = S.pinned.includes(name);
+  const names = pinned
+    ? S.pinned.filter((n) => S.groupList.some((g) => g.name === n))
+    : S.groupList.filter((g) => !S.pinned.includes(g.name)).map((g) => g.name);
+  return { pinned, names };
+}
+
+function ensureFolderDrop() {
+  if (!folderDropEl) {
+    folderDropEl = document.createElement("div");
+    folderDropEl.id = "folder-drop";
+    document.body.appendChild(folderDropEl);
+  }
+  return folderDropEl;
+}
+
+function hideFolderDrop() {
+  if (folderDropEl) folderDropEl.style.display = "none";
+}
+
+function clearFolderDragVisuals() {
+  document.querySelectorAll(".folder.ghost").forEach((el) => el.remove());
+  document.querySelectorAll("#folders .dragsrc").forEach((el) => el.classList.remove("dragsrc"));
+  document.querySelectorAll("#folders .lift").forEach((el) => el.classList.remove("lift"));
+  document.body.classList.remove("folder-dragging");
+  if (folderDropEl) {
+    folderDropEl.remove();
+    folderDropEl = null;
+  }
+}
+
+function cancelFolderDrag() {
+  const d = dragCtx;
+  dragCtx = null;
+  clearFolderDragVisuals();
+  resetHold();
+  if (d) {
+    suppressClick = true;
+    setTimeout(() => (suppressClick = false), 450);
+  }
+}
+
 function beginFolderDrag(e) {
   const info = holdInfo;
   if (!info) return;
+  if (selMode) return;
+  if (S.gq.trim()) {
+    toast("清空搜索后再拖拽排序");
+    resetHold();
+    return;
+  }
+  const zone = folderZone(info.name);
   const r = info.card.getBoundingClientRect();
   dragCtx = {
     name: info.name,
+    pinned: zone.pinned,
+    order: zone.names.slice(),
+    changed: false,
     offX: info.x - r.left,
     offY: info.y - r.top,
     w: r.width,
@@ -1282,6 +1337,8 @@ function beginFolderDrag(e) {
   g.style.height = r.height + "px";
   document.body.appendChild(g);
   info.card.classList.add("dragsrc");
+  document.body.classList.add("folder-dragging");
+  ensureFolderDrop();
   if (navigator.vibrate) navigator.vibrate(16);
 }
 
@@ -1291,12 +1348,17 @@ function updateFolderDrag(e) {
   d.moved = true;
   d.ghost.style.left = e.clientX - d.offX + "px";
   d.ghost.style.top = e.clientY - d.offY + "px";
-  if (S.gq.trim()) return;
+  if (selMode || S.gq.trim()) return;
 
   const cards = [...document.querySelectorAll("#folders .folder[data-group]")].filter(
-    (c) => c.dataset.group !== d.name
+    (c) =>
+      c.dataset.group !== d.name &&
+      S.pinned.includes(c.dataset.group) === d.pinned
   );
-  if (!cards.length) return;
+  if (!cards.length) {
+    hideFolderDrop();
+    return;
+  }
   let best = 0;
   let bestD = Infinity;
   cards.forEach((c, i) => {
@@ -1310,33 +1372,54 @@ function updateFolderDrag(e) {
     }
   });
   const target = cards[best];
-  const r = target.getBoundingClientRect();
-  const after = e.clientX > r.left + r.width / 2;
-  const order = S.groupList.map((g) => g.name).filter((n) => n !== d.name);
-  const pos = order.indexOf(target.dataset.group) + (after ? 1 : 0);
-  order.splice(pos, 0, d.name);
-  if (order.join("\u0001") === S.groupList.map((g) => g.name).join("\u0001")) return;
-  const before = captureFolderRects();
-  S.groupList = order.map((n) => S.groupList.find((g) => g.name === n)).filter(Boolean);
-  renderFolders(true);
-  flipFolders(before);
+  const rect = target.getBoundingClientRect();
+  const after = e.clientX > rect.left + rect.width / 2;
+  const current = folderZone(d.name).names;
+  const rest = current.filter((n) => n !== d.name);
+  const pos = rest.indexOf(target.dataset.group) + (after ? 1 : 0);
+  const next = rest.slice();
+  next.splice(pos, 0, d.name);
+  d.order = next;
+  d.changed = next.length !== current.length || next.some((n, i) => n !== current[i]);
+
+  const line = ensureFolderDrop();
+  line.style.display = "block";
+  line.style.left = (after ? rect.right + 3 : rect.left - 6) + "px";
+  line.style.top = rect.top + 8 + "px";
+  line.style.height = Math.max(24, rect.height - 16) + "px";
 }
 
 async function endFolderDrag() {
   const d = dragCtx;
   dragCtx = null;
   if (!d) return;
-  if (d.ghost) d.ghost.remove();
+  clearFolderDragVisuals();
+  resetHold();
   suppressClick = true;
   setTimeout(() => (suppressClick = false), 450);
-  resetHold();
-  document.querySelectorAll("#folders .dragsrc").forEach((el) => el.classList.remove("dragsrc"));
-  if (!d.moved) return;
+  if (!d.moved || !d.changed || !d.order) return;
+
+  const before = captureFolderRects();
   try {
-    await invokeRetry("set_group_order", { order: S.groupList.map((g) => g.name) });
+    if (d.pinned) {
+      S.pinned = d.order.slice();
+      renderFolders(true);
+      flipFolders(before);
+      await invokeRetry("set_pinned_groups", { groups: S.pinned });
+    } else {
+      const pinned = S.pinned.filter((n) => S.groupList.some((g) => g.name === n));
+      const full = [...pinned, ...d.order];
+      S.groupList = full
+        .map((n) => S.groupList.find((g) => g.name === n))
+        .filter(Boolean);
+      renderFolders(true);
+      flipFolders(before);
+      await invokeRetry("set_group_order", { order: full });
+    }
     await loadGroups();
-    toast("顺序已保存");
+    toast(d.pinned ? "置顶顺序已保存" : "分组顺序已保存");
   } catch (err) {
+    await loadGroups();
     toast("保存顺序失败：" + String(err));
   }
 }
@@ -1885,7 +1968,14 @@ function wire() {
     clearTimeout(holdTimer);
     finishFolderHold();
   });
-  folders.addEventListener("pointercancel", () => { clearTimeout(holdTimer); resetHold(); });
+  folders.addEventListener("touchmove", (e) => {
+    if (dragCtx || (holdInfo && holdInfo.armed)) e.preventDefault();
+  }, { passive: false });
+  folders.addEventListener("contextmenu", (e) => e.preventDefault());
+  folders.addEventListener("pointercancel", () => {
+    if (dragCtx) cancelFolderDrag();
+    else { clearTimeout(holdTimer); resetHold(); }
+  });
   folders.addEventListener("click", (e) => {
     const f = e.target.closest(".folder");
     if (!f) return;

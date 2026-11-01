@@ -1353,3 +1353,24 @@ body.gdselect .fab { display: none !important; }
   object-fit: cover;
   display: block;
 }
+
+/* 分组拖拽排序 */
+.folder {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+body.folder-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+#folder-drop {
+  position: fixed;
+  display: none;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(110, 168, 254, 0.65);
+  z-index: 95;
+  pointer-events: none;
+}
