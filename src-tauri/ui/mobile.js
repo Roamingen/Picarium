@@ -49,6 +49,17 @@ let holdInfo = null;
 let holdTimer = 0;
 let dragCtx = null;
 let suppressClick = false;
+
+/* 分组详情：独立于图库的一套选择 / 搜索 / 加载状态 */
+let gdItems = [];
+let gdSelMode = false;
+let gdSel = new Set();
+let gdQ = "";
+let gdLoadSeq = 0;
+let gdHoldInfo = null;
+let gdHoldTimer = 0;
+let gdHoldFired = false;
+let mergeTarget = "";
 try {
   S.pinsPerRow = Math.min(6, Math.max(3, +localStorage.getItem('sb.pinPerRow') || 4));
   S.pinRows = Math.min(3, Math.max(1, +localStorage.getItem('sb.pinRows') || 2));
@@ -269,11 +280,11 @@ function renderGrid() {
     grid.innerHTML = `<div class="empty">${hint}</div>`;
     return;
   }
-  grid.innerHTML = S.items.map(cardHtml).join("");
+  grid.innerHTML = S.items.map((a) => cardHtml(a)).join("");
 }
 
-function cardHtml(a) {
-  const on = imgSel.has(a.sha);
+function cardHtml(a, selected = imgSel) {
+  const on = (selected && typeof selected.has === "function" ? selected : imgSel).has(a.sha);
   return `<button class="card${on ? " sel" : ""}" data-sha="${escapeAttr(a.sha)}" data-name="${escapeAttr(a.name)}">
     <img loading="lazy" src="${thumbUrl(a.sha)}" alt="" onerror="this.style.display='none'">
     ${a.animated ? '<span class="badge">GIF</span>' : ""}
@@ -295,6 +306,8 @@ async function loadGroups() {
   const gl = await invokeRetry("group_list");
   S.groupList = (gl && gl.groups) || [];
   S.pinned = (gl && gl.pinned) || [];
+  S.starredCover = (gl && gl.starred_cover) || null;
+  S.starredBytes = (gl && gl.starred_bytes) || 0;
   renderPins();
   if (S.tab === "groups" && !S.gview) renderFolders();
 }
@@ -311,9 +324,12 @@ function folderIcon(name) {
 
 const FAV_NAME = "收藏";
 function favCard(count, picked) {
+  const cover = S.starredCover
+    ? `<img class="favcover" src="${thumbUrl(S.starredCover)}" alt="" loading="lazy" onerror="this.remove()">`
+    : "♥";
   return `<button class="folder fav${picked ? " sel" : ""}" data-fav="1">
     <span class="fcheck">${SVG.check}</span>
-    <div class="fc favfc">♥</div>
+    <div class="fc favfc">${cover}</div>
     <div class="fb"><span class="fname">收藏夹</span><span class="fsub">${count} 张 · 特殊分组</span></div>
   </button>`;
 }
@@ -347,20 +363,30 @@ function renderFolders(keepScroll) {
       return S.groupList.indexOf(a) - S.groupList.indexOf(b);
     });
   const y = keepScroll ? window.scrollY : null;
-  $("gcount").textContent = selMode ? ` 已选 ${sel.size} 个` : ` ${S.groupList.length} 个`;
-  $("btn-newgroup").innerHTML = selMode
-    ? SVG.check
-    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
-  $("btn-newgroup").title = selMode ? "完成" : "新建分组";
-  $("selbar").hidden = !selMode;
-  if (selMode) $("selcount").textContent = String(sel.size);
+  $("ghead").hidden = selMode;
+  $("gselhead").hidden = !selMode;
+  $("gactbar").hidden = !selMode;
+  document.body.classList.toggle("gselect", selMode);
+  $("gcount").textContent = ` ${S.groupList.length} 个`;
+  $("gseln").textContent = String(sel.size);
+  const visible = list.map((g) => g.name);
+  const full = visible.length > 0 && visible.every((n) => sel.has(n));
+  $("gsel-all").textContent = full ? "取消全选" : "全选";
+  $("gsel-all").classList.toggle("done", full);
+  const picked = S.groupList.filter((g) => sel.has(g.name));
+  const pinned = picked.filter((g) => g.pinned).length;
+  $("gactbar").querySelector('[data-gact="dissolve"]').disabled = sel.size === 0;
+  $("gactbar").querySelector('[data-gact="delete"]').disabled = sel.size === 0;
+  $("gactbar").querySelector('[data-gact="pin"]').disabled = sel.size === 0 || pinned === picked.length;
+  $("gactbar").querySelector('[data-gact="unpin"]').disabled = sel.size === 0 || pinned === 0;
   const starred = (S.stats && S.stats.starred) || 0;
+  const empty = list.length
+    ? ""
+    : `<div class="empty">${q ? "没有匹配的分组。" : "还没有分组。点右下角「+」新建一个。"}</div>`;
   folderBox.innerHTML =
-    (q ? "" : favCard(starred, false)) +
+    (!selMode && !q ? favCard(starred, false) : "") +
     list.map((g) => folderCard(g)).join("") +
-    (selMode
-      ? ""
-      : `<button class="folder new" data-new="1"><div class="fc">＋</div><div class="fb"><span class="fname">新建分组</span><span class="fsub">把一堆图归到一起</span></div></button>`);
+    empty;
   if (y !== null) window.scrollTo(0, y);
   if (dragCtx) {
     const src = folderBox.querySelector(`.folder[data-group="${cssEsc(dragCtx.name)}"]`);
@@ -372,32 +398,160 @@ function cssEsc(s) {
   return String(s).replace(/["\\]/g, "\\$&");
 }
 function syncGroupPin(name) {
-  const on = S.pinned.includes(name);
-  const b = $("btn-gpin");
-  b.classList.toggle("on", on);
-  b.title = on ? "取消置顶" : "置顶到图库";
-  b.style.color = on ? "var(--accent)" : "";
+  const on = name !== FAV_NAME && S.pinned.includes(name);
+  const pin = $("gd-pin");
+  if (pin) pin.hidden = !on;
+  const g = S.groupList.find((x) => x.name === name);
+  if (g) g.pinned = on;
+}
+
+function gdDisplayName(name) {
+  return name === FAV_NAME ? "收藏夹" : name;
+}
+
+function gdParam(name) {
+  return name === FAV_NAME ? "__star__" : name;
+}
+
+function gdCount(name) {
+  if (name === FAV_NAME) return (S.stats && S.stats.starred) || 0;
+  const g = S.groupList.find((x) => x.name === name);
+  return g ? g.count : gdItems.length;
+}
+
+function gdBytes(name) {
+  if (name === FAV_NAME) return S.starredBytes || 0;
+  const g = S.groupList.find((x) => x.name === name);
+  return g ? g.bytes || 0 : 0;
+}
+
+function renderGdFilter() {
+  const b = $("btn-gfilter");
+  if (b) b.classList.toggle("active", hasFilters(S.gFilters));
+}
+
+function paintGdSel() {
+  document.querySelectorAll("#gd-grid .card").forEach((c) => {
+    c.classList.toggle("sel", gdSel.has(c.dataset.sha));
+  });
+}
+
+function syncGdSel() {
+  const n = $("gdseln");
+  if (n) n.textContent = String(gdSel.size);
+  const all = gdItems.length > 0 && gdItems.every((a) => gdSel.has(a.sha));
+  const b = $("gdsel-all");
+  if (b) {
+    b.textContent = all ? "取消全选" : "全选";
+    b.classList.toggle("done", all);
+  }
+  for (const btn of document.querySelectorAll("#gdactbar button")) btn.disabled = gdSel.size === 0;
+}
+
+function setGdSelMode(on) {
+  on = !!on;
+  if (!on) gdSel.clear();
+  gdSelMode = on;
+  document.body.classList.toggle("gdselect", on);
+  $("gdhead").hidden = on;
+  $("gdselhead").hidden = !on;
+  $("gdactbar").hidden = !on;
+  if (on) closeGmenu();
+  paintGdSel();
+  syncGdSel();
+  syncGuard();
+}
+
+function toggleGdSel(sha) {
+  if (gdSel.has(sha)) gdSel.delete(sha);
+  else gdSel.add(sha);
+  if (gdSel.size === 0) {
+    setGdSelMode(false);
+    return;
+  }
+  paintGdSel();
+  syncGdSel();
+}
+
+function gdAll() {
+  if (!gdSelMode) return;
+  const all = gdItems.length > 0 && gdItems.every((a) => gdSel.has(a.sha));
+  gdSel.clear();
+  if (!all) gdItems.forEach((a) => gdSel.add(a.sha));
+  if (gdSel.size === 0) {
+    setGdSelMode(false);
+    return;
+  }
+  paintGdSel();
+  syncGdSel();
+}
+
+function pruneGdSel() {
+  const keep = new Set(gdItems.map((a) => a.sha));
+  for (const sha of [...gdSel]) if (!keep.has(sha)) gdSel.delete(sha);
+  if (gdSelMode && gdSel.size === 0) {
+    setGdSelMode(false);
+    return true;
+  }
+  return false;
+}
+
+async function loadGroup(opts = {}) {
+  if (!S.gview) return;
+  const name = S.gview;
+  const isFav = name === FAV_NAME;
+  const seq = ++gdLoadSeq;
+  const g = S.groupList.find((x) => x.name === name);
+  const total = gdCount(name);
+  const bytes = gdBytes(name);
+  const baseMeta = bytes ? `${total} 张 · ${fmtSize(bytes)}` : `${total} 张`;
+  $("gd-title").textContent = gdDisplayName(name);
+  $("gd-pin").hidden = isFav || !(g && g.pinned);
+  $("btn-gdsel").hidden = isFav;
+  $("gd-meta").textContent = baseMeta;
+  $("gd-grid").innerHTML = '<div class="spinner">正在读取…</div>';
+  try {
+    const items = await invokeRetry("list_assets", {
+      q: gdQ,
+      group: gdParam(name),
+      limit: 1000,
+      sort: sortParam(S.gFilters),
+      filters: filterJson(S.gFilters),
+    });
+    if (seq !== gdLoadSeq) return;
+    gdItems = items || [];
+    if (gdSelMode) pruneGdSel();
+    const filtering = !!(S.gFilters.type || S.gFilters.days || (S.gFilters.tags && S.gFilters.tags.length));
+    $("gd-grid").innerHTML = gdItems.length
+      ? gdItems.map((a) => cardHtml(a, gdSel)).join("")
+      : `<div class="gempty">${gdQ || filtering ? "没有匹配的图片" : isFav ? "收藏夹还是空的" : "这个分组还是空的"}</div>`;
+    if (gdQ || filtering) {
+      $("gd-meta").textContent = `${gdItems.length} / ${total} 张 · ${gdQ ? "搜索结果" : "筛选结果"}`;
+    }
+    renderGdFilter();
+    syncGdSel();
+    paintGdSel();
+  } catch (e) {
+    if (seq !== gdLoadSeq) return;
+    $("gd-grid").innerHTML = '<div class="gempty">读取失败：' + escapeHtml(String(e)) + "</div>";
+  }
 }
 
 async function openGroup(name) {
   S.gview = name;
+  gdQ = "";
+  if (gdSelMode) setGdSelMode(false);
+  gdSel.clear();
+  const q = $("gdq");
+  if (q) q.value = "";
+  if ($("gdq-clear")) $("gdq-clear").hidden = true;
+  closeGmenu();
   setTab("groups");
   syncGuard();
-  const g = S.groupList.find((x) => x.name === name);
-  $("gd-title").textContent = name;
   syncGroupPin(name);
-  $("gd-meta").textContent = g ? `${g.count} 张 · 长按可换封面 / 重命名` : "";
-  $("btn-gfilter").classList.toggle("active", hasFilters(S.gFilters));
-  $("gd-grid").innerHTML = '<div class="spinner">正在读取…</div>';
-  try {
-    const items = await invokeRetry("list_assets", { q: "", group: name, limit: 500, sort: sortParam(S.gFilters), filters: filterJson(S.gFilters) });
-    $("gd-meta").textContent = `${items.length} 张 · 右上角可换封面`;
-    $("gd-grid").innerHTML = items.length
-      ? items.map(cardHtml).join("")
-      : '<div class="gempty">这个分组还是空的</div>';
-  } catch (e) {
-    $("gd-grid").innerHTML = '<div class="gempty">读取失败：' + escapeHtml(String(e)) + "</div>";
-  }
+  renderGdFilter();
+  await loadGroup();
+  syncGuard();
 }
 
 /* ---------- 图片预览 / 多选 ---------- */
@@ -491,13 +645,18 @@ function fmtSource(src) {
   return "来自" + (map[src] || src || "未知");
 }
 
+function viewerList() {
+  return (S.gview ? gdItems : S.items) || [];
+}
+
 function viewerAsset() {
-  return (S.items || [])[vIndex] || {};
+  return viewerList()[vIndex] || {};
 }
 
 function renderViewer() {
   const a = viewerAsset();
-  $("v-count").textContent = `${S.items.length ? vIndex + 1 : 0} / ${S.items.length}`;
+  const list = viewerList();
+  $("v-count").textContent = `${list.length ? vIndex + 1 : 0} / ${list.length}`;
   $("v-name").textContent = a.name || "未命名";
   // 预览用原图，放大后仍然清晰
   $("v-img").src = thumbUrl(a.sha, true);
@@ -525,7 +684,8 @@ function renderViewer() {
 }
 
 function openViewer(sha) {
-  const idx = (S.items || []).findIndex((x) => x.sha === sha);
+  const list = viewerList();
+  const idx = list.findIndex((x) => x.sha === sha);
   vIndex = idx < 0 ? 0 : idx;
   renderViewer();
   $("viewer").hidden = false;
@@ -542,8 +702,9 @@ function closeViewer() {
 }
 
 function stepViewer(delta) {
-  if (!S.items.length) return;
-  const next = Math.min(S.items.length - 1, Math.max(0, vIndex + delta));
+  const list = viewerList();
+  if (!list.length) return;
+  const next = Math.min(list.length - 1, Math.max(0, vIndex + delta));
   if (next === vIndex) return;
   vIndex = next;
   renderViewer();
@@ -559,9 +720,20 @@ async function loadTrashDays() {
 }
 
 function backGroups() {
+  if (gdSelMode) setGdSelMode(false);
+  closeGmenu();
   S.gview = null;
+  gdItems = [];
+  gdQ = "";
+  gdSel.clear();
+  document.body.classList.remove("gdselect");
+  $("gdactbar").hidden = true;
+  $("gdselhead").hidden = true;
+  $("gdhead").hidden = false;
   $("groupdetail").hidden = true;
   $("groupsview").hidden = false;
+  $("fab").hidden = false;
+  $("fab").title = "新建分组";
   renderFolders();
   syncGuard();
 }
@@ -573,11 +745,13 @@ function activeLayer() {
   const shown = (id) => { const el = $(id); return el && !el.hidden; };
   if (shown("lightbox")) return { close: () => closeLightbox() };
   if (shown("sheetmask")) return { close: () => { if (sheetResolve) { sheetResolve(false); sheetResolve = null; } closeSheet(); } };
+  if (shown("gmenu")) return { close: () => closeGmenu() };
   if (shown("filtermask")) return { close: () => { $("filtermask").hidden = true; syncGuard(); } };
   if (shown("pickmask")) return { close: exitPicker };
   if (imgSelMode) return { close: () => setImgSelMode(false) };
   if (shown("viewer")) return { close: () => closeViewer() };
   if (trashSelMode) return { close: () => setTrashSelMode(false) };
+  if (gdSelMode) return { close: () => setGdSelMode(false) };
   if (selMode) return { close: () => setSelMode(false) };
   if (S.tab === "groups" && S.gview) return { close: () => backGroups() };
   if (S.tab !== "gallery") return { close: () => setTab("gallery") };
@@ -611,12 +785,12 @@ function closeSheet() {
 }
 let sheetResolve = null;
 
-function confirmSheet(text) {
+function confirmSheet(text, title = "确认", okText = "确定") {
   return new Promise((resolve) => {
     sheetResolve = resolve;
     openSheet(
-      "确认",
-      `<div class="snote">${escapeHtml(text)}</div>${sheetActions("确定", "sheet-ok")}`
+      title,
+      `<div class="snote">${escapeHtml(text)}</div>${sheetActions(okText, "sheet-ok", /删除|清空/.test(okText))}`
     );
     $("sheet-body").onclick = (e) => {
       if (e.target.id === "sheet-cancel") {
@@ -632,30 +806,85 @@ function confirmSheet(text) {
   });
 }
 
-function sheetActions(okText, okId) {
-  return `<div class="sheet-actions"><button id="sheet-cancel">取消</button><button class="primary" id="${okId}">${okText}</button></div>`;
+function sheetActions(okText, okId, danger = false) {
+  return `<div class="sheet-actions"><button id="sheet-cancel">取消</button><button class="primary${danger ? " danger" : ""}" id="${okId}">${okText}</button></div>`;
+}
+
+function closeGmenu() {
+  const m = $("gmenu");
+  if (m) m.hidden = true;
+}
+
+async function gdAction(act) {
+  const shas = [...gdSel];
+  if (!shas.length) return;
+  if (act === "send") {
+    try {
+      await invoke("share_assets", { shas });
+      await markUsed(shas);
+      toast(`已发送 ${shas.length} 张`);
+    } catch (e) {
+      toast("发送失败：" + String(e));
+    }
+    return;
+  }
+  if (act === "tag") return toast("标签在后面的批次接上");
+  if (act === "add") {
+    openGroupPicker(shas);
+    return;
+  }
+  if (act === "remove") {
+    const ok = await confirmSheet(`把 ${shas.length} 张图移出「${gdDisplayName(S.gview)}」？图片不会被删除。`, "移出当前分组", "移出");
+    if (!ok) return;
+    try {
+      await invokeRetry("batch_ungroup", { shas, group: S.gview });
+      setGdSelMode(false);
+      await loadGroup();
+      await loadGroups();
+      toast(`已移出 ${shas.length} 张`);
+    } catch (e) {
+      toast("移出失败：" + String(e));
+    }
+    return;
+  }
+  if (act === "delete") {
+    const ok = await confirmSheet(`${shas.length} 张图会先放进回收站，可在回收站恢复；超过保留天数后才会真正清理。`, "删除图片", "删除");
+    if (!ok) return;
+    try {
+      for (const sha of shas) await invokeRetry("delete_asset", { sha });
+      setGdSelMode(false);
+      await loadGroup();
+      await loadGroups();
+      toast(`已删除 ${shas.length} 张`);
+    } catch (e) {
+      toast("删除失败：" + String(e));
+    }
+  }
 }
 
 function openGroupMenu(name) {
-  const pinned = S.pinned.includes(name);
-  openSheet(
-    name,
-    `<div class="menu">
-      <button data-act="cover">换封面</button>
-      <button data-act="rename">重命名</button>
-      <button data-act="pin">${pinned ? "取消置顶" : "置顶到图库"}</button>
-      <button data-act="delete" class="danger">删除分组（只解散，不删图）</button>
-    </div>`
-  );
-  $("sheet-body").onclick = async (e) => {
-    const b = e.target.closest("button[data-act]");
-    if (!b) return;
-    closeSheet();
-    if (b.dataset.act === "cover") openCoverPicker(name);
-    else if (b.dataset.act === "rename") openRename(name);
-    else if (b.dataset.act === "pin") await togglePin(name);
-    else if (b.dataset.act === "delete") openDeleteGroup(name);
-  };
+  closeGmenu();
+  const isFav = name === FAV_NAME;
+  const items = isFav
+    ? [["cover", "更换封面"], ["info", "详细信息"]]
+    : [["cover", "更换封面"], ["sort", "排序"], ["merge", "并入其他分组"], ["rename", "重命名"], ["info", "详细信息"]];
+  const box = $("gmenu");
+  box.innerHTML = items.map(([act, label]) => `<button data-gmact="${act}">${label}</button>`).join("");
+  box.hidden = false;
+  syncGuard();
+}
+
+function gmenuAction(act) {
+  const name = S.gview;
+  if (!name) return;
+  closeGmenu();
+  if (act === "cover") {
+    if (name === FAV_NAME) openFavCoverPicker();
+    else openCoverPicker(name);
+  } else if (act === "sort") openSortSheet();
+  else if (act === "merge") openMergeSheet();
+  else if (act === "rename") openRename(name);
+  else if (act === "info") openGroupInfo();
 }
 
 async function togglePin(name) {
@@ -744,6 +973,7 @@ function openDeleteGroup(name) {
 }
 
 async function openCoverPicker(name) {
+  if (name === FAV_NAME) return openFavCoverPicker();
   openSheet(`换封面 · ${name}`, '<div class="spinner">正在读取…</div>');
   try {
     const items = await invokeRetry("list_assets", { q: "", group: name, limit: 300 });
@@ -770,6 +1000,7 @@ async function openCoverPicker(name) {
         await invokeRetry("set_group_cover", { group: name, sha: b.dataset.cover });
         closeSheet();
         await loadGroups();
+        if (S.gview === name) await loadGroup();
         toast("封面已更新");
       } catch (err) {
         toast("换封面失败：" + String(err));
@@ -778,6 +1009,168 @@ async function openCoverPicker(name) {
   } catch (e) {
     $("sheet-body").innerHTML = '<div class="gempty">读取失败：' + escapeHtml(String(e)) + "</div>";
   }
+}
+
+async function openFavCoverPicker() {
+  openSheet("换封面 · 收藏夹", '<div class="spinner">正在读取…</div>');
+  try {
+    const items = await invokeRetry("list_assets", { q: "", group: "__star__", limit: 300 });
+    if (!items.length) {
+      $("sheet-body").innerHTML = '<div class="gempty">收藏夹还没有图，先收藏几张再选封面。</div>';
+      return;
+    }
+    const cur = S.starredCover;
+    $("sheet-body").innerHTML =
+      '<div class="coverpick">' +
+      items
+        .map(
+          (a) =>
+            `<button data-cover="${escapeAttr(a.sha)}" class="${a.sha === cur ? "on" : ""}">
+              <img src="${thumbUrl(a.sha)}" alt="" loading="lazy" onerror="this.remove()">
+            </button>`
+        )
+        .join("") +
+      '</div><div class="shnote">点一张设为收藏夹封面</div>';
+    $("sheet-body").onclick = async (e) => {
+      const b = e.target.closest("button[data-cover]");
+      if (!b) return;
+      try {
+        await invokeRetry("set_starred_cover", { sha: b.dataset.cover });
+        closeSheet();
+        await loadGroups();
+        if (S.gview === FAV_NAME) await loadGroup();
+        toast("封面已更新");
+      } catch (err) {
+        toast("换封面失败：" + String(err));
+      }
+    };
+  } catch (e) {
+    $("sheet-body").innerHTML = '<div class="gempty">读取失败：' + escapeHtml(String(e)) + "</div>";
+  }
+}
+
+function openSortSheet() {
+  const opts = [
+    ["", "最新入库"],
+    ["oldest", "最旧入库"],
+    ["size", "大小（大→小）"],
+    ["name", "名称 A→Z"],
+  ];
+  const cur = S.gFilters.sort || "";
+  openSheet(
+    "排序",
+    `<div class="menu">${opts
+      .map(([v, label]) => `<button data-sort="${v}" class="${v === cur ? "on" : ""}">${label}</button>`)
+      .join("")}</div><div class="snote">排序只影响组内图片，不改变分组顺序。</div>`
+  );
+  $("sheet-body").onclick = (e) => {
+    const b = e.target.closest("button[data-sort]");
+    if (!b) return;
+    S.gFilters.sort = b.dataset.sort;
+    closeSheet();
+    loadGroup();
+    renderGdFilter();
+    toast("已更新排序");
+  };
+}
+
+async function openGroupInfo() {
+  const name = S.gview;
+  if (!name) return;
+  const isFav = name === FAV_NAME;
+  const g = S.groupList.find((x) => x.name === name);
+  const count = gdCount(name);
+  const bytes = gdBytes(name);
+  const cover = isFav ? S.starredCover : g && g.cover;
+  const pinned = isFav ? "—" : g && g.pinned ? "是" : "否";
+  let all = gdItems;
+  if (gdItems.length < count) {
+    openSheet("详细信息", '<div class="spinner">正在读取…</div>');
+    try {
+      all = await invokeRetry("list_assets", {
+        q: "",
+        group: gdParam(name),
+        limit: 2000,
+        sort: "added",
+        filters: "{}",
+      });
+    } catch {
+      all = gdItems;
+    }
+  }
+  const added = all.map((a) => a.added_at).filter(Boolean).sort().pop();
+  const recent = added ? String(added).replace("T", " ").slice(0, 16) : "—";
+  const gif = all.filter((a) => a.animated).length;
+  const still = all.length - gif;
+  const rows = [
+    ["分组名", gdDisplayName(name)],
+    ["图片数量", `${count} 张`],
+    ["总大小", bytes ? fmtSize(bytes) : "—"],
+    ["封面", cover ? "自定义" : "默认"],
+    ["置顶", pinned],
+    ["最近添加", recent],
+    ["图片构成", all.length ? `${gif} 张 GIF · ${still} 张静态` : "—"],
+    ["创建时间", "—"],
+  ];
+  const note =
+    "只读 · 数据来自本地索引" +
+    (all.length < count ? `；图片构成为已加载的 ${all.length} 张` : "") +
+    "；创建时间索引暂未记录";
+  openSheet(
+    "详细信息",
+    `<div class="kv">${rows
+      .map(([k, v]) => `<div class="kvrow"><span>${k}</span><b>${escapeHtml(v)}</b></div>`)
+      .join("")}</div><div class="snote">${escapeHtml(note)}</div>`
+  );
+}
+
+async function openMergeSheet() {
+  const name = S.gview;
+  if (!name || name === FAV_NAME) return;
+  const targets = S.groupList.filter((g) => g.name !== name);
+  if (!targets.length) return toast("没有其他分组可以并入");
+  mergeTarget = "";
+  openSheet("并入其他分组", '<div class="spinner">正在读取…</div>');
+  let all = [];
+  try {
+    all = await invokeRetry("list_assets", { q: "", group: name, limit: 2000 });
+  } catch (e) {
+    $("sheet-body").innerHTML = '<div class="gempty">读取失败：' + escapeHtml(String(e)) + "</div>";
+    return;
+  }
+  $("sheet-body").innerHTML =
+    `<div class="mergelist">${targets
+      .map(
+        (g) =>
+          `<button class="merge-row" data-merge="${escapeAttr(g.name)}"><span class="mname">${escapeHtml(g.name)}</span><span class="mcount">${g.count} 张</span></button>`
+      )
+      .join("")}</div>` +
+    `<div class="snote">并入后「${escapeHtml(name)}」会解散，${all.length} 张图只移动、不删除。</div>` +
+    `<div class="sheet-actions"><button id="merge-cancel">取消</button><button class="primary" id="merge-ok" disabled>并入</button></div>`;
+  $("sheet-body").onclick = async (e) => {
+    const row = e.target.closest("button[data-merge]");
+    if (row) {
+      mergeTarget = row.dataset.merge;
+      for (const b of $("sheet-body").querySelectorAll("button[data-merge]")) b.classList.toggle("on", b === row);
+      const ok = $("merge-ok");
+      ok.disabled = false;
+      ok.textContent = `并入「${mergeTarget}」`;
+      return;
+    }
+    if (e.target.id === "merge-cancel") return closeSheet();
+    if (e.target.id !== "merge-ok" || !mergeTarget) return;
+    const target = mergeTarget;
+    try {
+      if (all.length) await invokeRetry("add_to_group", { shas: all.map((a) => a.sha), group: target });
+      await invokeRetry("remove_group", { name, deleteAssets: false });
+      closeSheet();
+      backGroups();
+      await loadGroups();
+      toast(`已并入「${target}」`);
+    } catch (err) {
+      toast("并入失败：" + String(err));
+    }
+  };
 }
 
 
@@ -819,6 +1212,16 @@ function setSelMode(on) {
   if (!on) sel.clear();
   renderFolders(true);
   syncGuard();
+}
+
+function gselAll() {
+  const names = [...document.querySelectorAll("#folders .folder[data-group]")].map((f) => f.dataset.group);
+  if (!names.length) return;
+  const full = names.every((n) => sel.has(n));
+  if (full) sel.clear();
+  else names.forEach((n) => sel.add(n));
+  if (sel.size === 0) selMode = false;
+  renderFolders(true);
 }
 
 function toggleSel(name) {
@@ -1056,24 +1459,31 @@ async function batchSetPin(on) {
   }
 }
 
-async function batchDelete() {
+async function batchGroupRemove(deleteAssets) {
   const names = [...sel];
   if (!names.length) return;
-  openSheet(
-    `删除 ${names.length} 个分组`,
-    `<div class="shnote">只解散分组，组里的图会回到「未分组」，不会被删除。</div>
-     ${sheetActions("删除", "batch-del")}`
-  );
+  const picked = S.groupList.filter((g) => names.includes(g.name));
+  if (!picked.length) return;
+  const total = picked.reduce((n, g) => n + g.count, 0);
+  const danger = !!deleteAssets;
+  const title = danger
+    ? `删除 ${picked.length} 个分组及组内 ${total} 张图？`
+    : `解散 ${picked.length} 个分组？`;
+  const note = danger
+    ? `分组会被移除，${total} 张图先放进回收站，可在回收站恢复；超过保留天数后才会真正清理。`
+    : `只移除分组，${total} 张图回到「未分组」，不会被删除。`;
+  openSheet(title, `<div class="shnote">${note}</div>${sheetActions(danger ? "删除" : "解散分组", "batch-del")}`);
   $("sheet-cancel").onclick = closeSheet;
+  if (danger) $("batch-del").classList.add("danger");
   $("batch-del").onclick = async () => {
     try {
-      for (const n of names) await invokeRetry("remove_group", { name: n, deleteAssets: false });
+      for (const n of names) await invokeRetry("remove_group", { name: n, deleteAssets: danger });
       closeSheet();
       setSelMode(false);
       await loadGroups();
-      toast("已删除分组");
+      toast(danger ? `已删除 ${picked.length} 个分组，${total} 张图已移入回收站` : `已解散 ${picked.length} 个分组`);
     } catch (err) {
-      toast("删除失败：" + String(err));
+      toast((danger ? "删除失败：" : "解散失败：") + String(err));
     }
   };
 }
@@ -1263,7 +1673,8 @@ function hostFilters() {
 }
 
 function filterScope() {
-  return filterHost === "group" ? S.gview || "分组" : filterHost === "trash" ? "回收站" : "图库";
+  if (filterHost !== "group") return filterHost === "trash" ? "回收站" : "图库";
+  return S.gview === FAV_NAME ? "收藏夹" : S.gview || "分组";
 }
 
 function renderFilterSheet() {
@@ -1313,8 +1724,8 @@ function updateFilterCount() {
     filterHost === "trash"
       ? invokeRetry("trash_list", { q: null, filters: filterJson(f) })
       : invokeRetry("list_assets", {
-          q: filterHost === "gallery" ? S.q : "",
-          group: filterHost === "group" ? S.gview : groupParam(),
+          q: filterHost === "gallery" ? S.q : filterHost === "group" ? gdQ : "",
+          group: filterHost === "group" ? gdParam(S.gview) : groupParam(),
           limit: 2000,
           sort: sortParam(f),
           filters: filterJson(f),
@@ -1328,13 +1739,25 @@ function setTab(tab) {
   window.scrollTo(0, 0);
   for (const b of document.querySelectorAll("#nav button")) b.classList.toggle("on", b.dataset.tab === tab);
 
+  if (tab !== "groups" || !S.gview) {
+    if (gdSelMode) setGdSelMode(false);
+    closeGmenu();
+    gdItems = [];
+    gdQ = "";
+    $("gdselhead").hidden = true;
+    $("gdactbar").hidden = true;
+    document.body.classList.remove("gdselect");
+  }
+
   const isGallery = tab === "gallery";
   const isGroups = tab === "groups";
+  const onGroupsList = isGroups && !S.gview;
   $("topwrap").hidden = !isGallery;
   $("searchbox").hidden = !isGallery;
   $("chips").hidden = !isGallery;
   $("grid").hidden = !isGallery;
-  $("fab").hidden = !isGallery;
+  $("fab").hidden = !(isGallery || onGroupsList);
+  $("fab").title = onGroupsList ? "新建分组" : "导入";
   $("inbox").hidden = !(isGallery && S.sharedPaths.length > 0);
   $("pins-wrap").hidden = !isGallery || pinNames().length === 0;
   $("groupsview").hidden = !isGroups || !!S.gview;
@@ -1344,7 +1767,7 @@ function setTab(tab) {
 
   if (isGallery) renderPins();
   if (isGroups) {
-    if (S.gview) $("gd-title").textContent = S.gview;
+    if (S.gview) $("gd-title").textContent = gdDisplayName(S.gview);
     else renderFolders();
   }
   if (tab !== "gallery") {
@@ -1440,7 +1863,7 @@ function wire() {
   const folders = $("folders");
   folders.addEventListener("pointerdown", (e) => {
     const f = e.target.closest(".folder");
-    if (!f || f.dataset.new || e.button > 0) return;
+    if (!f || !f.dataset.group || e.button > 0) return;
     suppressClick = false;
     holdInfo = { name: f.dataset.group, card: f, x: e.clientX, y: e.clientY, armed: false, moved: false };
     clearTimeout(holdTimer);
@@ -1467,51 +1890,109 @@ function wire() {
     const f = e.target.closest(".folder");
     if (!f) return;
     if (suppressClick) { suppressClick = false; return; }
-    if (f.dataset.new) { if (!selMode) openNewGroup(); return; }
     if (f.dataset.fav) {
       if (selMode) { toast("收藏夹不能加入分组"); return; }
-      S.view = "star";
-      setTab("gallery");
-      refresh();
+      openGroup(FAV_NAME);
       return;
     }
     if (selMode) toggleSel(f.dataset.group);
     else openGroup(f.dataset.group);
   });
 
-  $("btn-newgroup").addEventListener("click", () => {
-    if (selMode) setSelMode(false);
-    else openNewGroup();
+  $("btn-gsel").addEventListener("click", () => {
+    if (!S.groupList.length) return toast("还没有分组");
+    setSelMode(true);
   });
-  $("selbar").addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-sel]");
-    if (!b) return;
-    const act = b.dataset.sel;
+  $("gsel-close").addEventListener("click", () => setSelMode(false));
+  $("gsel-all").addEventListener("click", gselAll);
+  $("gactbar").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-gact]");
+    if (!b || b.disabled) return;
+    const act = b.dataset.gact;
     if (act === "pin") batchSetPin(true);
     else if (act === "unpin") batchSetPin(false);
-    else if (act === "delete") batchDelete();
-    else batchSingle(act);
+    else batchGroupRemove(act === "delete");
   });
   $("btn-gback").addEventListener("click", backGroups);
-  $("btn-gpin").addEventListener("click", async () => {
-    if (!S.gview) return;
-    const name = S.gview;
-    const next = S.pinned.includes(name) ? S.pinned.filter((n) => n !== name) : [...S.pinned, name];
-    try {
-      await invoke("set_pinned_groups", { groups: next });
-      S.pinned = next;
-      const g = S.groupList.find((x) => x.name === name);
-      if (g) g.pinned = next.includes(name);
-      syncGroupPin(name);
-      renderPins();
-      renderFolders(true);
-      toast(next.includes(name) ? "已置顶到图库" : "已取消置顶");
-    } catch (err) {
-      toast("设置失败：" + err);
+  $("btn-gdsel").addEventListener("click", () => {
+    if (!gdItems.length) return toast("这个分组还没有图片");
+    setGdSelMode(!gdSelMode);
+  });
+  $("gdsel-close").addEventListener("click", () => setGdSelMode(false));
+  $("gdsel-all").addEventListener("click", gdAll);
+  $("gdactbar").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-gdact]");
+    if (b && !b.disabled) gdAction(b.dataset.gdact);
+  });
+  $("btn-gmore").addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (S.gview) openGroupMenu(S.gview);
+  });
+  $("gmenu").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-gmact]");
+    if (b) gmenuAction(b.dataset.gmact);
+  });
+  document.addEventListener("pointerdown", (e) => {
+    const m = $("gmenu");
+    if (!m || m.hidden) return;
+    if (e.target.closest("#gmenu") || e.target.closest("#btn-gmore")) return;
+    closeGmenu();
+  });
+
+  let gdQT = 0;
+  $("gdq").addEventListener("input", () => {
+    const v = $("gdq").value;
+    $("gdq-clear").hidden = !v;
+    clearTimeout(gdQT);
+    gdQT = setTimeout(() => {
+      gdQ = v.trim();
+      loadGroup();
+    }, 200);
+  });
+  $("gdq-clear").addEventListener("click", () => {
+    $("gdq").value = "";
+    $("gdq-clear").hidden = true;
+    gdQ = "";
+    loadGroup();
+    $("gdq").focus();
+  });
+
+  const gdGrid = $("gd-grid");
+  gdGrid.addEventListener("pointerdown", (e) => {
+    if (S.gview === FAV_NAME) return;
+    const c = e.target.closest(".card");
+    if (!c || e.button > 0) return;
+    gdHoldFired = false;
+    gdHoldInfo = { sha: c.dataset.sha, x: e.clientX, y: e.clientY, el: c };
+    clearTimeout(gdHoldTimer);
+    gdHoldTimer = setTimeout(() => {
+      if (!gdHoldInfo) return;
+      gdHoldFired = true;
+      gdSel.add(gdHoldInfo.sha);
+      setGdSelMode(true);
+      gdHoldInfo.el.classList.add("lift");
+      setTimeout(() => gdHoldInfo && gdHoldInfo.el && gdHoldInfo.el.classList.remove("lift"), 160);
+      if (navigator.vibrate) navigator.vibrate(12);
+      gdHoldInfo = null;
+      setTimeout(() => { gdHoldFired = false; }, 600);
+    }, 340);
+  });
+  gdGrid.addEventListener("pointermove", (e) => {
+    if (!gdHoldInfo) return;
+    if (Math.hypot(e.clientX - gdHoldInfo.x, e.clientY - gdHoldInfo.y) > 8) {
+      clearTimeout(gdHoldTimer);
+      gdHoldInfo = null;
     }
   });
-  $("btn-gcover").addEventListener("click", () => {
-    if (S.gview) openCoverPicker(S.gview);
+  const gdEndHold = () => { clearTimeout(gdHoldTimer); gdHoldInfo = null; };
+  gdGrid.addEventListener("pointerup", gdEndHold);
+  gdGrid.addEventListener("pointercancel", gdEndHold);
+  gdGrid.addEventListener("click", (e) => {
+    const c = e.target.closest(".card");
+    if (!c) return;
+    if (gdHoldFired) { gdHoldFired = false; return; }
+    if (gdSelMode) toggleGdSel(c.dataset.sha);
+    else openViewer(c.dataset.sha);
   });
 
   // 点遮罩关掉弹层
@@ -1571,7 +2052,13 @@ function wire() {
     setTab(b.dataset.tab);
   });
 
-  $("fab").addEventListener("click", openImportSheet);
+  $("fab").addEventListener("click", () => {
+    if (S.tab === "groups" && !S.gview && !selMode) {
+      openNewGroup();
+      return;
+    }
+    openImportSheet();
+  });
   $("btn-filter").addEventListener("click", openFilters);
   $("btn-inbox").addEventListener("click", () => {
     if (!S.sharedPaths.length) return toast("分享收件箱是空的");
@@ -1957,7 +2444,12 @@ async function createPickGroup() {
 
 function exitPicker() {
   closeGroupPicker();
-  setImgSelMode(false);
+  if (gdSelMode) {
+    setGdSelMode(false);
+    loadGroup();
+  } else {
+    setImgSelMode(false);
+  }
 }
 
 function openGroupPicker(shas) {
@@ -1984,9 +2476,15 @@ async function pickerMoveIn() {
     try {
       await invokeRetry("batch_star", { shas: pickShas, on: true });
       closeGroupPicker();
-      setImgSelMode(false);
+      if (S.gview) {
+        setGdSelMode(false);
+        await loadGroup();
+      } else {
+        setImgSelMode(false);
+        await afterMoveRefresh(pickShas[0]);
+      }
+      await loadGroups();
       toast(`已收藏 ${pickShas.length} 张`);
-      await afterMoveRefresh(pickShas[0]);
     } catch (err) {
       toast("收藏失败：" + err);
     }
@@ -1995,10 +2493,15 @@ async function pickerMoveIn() {
   try {
     await invokeRetry("add_to_group", { shas: pickShas, group: name });
     closeGroupPicker();
-    setImgSelMode(false);
-    toast(`已加入「${name}」`);
-    await afterMoveRefresh(pickShas[0]);
+    if (S.gview) {
+      setGdSelMode(false);
+      await loadGroup();
+    } else {
+      setImgSelMode(false);
+      await afterMoveRefresh(pickShas[0]);
+    }
     await loadGroups();
+    toast(`已加入「${name}」`);
   } catch (err) {
     toast("操作失败：" + err);
   }
@@ -2008,10 +2511,16 @@ async function pickerMoveOut() {
   try {
     await invoke("clear_groups", { shas: pickShas });
     closeGroupPicker();
-    setImgSelMode(false);
-    toast("已移出分组");
-    await afterMoveRefresh(pickShas[0]);
+    if (S.gview) {
+      setGdSelMode(false);
+      closeViewer();
+      await loadGroup();
+    } else {
+      setImgSelMode(false);
+      await afterMoveRefresh(pickShas[0]);
+    }
     await loadGroups();
+    toast("已移出分组");
   } catch (err) {
     toast("操作失败：" + err);
   }
@@ -2049,10 +2558,26 @@ $("v-star").addEventListener("click", async () => {
   const a = viewerAsset();
   if (!a.sha) return;
   try {
-    await invoke("batch_star", { shas: [a.sha], on: !a.starred });
-    a.starred = !a.starred;
+    const on = !a.starred;
+    await invoke("batch_star", { shas: [a.sha], on });
+    a.starred = on;
+    if (S.gview) {
+      await loadGroup();
+      const idx = viewerList().findIndex((x) => x.sha === a.sha);
+      if (idx < 0) {
+        closeViewer();
+        await loadGroups();
+        toast(on ? "已收藏" : "已取消收藏");
+        return;
+      }
+      vIndex = idx;
+      renderViewer();
+      await loadGroups();
+      toast(on ? "已收藏" : "已取消收藏");
+      return;
+    }
     renderViewer();
-    toast(a.starred ? "已收藏" : "已取消收藏");
+    toast(on ? "已收藏" : "已取消收藏");
     await refresh();
     const idx = S.items.findIndex((x) => x.sha === a.sha);
     if (idx >= 0) vIndex = idx;
@@ -2069,7 +2594,12 @@ $("v-del").addEventListener("click", async () => {
     await invokeRetry("delete_asset", { sha: a.sha });
     closeViewer();
     toast("已移入回收站");
-    await refresh();
+    if (S.gview) {
+      await loadGroup();
+      await loadGroups();
+    } else {
+      await refresh();
+    }
   } catch (err) {
     toast("删除失败：" + err);
   }
@@ -2255,7 +2785,8 @@ $("f-apply").addEventListener("click", async () => {
   $("filtermask").hidden = true;
   syncGuard();
   if (filterHost === "group" && S.gview) {
-    await openGroup(S.gview);
+    await loadGroup();
+    renderGdFilter();
   } else if (filterHost === "trash") {
     await loadTrash();
   } else {

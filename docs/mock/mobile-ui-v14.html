@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>移动端 v14 · 分组页（4 版卡片 / 两区拖拽 / 收藏夹）</title>
+<style>
+  :root{
+    --bg:#14161a; --surface:#0f1115; --surface2:#232833; --surface3:#1c212a;
+    --line:#2a2f38; --line2:#333a47; --fg:#e8eaed; --dim:#8b93a1; --dim2:#5d6573;
+    --accent:#6ea8fe; --on-accent:#0d1420; --danger:#ff5d6c;
+    --nav-bg:rgba(15,17,21,.97); --sheet:#191d24;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:36px 0 80px;background:#08090b;color:var(--fg);
+    font:14px/1.5 -apple-system,"Segoe UI",system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .canvas{width:1320px;margin:0 auto}
+  .head{text-align:center;margin-bottom:22px}
+  h1{font-size:24px;margin:0 0 8px}
+  .head p{margin:0;color:var(--dim);font-size:13px}
+  .note{width:1180px;margin:0 auto 30px;padding:16px 20px;border:1px solid var(--line);
+    border-radius:14px;background:#101318;color:var(--dim);font-size:12.5px;line-height:1.85}
+  .note b{color:var(--fg)}
+  .note .hl{color:var(--accent)}
+  .note ul,.note ol{margin:6px 0 2px;padding-left:18px}
+  .note li{margin:3px 0}
+  code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.92em;
+    color:#a9c7f2;background:rgba(110,168,254,.08);border-radius:4px;padding:0 4px}
+  .row{display:flex;justify-content:center;gap:32px;margin-bottom:24px;flex-wrap:wrap}
+  .item{width:390px;flex:0 0 390px}
+  .cap{margin-top:12px;color:var(--dim);font-size:12px;line-height:1.75}
+  .cap b{color:var(--fg)}
+  .tagline{text-align:center;color:var(--dim2);font-size:12px;margin-top:10px}
+
+  .phone{width:390px;height:844px;border-radius:38px;background:var(--bg);position:relative;
+    overflow:hidden;border:1px solid #262b33;box-shadow:0 30px 60px rgba(0,0,0,.52);
+    display:flex;flex-direction:column}
+  .status{height:44px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:0 24px;font-size:12px;font-weight:650;color:#e6eaf0}
+  .sbr{display:flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;color:#cfd6df}
+  .batt{width:20px;height:10px;border:1px solid #cfd6df;border-radius:3px;position:relative}
+  .batt::before{content:"";position:absolute;left:1.5px;top:1.5px;bottom:1.5px;width:60%;
+    background:#cfd6df;border-radius:1px}
+  .batt::after{content:"";position:absolute;right:-3px;top:3px;width:2px;height:4px;
+    background:#cfd6df;border-radius:1px}
+  .screen{flex:1;min-height:0;position:relative;display:flex;flex-direction:column;overflow:hidden}
+
+  .ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;
+    stroke-linecap:round;stroke-linejoin:round;display:block}
+  .ic.fill{fill:currentColor;stroke:none}
+  .iconbtn{border:0;background:var(--surface2);color:#aab4c3;display:flex;align-items:center;
+    justify-content:center;padding:0;font-family:inherit}
+  .iconbtn.ghost{background:transparent}
+  .iconbtn.active{background:var(--surface2);color:var(--fg)}
+  .iconbtn svg{width:21px;height:21px}
+
+  /* ---------- 分组列表 ---------- */
+  .ghead{display:flex;align-items:center;gap:10px;padding:8px 16px 10px;flex:0 0 auto}
+  .gtitle{font-size:20px;font-weight:700;line-height:1.2}
+  .gtitle small{font-size:11.5px;color:var(--dim);font-weight:400;margin-left:5px}
+  .ghead .iconbtn{width:40px;height:40px;border-radius:14px;margin-left:auto}
+  .search{margin:2px 16px 10px;height:46px;border-radius:14px;background:var(--surface3);
+    border:1px solid var(--line);display:flex;align-items:center;gap:9px;padding:0 8px 0 14px;
+    color:var(--dim);flex:0 0 auto}
+  .search>svg{width:18px;height:18px;flex:0 0 auto;color:var(--dim)}
+  .search .ph{flex:1;min-width:0;font-size:14px;color:var(--dim2);overflow:hidden;
+    white-space:nowrap;text-overflow:ellipsis}
+  .fbtn{width:36px;height:36px;border:0;border-radius:10px;background:var(--surface2);
+    color:#aab4c3;display:flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0}
+  .fbtn svg{width:19px;height:19px}
+  .folders{display:grid;grid-template-columns:1fr 1fr;gap:16px 12px;padding:4px 16px 96px;
+    align-content:start}
+  .folder{position:relative;border:0;border-radius:16px;overflow:visible;background:transparent;
+    padding:0;text-align:left;color:inherit;font-family:inherit;min-width:0}
+  .fc{height:118px;display:flex;align-items:center;justify-content:center;font-size:38px;
+    position:relative;overflow:hidden;line-height:1;border-radius:14px;background:var(--surface3)}
+  .fb{padding:7px 2px 0;background:transparent}
+  .fname{display:block;font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis}
+  .fsub{display:block;font-size:10.5px;color:var(--dim);margin-top:1px}
+  .gpin{position:absolute;top:8px;left:8px;width:24px;height:24px;border-radius:50%;
+    background:rgba(8,10,14,.72);border:1px solid rgba(255,255,255,.2);color:#fff;
+    display:flex;align-items:center;justify-content:center;z-index:4;
+    box-shadow:0 2px 6px rgba(0,0,0,.28)}
+  .gpin svg{width:13px;height:13px}
+  .fcheck{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;
+    border:1.5px solid rgba(255,255,255,.6);background:rgba(10,12,16,.35);color:#fff;
+    display:flex;align-items:center;justify-content:center;opacity:0;z-index:5}
+  .fcheck svg{width:14px;height:14px}
+  .folder.sel .fcheck{opacity:1;background:var(--accent);border-color:var(--accent);
+    color:var(--on-accent)}
+
+  /* 卡片 B：图下裸字（主画面） */
+  .folders.b .fc{height:128px;border:1px solid var(--line)}
+  .folders.b .folder.sel{box-shadow:0 0 0 2px var(--accent);border-radius:16px}
+  .folders.b .folder.sel .fc{border-color:transparent}
+  .folders.b .folder.fav .fc{border-color:rgba(255,93,108,.28)}
+  .folders.b .folder.fav .fsub{color:#ff8a95}
+
+  /* 卡片 A：全幅沉浸 */
+  .folders.a .folder{overflow:hidden;background:var(--surface3);border-radius:16px}
+  .folders.a .fc{height:170px;border-radius:0}
+  .folders.a .fb{position:absolute;left:0;right:0;bottom:0;z-index:2;
+    padding:26px 10px 9px;background:linear-gradient(180deg,transparent,rgba(6,8,12,.86))}
+  .folders.a .fname{color:#fff}
+  .folders.a .fsub{color:rgba(255,255,255,.72)}
+  .folders.a .folder.sel{box-shadow:inset 0 0 0 2px var(--accent)}
+  .folders.a .folder.fav .fc{background:linear-gradient(160deg,#ffe3e7,#ffd0d6);color:#ff5d6c}
+  .folders.a .folder.fav .fname{color:#fff}
+  .folders.a .folder.fav .fsub{color:rgba(255,255,255,.8)}
+
+  /* 卡片 C：玻璃胶囊 */
+  .folders.c .folder{overflow:hidden;background:var(--surface3);border-radius:16px}
+  .folders.c .fc{height:158px;border-radius:0}
+  .folders.c .fb{position:absolute;left:8px;right:8px;bottom:8px;z-index:2;
+    padding:7px 9px;border-radius:11px;background:rgba(12,15,21,.58);
+    border:1px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(12px);
+    backdrop-filter:blur(12px)}
+  .folders.c .fname{font-size:12px;color:#fff}
+  .folders.c .fsub{font-size:10px;color:rgba(255,255,255,.68)}
+  .folders.c .folder.sel{box-shadow:inset 0 0 0 2px var(--accent)}
+  .folders.c .folder.fav .fc{background:linear-gradient(160deg,#ffe3e7,#ffd0d6);color:#ff5d6c}
+
+  /* 卡片 D：紧凑一行 */
+  .folders.d{grid-template-columns:1fr;gap:8px}
+  .folders.d .folder{display:flex;align-items:center;gap:11px;padding:7px;
+    border:1px solid var(--line);border-radius:14px;background:var(--surface3);min-height:70px}
+  .folders.d .fc{width:56px;height:56px;flex:0 0 56px;border-radius:10px;font-size:26px}
+  .folders.d .fb{flex:1;min-width:0;padding:0 30px 0 0}
+  .folders.d .fname{font-size:13px}
+  .folders.d .fsub{font-size:10.5px;margin-top:2px}
+  .folders.d .gpin{top:5px;left:5px;width:20px;height:20px}
+  .folders.d .gpin svg{width:11px;height:11px}
+  .folders.d .fcheck{top:50%;right:10px;transform:translateY(-50%);width:22px;height:22px}
+  .folders.d .folder.sel{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+  .folders.d .folder.fav .fc{background:linear-gradient(160deg,#ffe3e7,#ffd0d6);color:#ff5d6c}
+  .folders.d .folder.fav .fsub{color:#ff8a95}
+
+  .fab{position:absolute;right:18px;bottom:88px;width:56px;height:56px;border-radius:18px;
+    background:var(--accent);color:var(--on-accent);display:flex;align-items:center;
+    justify-content:center;z-index:6;padding:0;border:0;box-shadow:0 10px 24px rgba(0,0,0,.45)}
+  .fab svg{width:24px;height:24px}
+  .nav{position:absolute;left:0;right:0;bottom:0;height:74px;border-top:1px solid var(--line);
+    background:var(--nav-bg);display:flex;z-index:5}
+  .nav button{flex:1;border:0;background:transparent;font-family:inherit;color:#8b93a1;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    font-size:10.5px;padding:0}
+  .nav button svg{width:22px;height:22px}
+  .nav button.on{color:var(--accent);font-weight:600}
+
+  /* ---------- 选择态 ---------- */
+  .selhead{display:flex;align-items:center;gap:10px;padding:6px 16px 10px;flex:0 0 auto}
+  .selhead .iconbtn{width:40px;height:40px;border-radius:50%;background:var(--surface2)}
+  .selcount{flex:1;text-align:center;font-size:16px;font-weight:650;color:var(--fg)}
+  .selcount b{color:var(--accent);font-weight:700}
+  .allbtn{border:0;background:transparent;color:var(--accent);font-size:13px;font-weight:650;
+    font-family:inherit;padding:6px 2px}
+  .actbar{position:absolute;left:0;right:0;bottom:0;height:74px;border-top:1px solid var(--line);
+    background:var(--nav-bg);display:flex;z-index:6}
+  .actbar button{flex:1;border:0;background:transparent;font-family:inherit;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    font-size:11px;color:#9aa3b2;padding:0}
+  .actbar button svg{width:22px;height:22px}
+  .actbar button.danger{color:var(--danger)}
+  .actbar button.dis{opacity:.4}
+
+  /* ---------- 分组详情 ---------- */
+  .dhead{display:flex;align-items:center;gap:8px;padding:4px 12px 6px 8px;flex:0 0 auto}
+  .dhead .iconbtn{width:40px;height:40px;border-radius:20px;background:transparent;color:#aab4c3}
+  .dhead .iconbtn.active{background:var(--surface2);color:var(--fg)}
+  .dtitles{flex:1;min-width:0;padding:1px 0}
+  .dname{display:flex;align-items:center;gap:7px;font-size:19px;font-weight:700;line-height:1.25}
+  .dname .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pinmini{width:19px;height:19px;border-radius:50%;background:rgba(110,168,254,.14);
+    color:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .pinmini svg{width:11px;height:11px}
+  .heartmini{width:19px;height:19px;border-radius:50%;background:rgba(255,93,108,.16);
+    color:#ff8a95;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .heartmini svg{width:11px;height:11px}
+  .dmeta{font-size:11.5px;color:var(--dim2);margin-top:3px}
+
+  .igrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:2px 12px 90px}
+  .itile{position:relative;aspect-ratio:1;border-radius:12px;overflow:hidden;
+    background:var(--surface3);display:flex;align-items:center;justify-content:center;
+    font-size:30px}
+  .itile .gif{position:absolute;left:6px;bottom:6px;font-size:9px;font-weight:800;
+    letter-spacing:.4px;padding:1px 5px;border-radius:5px;background:rgba(0,0,0,.6);color:#fff}
+  .itile .heart{position:absolute;right:6px;top:5px;color:#ff8a95;font-size:11px}
+
+  /* ---------- 右上角 ⋮ 浮动菜单 ---------- */
+  .imenu{position:absolute;top:90px;right:14px;width:196px;background:#1b2029;
+    border:1px solid var(--line2);border-radius:16px;padding:5px 0;
+    box-shadow:0 24px 54px rgba(0,0,0,.62);z-index:30;overflow:hidden}
+  .imenu button{display:block;width:100%;text-align:left;border:0;background:transparent;
+    color:var(--fg);font-family:inherit;font-size:14.5px;padding:13px 18px;line-height:1.2}
+  .imenu button:active{background:var(--surface2)}
+
+  /* ---------- 遮罩 / 底部弹层 ---------- */
+  .scrim{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:20}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--sheet);
+    border-radius:22px 22px 0 0;z-index:21;padding:0 16px 18px;
+    box-shadow:0 -20px 40px rgba(0,0,0,.45);overflow:hidden}
+  .grabwrap{display:flex;justify-content:center;padding:8px 0 2px}
+  .grab{width:38px;height:4px;border-radius:2px;background:var(--line2)}
+  .csheet{height:256px;display:flex;flex-direction:column}
+  .csheet .stitle{font-size:17px;font-weight:700;padding:8px 2px 6px;line-height:1.45}
+  .csheet .cbody{font-size:13px;color:var(--dim);line-height:1.7;padding:0 2px}
+  .csheet .sbtnrow{margin-top:auto}
+  .sbtnrow{display:flex;gap:10px;margin-top:14px}
+  .sbtn{flex:1;height:46px;border-radius:14px;border:1px solid var(--line2);
+    background:var(--surface2);color:var(--fg);font:inherit;font-size:14.5px;font-weight:600;
+    display:flex;align-items:center;justify-content:center}
+  .sbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .sbtn.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+
+  /* ---------- 卡片实验区 ---------- */
+  .lab{display:grid;grid-template-columns:repeat(2,390px);gap:26px 48px;
+    justify-content:center;margin-bottom:36px}
+  .labitem{width:390px}
+  .labtag{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px;font-weight:650}
+  .labtag .k{width:22px;height:22px;border-radius:50%;background:var(--surface2);
+    border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;color:var(--dim);flex:0 0 auto}
+  .labtag .rec{font-size:10px;font-weight:700;color:var(--on-accent);background:var(--accent);
+    border-radius:999px;padding:2px 7px;letter-spacing:.2px}
+  .labphone{width:390px;height:548px;border-radius:34px;background:var(--bg);position:relative;
+    overflow:hidden;border:1px solid #262b33;box-shadow:0 24px 50px rgba(0,0,0,.5);
+    display:flex;flex-direction:column}
+  .labphone .status{height:40px}
+  .labphone .screen{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+  .labphone .ghead{padding:4px 16px 8px}
+  .labphone .gtitle{font-size:18px}
+  .labphone .search{margin:0 16px 8px;height:42px}
+  .labphone .folders{padding:4px 16px 16px;gap:14px 12px}
+  .labphone .folders.d{gap:8px}
+  .labcap{color:var(--dim);font-size:12px;line-height:1.7;margin-top:10px}
+  .labcap b{color:var(--fg)}
+
+  /* ---------- 拖拽构思 ---------- */
+  .dragrow{display:flex;justify-content:center;gap:28px;align-items:flex-start;margin-bottom:24px}
+  .dragpanel{width:720px;background:#101318;border:1px solid var(--line);border-radius:14px;
+    padding:16px 20px;color:var(--dim);font-size:12.5px;line-height:1.75}
+  .dragpanel h2{font-size:17px;color:var(--fg);margin:0 0 6px}
+  .dragpanel .lead{color:var(--dim);font-size:13px;margin:0 0 10px}
+  .dsec{padding:9px 0;border-top:1px solid var(--line)}
+  .dsec:first-of-type{border-top:0}
+  .dsec>b{display:block;color:var(--fg);font-size:13px;margin-bottom:3px}
+  .dsec p{margin:0}
+  .dsec ul{margin:4px 0 0;padding-left:17px}
+  .dsec li{margin:3px 0}
+  .dsec.bad b{color:#ff9a86}
+  .dsec.good b{color:#8bd5a8}
+  .sectlbl{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:11.5px;
+    color:var(--dim);padding:2px 2px 0;line-height:1.2}
+  .sectlbl b{color:var(--fg);font-weight:600}
+  .sectlbl .tag{font-size:10px;color:var(--dim2);border:1px solid var(--line);
+    border-radius:999px;padding:1px 7px}
+  .dropzone{grid-column:1/-1;height:184px;border:1.5px dashed rgba(110,168,254,.75);
+    border-radius:16px;background:rgba(110,168,254,.06);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:7px;position:relative}
+  .dropzone .hint{font-size:11px;font-weight:600;color:var(--accent)}
+  .dragclone{width:173px;height:162px;transform:scale(1.02);opacity:.97;
+    box-shadow:0 22px 40px rgba(0,0,0,.62);border-radius:16px}
+  .dragclone .fc{height:128px}
+  .dragclone .fb{padding:7px 2px 0}
+
+  .foot{color:var(--dim2);font-size:11.5px;margin-top:12px}
+</style>
+</head>
+<body>
+
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-checksq" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></symbol>
+  <symbol id="i-pinoff" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/><path d="M4 4l16 16"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-folderminus" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/><path d="M9 13h6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.7-7.5 1.1-1.1a5.5 5.5 0 0 0 0-7.8Z"/></symbol>
+</svg>
+
+<div class="canvas">
+  <div class="head">
+    <h1>移动端 v14 · 分组页</h1>
+    <p>4 版卡片 / pin 左上 / ⋮ 贴近三点 / 收藏夹特殊详情 / 两区拖拽 · 390×844 · 深色主题</p>
+  </div>
+
+  <div class="note">
+    <b>现状</b>：图库的原地多选、添加到、筛选复用已经落地（32d60ba）；分组页仍是旧交互。上一轮 v13 已给整体方向，这一轮按你的反馈改。<br>
+    <b>本轮</b>：<b class="hl">只出 v14 设计稿</b>，不改 mobile.js / mobile.css / Rust；排序和并入的两个弹层沿用 v13 第⑥⑦屏，这里不重复。重点看：4 版卡片、pin 与勾的位置、⋮ 贴近三个点、收藏夹特殊详情、两区拖拽。<br>
+    <b>已落实的反馈</b>：右上多选保留；删组 = 图进回收站、可恢复；置顶组之间可拖但永远在未置顶之前；收藏夹不参加其他操作、只留换封面；选到 0 个自动退出；菜单上移；pin 全部移到左上；卡片重做。
+  </div>
+
+  <!-- ================= 卡片实验区 ================= -->
+  <div class="lab">
+
+    <div class="labitem">
+      <div class="labtag"><span class="k">A</span>全幅沉浸</div>
+      <div class="labphone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="ghead"><div class="gtitle">分组 <small>7 个</small></div><button class="iconbtn"><svg class="ic"><use href="#i-checksq"/></svg></button></div>
+          <div class="search"><svg class="ic"><use href="#i-search"/></svg><span class="ph">搜索分组</span></div>
+          <div class="folders a">
+            <button class="folder fav"><div class="fc">♥</div><div class="fb"><span class="fname">收藏夹</span><span class="fsub">12 张 · 特殊分组</span></div></button>
+            <button class="folder pinned sel"><div class="fc" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span><span class="fcheck"><svg class="ic"><use href="#i-check"/></svg></span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">36 张</span></div></button>
+            <button class="folder pinned"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">12 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠</div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">9 张</span></div></button>
+          </div>
+        </div>
+      </div>
+      <div class="labcap"><b>A</b>：封面铺满整卡，名字/张数压在底部渐变上。最像相册；但底部仍有一层渐变，如果你说的「被挡住」指的就是这块，A 不一定解决。</div>
+    </div>
+
+    <div class="labitem">
+      <div class="labtag"><span class="k">B</span>图下裸字 <span class="rec">推荐 · 主画面用这版</span></div>
+      <div class="labphone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="ghead"><div class="gtitle">分组 <small>7 个</small></div><button class="iconbtn"><svg class="ic"><use href="#i-checksq"/></svg></button></div>
+          <div class="search"><svg class="ic"><use href="#i-search"/></svg><span class="ph">搜索分组</span></div>
+          <div class="folders b">
+            <button class="folder fav"><div class="fc">♥</div><div class="fb"><span class="fname">收藏夹</span><span class="fsub">12 张 · 特殊分组</span></div></button>
+            <button class="folder pinned sel"><div class="fc" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span><span class="fcheck"><svg class="ic"><use href="#i-check"/></svg></span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">36 张</span></div></button>
+            <button class="folder pinned"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">12 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠</div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">9 张</span></div></button>
+          </div>
+        </div>
+      </div>
+      <div class="labcap"><b>B</b>：封面 128、下面直接落字，没有第二层底板。整卡无边框，最轻；选中靠 2px 外描边 + 右上勾。</div>
+    </div>
+
+    <div class="labitem">
+      <div class="labtag"><span class="k">C</span>玻璃胶囊</div>
+      <div class="labphone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="ghead"><div class="gtitle">分组 <small>7 个</small></div><button class="iconbtn"><svg class="ic"><use href="#i-checksq"/></svg></button></div>
+          <div class="search"><svg class="ic"><use href="#i-search"/></svg><span class="ph">搜索分组</span></div>
+          <div class="folders c">
+            <button class="folder fav"><div class="fc">♥</div><div class="fb"><span class="fname">收藏夹</span><span class="fsub">12 张 · 特殊分组</span></div></button>
+            <button class="folder pinned sel"><div class="fc" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span><span class="fcheck"><svg class="ic"><use href="#i-check"/></svg></span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">36 张</span></div></button>
+            <button class="folder pinned"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">12 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠</div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">9 张</span></div></button>
+          </div>
+        </div>
+      </div>
+      <div class="labcap"><b>C</b>：图片一直延伸到文字后面，底部只放一颗半透明玻璃胶囊托字。层次最好；<code>backdrop-filter</code> 在低端安卓上要实测帧率。</div>
+    </div>
+
+    <div class="labitem">
+      <div class="labtag"><span class="k">D</span>紧凑一行</div>
+      <div class="labphone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="ghead"><div class="gtitle">分组 <small>7 个</small></div><button class="iconbtn"><svg class="ic"><use href="#i-checksq"/></svg></button></div>
+          <div class="search"><svg class="ic"><use href="#i-search"/></svg><span class="ph">搜索分组</span></div>
+          <div class="folders d">
+            <button class="folder fav"><div class="fc">♥</div><div class="fb"><span class="fname">收藏夹</span><span class="fsub">12 张 · 特殊分组</span></div></button>
+            <button class="folder pinned sel"><div class="fc">🐱<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">36 张</span></div><span class="fcheck"><svg class="ic"><use href="#i-check"/></svg></span></button>
+            <button class="folder pinned"><div class="fc">🐟<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">12 张</span></div></button>
+            <button class="folder"><div class="fc">🐠</div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">9 张</span></div></button>
+          </div>
+        </div>
+      </div>
+      <div class="labcap"><b>D</b>：一行一张，56 缩略图 + 右侧信息；最轻、一屏放最多。但列表不再是双列相册，和「图库」的心智差最远。</div>
+    </div>
+
+  </div>
+
+  <!-- ================= 行 1 ================= -->
+  <div class="row">
+
+    <!-- ① 常态 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="ghead">
+            <div class="gtitle">分组 <small>7 个</small></div>
+            <button class="iconbtn" title="多选"><svg class="ic"><use href="#i-checksq"/></svg></button>
+          </div>
+          <div class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <span class="ph">搜索分组</span>
+          </div>
+          <div class="folders b">
+            <button class="folder fav"><div class="fc">♥</div><div class="fb"><span class="fname">收藏夹</span><span class="fsub">12 张 · 特殊分组</span></div></button>
+            <button class="folder pinned"><div class="fc" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">36 张</span></div></button>
+            <button class="folder pinned"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">12 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠</div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">9 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#2a3a58,#43567e)">😂</div><div class="fb"><span class="fname">表情包</span><span class="fsub">48 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#2d4a2e,#4a6b3a)">🌿</div><div class="fb"><span class="fname">壁纸</span><span class="fsub">21 张</span></div></button>
+          </div>
+        </div>
+        <button class="fab" aria-label="新建分组"><svg class="ic"><use href="#i-plus"/></svg></button>
+        <div class="nav">
+          <button><svg class="ic"><use href="#i-image"/></svg>图库</button>
+          <button class="on"><svg class="ic"><use href="#i-folder"/></svg>分组</button>
+          <button><svg class="ic"><use href="#i-trash"/></svg>回收站</button>
+          <button><svg class="ic"><use href="#i-user"/></svg>我的</button>
+        </div>
+      </div>
+      <div class="cap"><b>① 常态（卡片 B）</b>：封面下直接落字，没有第二层底板；置顶只留左上角黑色 pin，不再给整卡加蓝底/蓝边；收藏夹保留粉心 + 特殊分组；FAB 同图库（56×56、r18、右 18 / 底 88），点开现有「新建分组」输入弹层。列表可滚动，图上先露三行；0 个分组时中间一行提示「还没有分组，点右下 + 新建」，不再放末尾卡。</div>
+    </div>
+
+    <!-- ② 多选 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="selhead">
+            <button class="iconbtn"><svg class="ic"><use href="#i-x"/></svg></button>
+            <div class="selcount">已选 <b>2</b> 个</div>
+            <button class="allbtn">全选</button>
+          </div>
+          <div class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <span class="ph">搜索分组</span>
+          </div>
+          <div class="folders b">
+            <button class="folder pinned sel"><div class="fc" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span><span class="fcheck"><svg class="ic"><use href="#i-check"/></svg></span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">36 张</span></div></button>
+            <button class="folder pinned"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">12 张</span></div></button>
+            <button class="folder sel"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠<span class="fcheck"><svg class="ic"><use href="#i-check"/></svg></span></div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">9 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#2a3a58,#43567e)">😂</div><div class="fb"><span class="fname">表情包</span><span class="fsub">48 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#2d4a2e,#4a6b3a)">🌿</div><div class="fb"><span class="fname">壁纸</span><span class="fsub">21 张</span></div></button>
+          </div>
+        </div>
+        <div class="actbar">
+          <button><svg class="ic"><use href="#i-folderminus"/></svg>解散分组</button>
+          <button class="danger"><svg class="ic"><use href="#i-trash"/></svg>删除分组</button>
+          <button><svg class="ic"><use href="#i-pin"/></svg>置顶</button>
+          <button><svg class="ic"><use href="#i-pinoff"/></svg>取消置顶</button>
+        </div>
+      </div>
+      <div class="cap"><b>② 多选</b>：勾在右上、pin 在左上，互不遮挡；收藏夹直接隐藏；底栏四键照旧。取消最后一个 → <b>自动退出选择态</b>（按你的选择，不再保持 0 个）。置顶 / 取消置顶按选中项状态置灰；混合选择时两个都可点。</div>
+    </div>
+
+    <!-- ③ 删除确认 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="selhead">
+            <button class="iconbtn"><svg class="ic"><use href="#i-x"/></svg></button>
+            <div class="selcount">已选 <b>2</b> 个</div>
+            <button class="allbtn">全选</button>
+          </div>
+          <div class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <span class="ph">搜索分组</span>
+          </div>
+          <div class="folders b">
+            <button class="folder pinned sel"><div class="fc" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span><span class="fcheck"><svg class="ic"><use href="#i-check"/></svg></span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">36 张</span></div></button>
+            <button class="folder pinned"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">12 张</span></div></button>
+            <button class="folder sel"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠<span class="fcheck"><svg class="ic"><use href="#i-check"/></svg></span></div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">9 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#2a3a58,#43567e)">😂</div><div class="fb"><span class="fname">表情包</span><span class="fsub">48 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#2d4a2e,#4a6b3a)">🌿</div><div class="fb"><span class="fname">壁纸</span><span class="fsub">21 张</span></div></button>
+          </div>
+          <div class="scrim"></div>
+          <div class="sheet csheet">
+            <div class="grabwrap"><div class="grab"></div></div>
+            <div class="stitle">删除 2 个分组及组内 45 张图？</div>
+            <div class="cbody">分组会被移除，45 张图先放进回收站，可在回收站恢复；超过保留天数后才会真正清理。</div>
+            <div class="sbtnrow"><button class="sbtn">取消</button><button class="sbtn danger">删除</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><b>③ 删除确认</b>：删组 = 解散 + 图进回收站，必须把张数写出来。解散共用这套弹层，只换文案和主按钮（蓝「解散分组」）：<br><span style="color:var(--dim2)">「解散 2 个分组？只移除分组，45 张图回到未分组，不会被删除。」</span></div>
+    </div>
+
+  </div>
+
+  <!-- ================= 行 2 ================= -->
+  <div class="row">
+
+    <!-- ④ 详情 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="dhead">
+            <button class="iconbtn"><svg class="ic"><use href="#i-back"/></svg></button>
+            <div class="dtitles">
+              <div class="dname"><span class="t">猫猫</span><span class="pinmini"><svg class="ic"><use href="#i-pin"/></svg></span></div>
+              <div class="dmeta">36 张 · 9.2 MB</div>
+            </div>
+            <button class="iconbtn"><svg class="ic"><use href="#i-more"/></svg></button>
+          </div>
+          <div class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <span class="ph">搜组内图片</span>
+            <button class="fbtn"><svg class="ic"><use href="#i-sliders"/></svg></button>
+          </div>
+          <div class="igrid">
+            <div class="itile" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="heart">♥</span></div>
+            <div class="itile" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟</div>
+            <div class="itile" style="background:linear-gradient(150deg,#2a3a58,#43567e)">😂<span class="gif">GIF</span></div>
+            <div class="itile" style="background:linear-gradient(150deg,#2d4a2e,#4a6b3a)">🌿</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a3a52,#7a4a6e)">🐰<span class="heart">♥</span></div>
+            <div class="itile" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a3a36,#8a5a44)">🍥</div>
+            <div class="itile" style="background:linear-gradient(150deg,#2c3440,#4a5565)">🐼</div>
+            <div class="itile" style="background:linear-gradient(150deg,#24324e,#3e5275)">🌙</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a2a3a,#8a4458)">🍓</div>
+            <div class="itile" style="background:linear-gradient(150deg,#1f3a4a,#2f5a6a)">🐧</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a3450,#8a4a70)">🎀</div>
+          </div>
+        </div>
+        <div class="nav">
+          <button><svg class="ic"><use href="#i-image"/></svg>图库</button>
+          <button class="on"><svg class="ic"><use href="#i-folder"/></svg>分组</button>
+          <button><svg class="ic"><use href="#i-trash"/></svg>回收站</button>
+          <button><svg class="ic"><use href="#i-user"/></svg>我的</button>
+        </div>
+      </div>
+      <div class="cap"><b>④ 详情</b>：返回 / 组名 + 置顶小标 /「36 张 · 9.2 MB」/ ⋮；第二行组内搜索 + 筛选（复用图库筛选面板，scope = 本组）；3 列图点进预览。这里不放 FAB——加图走图库多选「添加到」。</div>
+    </div>
+
+    <!-- ⑤ ⋮ 菜单 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="dhead">
+            <button class="iconbtn"><svg class="ic"><use href="#i-back"/></svg></button>
+            <div class="dtitles">
+              <div class="dname"><span class="t">猫猫</span><span class="pinmini"><svg class="ic"><use href="#i-pin"/></svg></span></div>
+              <div class="dmeta">36 张 · 9.2 MB</div>
+            </div>
+            <button class="iconbtn active"><svg class="ic"><use href="#i-more"/></svg></button>
+          </div>
+          <div class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <span class="ph">搜组内图片</span>
+            <button class="fbtn"><svg class="ic"><use href="#i-sliders"/></svg></button>
+          </div>
+          <div class="igrid">
+            <div class="itile" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="heart">♥</span></div>
+            <div class="itile" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟</div>
+            <div class="itile" style="background:linear-gradient(150deg,#2a3a58,#43567e)">😂<span class="gif">GIF</span></div>
+            <div class="itile" style="background:linear-gradient(150deg,#2d4a2e,#4a6b3a)">🌿</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a3a52,#7a4a6e)">🐰<span class="heart">♥</span></div>
+            <div class="itile" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a3a36,#8a5a44)">🍥</div>
+            <div class="itile" style="background:linear-gradient(150deg,#2c3440,#4a5565)">🐼</div>
+            <div class="itile" style="background:linear-gradient(150deg,#24324e,#3e5275)">🌙</div>
+          </div>
+        </div>
+        <div class="imenu">
+          <button>更换封面</button>
+          <button>排序</button>
+          <button>并入其他分组</button>
+          <button>重命名</button>
+        </div>
+        <div class="nav">
+          <button><svg class="ic"><use href="#i-image"/></svg>图库</button>
+          <button class="on"><svg class="ic"><use href="#i-folder"/></svg>分组</button>
+          <button><svg class="ic"><use href="#i-trash"/></svg>回收站</button>
+          <button><svg class="ic"><use href="#i-user"/></svg>我的</button>
+        </div>
+      </div>
+      <div class="cap"><b>⑤ ⋮ 浮动菜单</b>：v13 的 top 是 100，这版 <b>90</b>，离 ⋮ 下沿约 2px；四行纯文字，点空白 / 返回关闭。排序项以后可以在右侧带当前值（如「最新」），这版先留纯文字。<br><span style="color:var(--dim2)">排序 / 并入的具体弹层与 v13 第⑥⑦屏相同，这版不重复。</span></div>
+    </div>
+
+    <!-- ⑥ 收藏夹详情 -->
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="dhead">
+            <button class="iconbtn"><svg class="ic"><use href="#i-back"/></svg></button>
+            <div class="dtitles">
+              <div class="dname"><span class="t">收藏夹</span><span class="heartmini"><svg class="ic fill"><use href="#i-heart"/></svg></span></div>
+              <div class="dmeta">12 张 · 3.1 MB</div>
+            </div>
+            <button class="iconbtn active"><svg class="ic"><use href="#i-more"/></svg></button>
+          </div>
+          <div class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <span class="ph">搜收藏夹</span>
+            <button class="fbtn"><svg class="ic"><use href="#i-sliders"/></svg></button>
+          </div>
+          <div class="igrid">
+            <div class="itile" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟</div>
+            <div class="itile" style="background:linear-gradient(150deg,#2a3a58,#43567e)">😂</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a3a52,#7a4a6e)">🐰</div>
+            <div class="itile" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a2a3a,#8a4458)">🍓</div>
+            <div class="itile" style="background:linear-gradient(150deg,#24324e,#3e5275)">🌙</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a3450,#8a4a70)">🎀</div>
+            <div class="itile" style="background:linear-gradient(150deg,#2c3440,#4a5565)">🐼</div>
+            <div class="itile" style="background:linear-gradient(150deg,#5a3a36,#8a5a44)">🍥</div>
+            <div class="itile" style="background:linear-gradient(150deg,#2a3a4a,#4a5a6a)">☁️</div>
+            <div class="itile" style="background:linear-gradient(150deg,#34304a,#544a6a)">💤</div>
+          </div>
+        </div>
+        <div class="imenu">
+          <button>更换封面</button>
+        </div>
+        <div class="nav">
+          <button><svg class="ic"><use href="#i-image"/></svg>图库</button>
+          <button class="on"><svg class="ic"><use href="#i-folder"/></svg>分组</button>
+          <button><svg class="ic"><use href="#i-trash"/></svg>回收站</button>
+          <button><svg class="ic"><use href="#i-user"/></svg>我的</button>
+        </div>
+      </div>
+      <div class="cap"><b>⑥ 收藏夹 · 特殊详情</b>：只有「更换封面」，没有多选 / 解散 / 删除 / 置顶 / 改名 / 并入；长按不进多选；搜索/筛选只用于看图，不是分组操作。点收藏夹卡进这里（现在是跳图库收藏筛选，v14 改成特殊详情，好放封面入口）。<br><span style="color:#ff9a86">后端注意：<code>set_group_cover</code> 目前只认 known_groups，收藏夹是 starred 虚拟分组，当前设不了封面。要支持，得加 <code>starred_cover</code> 字段或特判保留名；这是本设计唯一要动后端的点。</span></div>
+    </div>
+
+  </div>
+
+  <!-- ================= 行 3：拖拽 ================= -->
+  <div class="dragrow">
+    <div class="item">
+      <div class="phone">
+        <div class="status"><span>15:26</span><span class="sbr">5G<span class="batt"></span></span></div>
+        <div class="screen">
+          <div class="ghead">
+            <div class="gtitle">分组 <small>7 个</small></div>
+            <button class="iconbtn" title="多选"><svg class="ic"><use href="#i-checksq"/></svg></button>
+          </div>
+          <div class="search">
+            <svg class="ic"><use href="#i-search"/></svg>
+            <span class="ph">搜索分组</span>
+          </div>
+          <div class="folders b drag">
+            <div class="sectlbl"><b>置顶</b><span class="tag">2 个</span><span>只和置顶换位</span></div>
+            <button class="folder pinned"><div class="fc" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">36 张</span></div></button>
+            <button class="folder pinned"><div class="fc" style="background:linear-gradient(150deg,#5c4326,#8a6b3a)">🐟<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">摸鱼</span><span class="fsub">12 张</span></div></button>
+            <div class="dropzone">
+              <div class="folder pinned dragclone"><div class="fc" style="background:linear-gradient(150deg,#3b2a52,#6b4a86)">🐱<span class="gpin"><svg class="ic"><use href="#i-pin"/></svg></span></div><div class="fb"><span class="fname">猫猫</span><span class="fsub">36 张</span></div></div>
+              <span class="hint">拖动中 · 松手放到置顶区末尾</span>
+            </div>
+            <div class="sectlbl"><b>其他分组</b><span class="tag">5 个</span><span>只和非置顶换位</span></div>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#1f4a3f,#2f7a63)">🐠</div><div class="fb"><span class="fname">蓝色大肥鱼</span><span class="fsub">9 张</span></div></button>
+            <button class="folder"><div class="fc" style="background:linear-gradient(150deg,#2a3a58,#43567e)">😂</div><div class="fb"><span class="fname">表情包</span><span class="fsub">48 张</span></div></button>
+          </div>
+        </div>
+        <div class="nav">
+          <button><svg class="ic"><use href="#i-image"/></svg>图库</button>
+          <button class="on"><svg class="ic"><use href="#i-folder"/></svg>分组</button>
+          <button><svg class="ic"><use href="#i-trash"/></svg>回收站</button>
+          <button><svg class="ic"><use href="#i-user"/></svg>我的</button>
+        </div>
+      </div>
+      <div class="cap"><b>⑦ 拖拽排序 · 构思</b>：置顶区只和置顶换位，未置顶区只和未置顶换位；置顶永远在前。跨区拖到边界自动夹紧，不改变置顶状态。收藏夹固定最上、不参与，图里省略。松手保存；点击/原地松手仍进多选。</div>
+    </div>
+
+    <div class="dragpanel">
+      <h2>两区规则与落地方案</h2>
+      <p class="lead">先把「置顶顺序」和「分组顺序」分开存，拖拽就不会互相踩。</p>
+
+      <div class="dsec">
+        <b>① 置顶区内拖</b>
+        <p>只换置顶顺序 → <code>set_pinned_groups(newPinnedOrder)</code>。置顶组之间的顺序就是 <code>S.pinned</code> 数组顺序，<code>group_order</code> 不动。</p>
+      </div>
+
+      <div class="dsec">
+        <b>② 未置顶区内拖</b>
+        <p>只换未置顶顺序 → <code>set_group_order([...newPinnedOrder, ...newUnpinnedOrder])</code>。core 会把没提到的组补在后面，所以这里必须传完整顺序。</p>
+      </div>
+
+      <div class="dsec">
+        <b>③ 跨区与收藏夹</b>
+        <p>拖到分区边界就夹紧，不改变置顶状态；要置顶/取消置顶仍然走多选底栏。收藏夹固定最上，不参与拖拽，也不在多选里。</p>
+      </div>
+
+      <div class="dsec bad">
+        <b>为什么现在拖了没效果</b>
+        <ul>
+          <li><code>.folder</code> 没有 <code>touch-action:none</code>，长按后一拖，浏览器先判定为滚动 → <code>pointercancel</code>；<code>pointermove</code> 里的 <code>preventDefault()</code> 拦不住原生滚动（mobile.js:1450-1460）。</li>
+          <li>落点用 <code>S.groupList</code> 的顺序算（mobile.js:912），但渲染按 pinned-first 重排（mobile.js:334-348），落点会跳。</li>
+          <li><code>renderFolders()</code> 每移动一次就重建 DOM（mobile.js:918），<code>setPointerCapture</code> 丢，拖动中断。</li>
+          <li><code>pointercancel</code> 只 <code>clearTimeout + resetHold</code>（mobile.js:1465），不清 <code>dragCtx</code>/ghost，卡片残留。</li>
+        </ul>
+      </div>
+
+      <div class="dsec good">
+        <b>修法</b>
+        <ul>
+          <li>拖动期间给 <code>#folders</code> 加 <code>touch-action:none; overscroll-behavior:contain</code>，或非 passive <code>touchmove</code> 在 armed 后 <code>preventDefault()</code>。</li>
+          <li>用一份 <code>renderedOrder</code>（pinned-first）算落点，不要用 <code>S.groupList</code>。</li>
+          <li>FLIP 只改 <code>transform</code>，不重建 DOM；松手再 <code>set_group_order</code> / <code>set_pinned_groups</code>。</li>
+          <li><code>pointercancel</code> 走 <code>endFolderDrag()</code>，清 ghost、恢复滚动。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= 底部说明 ================= -->
+  <div class="note">
+    <b>实现拆批（点头后一批一批做）</b>
+    <ol>
+      <li>分组列表：卡片 B + FAB + 多选四键 + 删除确认（不动后端）；</li>
+      <li>分组详情：头部 / ⋮ / 组内搜索筛选 / 排序 / 并入；</li>
+      <li>收藏夹详情 + 更换封面（需要后端加 <code>starred_cover</code>，见下）；</li>
+      <li>拖拽：两区排序 + 修 pointercancel / 落点 / DOM 重建。</li>
+    </ol>
+    <b>两个要你拍板的点</b>
+    <ul>
+      <li>卡片选 <b>A / B / C / D</b>；我推荐 <b>B</b>，主画面先用 B，选别的只换卡片 CSS，不动逻辑。</li>
+      <li>收藏夹换封面要动一小块后端：现在 <code>set_group_cover</code> 只认 known_groups，收藏夹是 starred 虚拟分组。建议加 <code>starred_cover</code> 字段（或特判保留名）；你同意吗？不想动后端的话，这一项先不做。</li>
+    </ul>
+    <b>另外两个实现注意</b>
+    <ul>
+      <li>头部「多少大小」：<code>group_list</code> 目前只回 count，没有 bytes；组内图 &gt;500 时 <code>list_assets</code> 也会截断。建议 <code>group_list</code> 直接补 bytes（收藏夹补 <code>starred_bytes</code>）。</li>
+      <li>删除文案不要写死「7 天」：回收站保留天数可设 7/30/90，统一说「可在回收站恢复，超过保留天数后清理」。</li>
+    </ul>
+  </div>
+
+  <div class="tagline">v14 · 只改设计稿，不改实现 · 卡片先选 A/B/C/D</div>
+</div>
+
+</body>
+</html>

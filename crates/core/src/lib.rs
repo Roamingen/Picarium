@@ -259,8 +259,11 @@ impl Library {
             }
             group_order = ordered;
         }
-        // 封面只保留「图还在、而且确实在这个组里」的记录
+        // 封面只保留「图还在、而且确实在这个组里」的记录；收藏夹是虚拟分组，单独保留
         group_covers.retain(|group, sha| {
+            if group == "__star__" {
+                return assets.iter().any(|a| &a.sha == sha && a.starred);
+            }
             known_groups.iter().any(|g| g == group)
                 && assets
                     .iter()
@@ -1004,6 +1007,31 @@ impl Library {
                     return Err(anyhow::anyhow!("封面必须是这个分组里的图"));
                 }
                 self.group_covers.insert(name.to_string(), sha.to_string());
+            }
+        }
+        self.save()
+    }
+
+    /// 收藏夹（虚拟分组）的封面；存在 group_covers 的保留键里。
+    pub fn starred_cover(&self) -> Option<&str> {
+        self.group_covers.get("__star__").map(|s| s.as_str())
+    }
+
+    pub fn set_starred_cover(&mut self, sha: Option<&str>) -> Result<()> {
+        match sha {
+            None => {
+                self.group_covers.remove("__star__");
+            }
+            Some(sha) => {
+                let ok = self
+                    .assets
+                    .iter()
+                    .any(|a| a.sha == sha && a.starred);
+                if !ok {
+                    return Err(anyhow::anyhow!("封面必须是收藏里的图"));
+                }
+                self.group_covers
+                    .insert("__star__".to_string(), sha.to_string());
             }
         }
         self.save()

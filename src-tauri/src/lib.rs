@@ -59,6 +59,7 @@ pub fn run() {
             commands::get_settings,
             commands::group_list,
             commands::set_group_cover,
+            commands::set_starred_cover,
         commands::add_to_group,
         commands::batch_ungroup,
         commands::clear_groups,

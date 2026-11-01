@@ -392,11 +392,18 @@ pub fn group_stats(state: State<'_, AppState>) -> Result<serde_json::Value, Stri
         .into_iter()
         .map(|(name, count)| serde_json::json!({ "name": name, "count": count }))
         .collect();
+    let starred_bytes: u64 = lib
+        .assets()
+        .iter()
+        .filter(|a| a.starred)
+        .map(|a| a.bytes)
+        .sum();
     Ok(serde_json::json!({
         "groups": groups,
         "ungrouped": lib.ungrouped_count(),
         "ungroupedNew": lib.ungrouped_new(),
         "starred": lib.starred_count(),
+        "starred_bytes": starred_bytes,
         "recent": lib.recent_count(),
         "total": lib.assets().len(),
     }))
@@ -507,6 +514,12 @@ pub fn trash_list(
 pub fn group_list(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let lib = state.lib.lock().map_err(|e| e.to_string())?;
     let stats: std::collections::BTreeMap<String, usize> = lib.group_stats().into_iter().collect();
+    let mut bytes: std::collections::BTreeMap<String, u64> = Default::default();
+    for a in lib.assets() {
+        for g in &a.groups {
+            *bytes.entry(g.clone()).or_default() += a.bytes;
+        }
+    }
     let pinned = lib.pinned_groups().to_vec();
     let groups: Vec<serde_json::Value> = lib
         .group_order()
@@ -521,13 +534,26 @@ pub fn group_list(state: State<'_, AppState>) -> Result<serde_json::Value, Strin
             serde_json::json!({
                 "name": name,
                 "count": stats.get(name).copied().unwrap_or(0),
+                "bytes": bytes.get(name).copied().unwrap_or(0),
                 "cover": cover,
                 "animated": animated,
                 "pinned": pinned.iter().any(|p| p == name),
             })
         })
         .collect();
-    Ok(serde_json::json!({ "groups": groups, "pinned": pinned }))
+    let starred_cover = lib.starred_cover().map(|s| s.to_string());
+    let starred_bytes: u64 = lib
+        .assets()
+        .iter()
+        .filter(|a| a.starred)
+        .map(|a| a.bytes)
+        .sum();
+    Ok(serde_json::json!({
+        "groups": groups,
+        "pinned": pinned,
+        "starred_cover": starred_cover,
+        "starred_bytes": starred_bytes,
+    }))
 }
 
 #[tauri::command]
@@ -538,6 +564,16 @@ pub fn set_group_cover(
 ) -> Result<(), String> {
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     lib.set_group_cover(&group, sha.as_deref())
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn set_starred_cover(
+    state: State<'_, AppState>,
+    sha: Option<String>,
+) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_starred_cover(sha.as_deref())
         .map_err(|e| format!("{e:#}"))
 }
 
