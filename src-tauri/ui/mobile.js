@@ -407,7 +407,7 @@ function renderFolders(keepScroll) {
     ? ""
     : `<div class="empty">${q ? "没有匹配的分组。" : "还没有分组。点右下角「+」新建一个。"}</div>`;
   folderBox.innerHTML =
-    (!selMode && !q ? favCard(starred, false) : "") +
+    (!q ? favCard(starred, false) : "") +
     list.map((g) => folderCard(g)).join("") +
     empty;
   if (crossDrag) {
@@ -2756,7 +2756,8 @@ function wire() {
     if (!f) return;
     if (suppressClick) { suppressClick = false; return; }
     if (f.dataset.fav) {
-      if (selMode) { toast("收藏夹不能加入分组"); return; }
+      // 多选时收藏夹只占位、不参选（CSS 也把它设成 pointer-events: none）
+      if (selMode) return;
       openGroup(FAV_NAME);
       return;
     }

@@ -1162,6 +1162,9 @@ body.select main.grid { padding-bottom: calc(96px + var(--safe-bottom)); }
 .gselhead { padding-top: calc(6px + var(--safe-top)); }
 body.gselect #nav,
 body.gselect .fab { display: none !important; }
+/* 收藏夹在多选里只占位（保持网格不重排），不参选、也不显示勾选圈 */
+body.gselect .folder.fav { opacity: .5; pointer-events: none; }
+body.gselect .folder.fav .fcheck { display: none; }
 
 /* 搜索框一键清空 */
 .clr {
