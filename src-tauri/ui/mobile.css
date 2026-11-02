@@ -875,7 +875,16 @@ body { overflow-x: hidden; overflow-y: auto; }
   display: flex; flex-direction: column;
   padding: calc(4px + var(--safe-top)) 0 calc(10px + var(--safe-bottom));
 }
-.vtop { display: flex; align-items: center; gap: 10px; padding: 4px 16px 2px; }
+.vtop { display: flex; align-items: center; gap: 10px; padding: 4px 16px 2px; position: relative; }
+/* 分组详情里的「移出分组 / 取消移出」：放顶栏右侧，底栏已经 5 个键太挤 */
+.vtab {
+  position: absolute; right: 56px; top: 50%; transform: translateY(-50%);
+  height: 30px; padding: 0 12px; border: 0; border-radius: 15px;
+  background: var(--surface2); color: var(--panel-fg);
+  font: inherit; font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+.vtab:active { transform: translateY(-50%) scale(.96); }
+.vtab.undo { background: rgba(110, 168, 254, .14); color: var(--accent); }
 .vround {
   width: 36px; height: 36px; border-radius: 50%; border: 0;
   background: transparent; color: var(--fg);

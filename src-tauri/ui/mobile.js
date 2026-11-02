@@ -449,6 +449,20 @@ function gdParam(name) {
   return name === FAV_NAME ? "__star__" : name;
 }
 
+// 重新加入分组 / 收藏夹时排到最前：等同于这张图的「入组时间」变成最新。
+// 分组详情默认走手动顺序（orders），所以这里直接把 key 的顺序改成「这张 + 其余原顺序」。
+async function bumpGroupFront(name, sha) {
+  try {
+    const key = gdParam(name);
+    const res = await invokeRetry("list_assets", { q: "", group: key, limit: 2000, sort: "manual", filters: "" });
+    const list = Array.isArray(res) ? res : (res && res.items) || [];
+    const rest = list.map((x) => x.sha).filter((s) => s !== sha);
+    await invokeRetry("set_asset_order", { key, shas: [sha, ...rest] });
+  } catch {
+    /* 排序失败不影响加入分组本身 */
+  }
+}
+
 function gdCount(name) {
   if (name === FAV_NAME) return (S.stats && S.stats.starred) || 0;
   const g = S.groupList.find((x) => x.name === name);
@@ -1420,6 +1434,15 @@ function renderViewer() {
   const offIcon = starPref ? SVG.star : SVG.heart;
   $("v-star").innerHTML = (on ? onIcon : offIcon) + `<span>${on ? "已收藏" : "收藏"}</span>`;
   $("v-star").classList.toggle("on", on);
+  // 分组详情：顶栏放「移出分组 / 取消移出」；收藏夹里由收藏键负责，不重复
+  const inRealGroup = !!S.gview && S.gview !== FAV_NAME;
+  const vun = $("v-un");
+  vun.hidden = !inRealGroup;
+  if (inRealGroup) {
+    const joined = (a.groups || []).includes(S.gview);
+    vun.textContent = joined ? "移出分组" : "取消移出";
+    vun.classList.toggle("undo", !joined);
+  }
   resetViewerTransform();
 }
 
@@ -1456,9 +1479,10 @@ function closeViewer() {
   vDirty = false;
   // 退出详情页后才刷新背后的列表：收藏夹里取消收藏的图会在这时消失
   if (dirty) {
+    // 先刷新分组列表（标题下的「N 张 · 大小」取自 groupList），再重载组内网格
     Promise.resolve()
-      .then(() => (group ? loadGroup() : refresh()))
       .then(() => (group ? loadGroups() : null))
+      .then(() => (group ? loadGroup() : refresh()))
       .catch(() => {});
   }
 }
@@ -3565,11 +3589,35 @@ $("v-star").addEventListener("click", async () => {
   }
   // 只更新收藏按钮与后端状态；当前预览的图片顺序（vStack）保持不动，
   // 所以取消收藏不会让这张图从当前列表里消失，退出详情页时才刷新。
+  if (on) await bumpGroupFront(FAV_NAME, a.sha); // 重新收藏 = 收藏时间最新
   a.starred = on;
   vCache.set(a.sha, a);
   vDirty = true;
   renderViewer();
   toast(on ? "已收藏" : "已取消收藏");
+});
+$("v-un").addEventListener("click", async () => {
+  const a = viewerAsset();
+  const g = S.gview;
+  if (!a.sha || !g || g === FAV_NAME) return;
+  const joined = (a.groups || []).includes(g);
+  try {
+    if (joined) {
+      await invoke("batch_ungroup", { shas: [a.sha], group: g });
+    } else {
+      await invoke("add_to_group", { shas: [a.sha], group: g });
+      await bumpGroupFront(g, a.sha); // 加回来 = 入组时间最新，排在最前
+    }
+  } catch (err) {
+    toast("操作失败：" + err);
+    return;
+  }
+  // 和取消收藏一样：当前列表是冻结快照，图片与计数不动，退出详情页才刷新分组
+  a.groups = joined ? (a.groups || []).filter((x) => x !== g) : [...(a.groups || []), g];
+  vCache.set(a.sha, a);
+  vDirty = true;
+  renderViewer();
+  toast(joined ? "已移出分组" : "已加入分组");
 });
 $("v-addto").addEventListener("click", () => {
   const a = viewerAsset();
