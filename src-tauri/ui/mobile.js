@@ -1353,6 +1353,11 @@ function toggleImgSel(sha) {
 }
 
 let vIndex = 0;
+// 打开详情页时冻结的图片顺序（sha 快照）。页内取消收藏不会让图片从当前列表消失，
+// 只有退出详情页时才刷新背后的列表。
+let vStack = null;
+let vCache = new Map();
+let vDirty = false;
 let vScale = 1, vTx = 0, vTy = 0;
 const vPointers = new Map();
 let vPinch = null, vPan = null, vLastTap = 0;
@@ -1375,18 +1380,23 @@ function fmtSource(src) {
   return "来自" + (map[src] || src || "未知");
 }
 
-function viewerList() {
+function viewerPool() {
   return (S.gview ? gdItems : S.items) || [];
 }
 
+function viewerCount() {
+  return vStack ? vStack.length : viewerPool().length;
+}
+
 function viewerAsset() {
-  return viewerList()[vIndex] || {};
+  if (vStack) return vCache.get(vStack[vIndex]) || {};
+  return viewerPool()[vIndex] || {};
 }
 
 function renderViewer() {
   const a = viewerAsset();
-  const list = viewerList();
-  $("v-count").textContent = `${list.length ? vIndex + 1 : 0} / ${list.length}`;
+  const total = viewerCount();
+  $("v-count").textContent = `${total ? vIndex + 1 : 0} / ${total}`;
   $("v-name").textContent = a.name || "未命名";
   // 预览用原图，放大后仍然清晰
   $("v-img").src = thumbUrl(a.sha, true);
@@ -1414,9 +1424,19 @@ function renderViewer() {
 }
 
 function openViewer(sha) {
-  const list = viewerList();
-  const idx = list.findIndex((x) => x.sha === sha);
-  vIndex = idx < 0 ? 0 : idx;
+  const pool = viewerPool();
+  vCache = new Map();
+  pool.forEach((x) => vCache.set(x.sha, x));
+  vStack = pool.map((x) => x.sha);
+  let idx = vStack.indexOf(sha);
+  if (idx < 0) {
+    // 兜底：列表里找不到这一张时仍然打开它，避免详情页空白
+    vCache.set(sha, (S.items || []).find((x) => x.sha === sha) || { sha });
+    vStack = [sha];
+    idx = 0;
+  }
+  vIndex = idx;
+  vDirty = false;
   renderViewer();
   $("viewer").hidden = false;
   document.body.style.overflow = "hidden";
@@ -1429,12 +1449,24 @@ function closeViewer() {
   resetViewerTransform();
   if (!document.body.classList.contains("multi")) document.body.style.overflow = "";
   syncGuard();
+  const dirty = vDirty;
+  const group = S.gview;
+  vStack = null;
+  vCache = new Map();
+  vDirty = false;
+  // 退出详情页后才刷新背后的列表：收藏夹里取消收藏的图会在这时消失
+  if (dirty) {
+    Promise.resolve()
+      .then(() => (group ? loadGroup() : refresh()))
+      .then(() => (group ? loadGroups() : null))
+      .catch(() => {});
+  }
 }
 
 function stepViewer(delta) {
-  const list = viewerList();
-  if (!list.length) return;
-  const next = Math.min(list.length - 1, Math.max(0, vIndex + delta));
+  const total = viewerCount();
+  if (!total) return;
+  const next = Math.min(total - 1, Math.max(0, vIndex + delta));
   if (next === vIndex) return;
   vIndex = next;
   renderViewer();
@@ -3327,12 +3359,10 @@ async function markUsed(shas) {
 
 async function afterMoveRefresh(sha) {
   await refresh();
-  if (!$("viewer").hidden && sha) {
-    const i = (S.items || []).findIndex((x) => x.sha === sha);
-    if (i >= 0) {
-      vIndex = i;
-      renderViewer();
-    }
+  if (vStack && sha) {
+    const fresh = (S.items || []).find((x) => x.sha === sha);
+    if (fresh) vCache.set(sha, fresh);
+    renderViewer();
   }
 }
 
@@ -3526,34 +3556,20 @@ $("v-save").addEventListener("click", async () => {
 $("v-star").addEventListener("click", async () => {
   const a = viewerAsset();
   if (!a.sha) return;
+  const on = !a.starred;
   try {
-    const on = !a.starred;
     await invoke("batch_star", { shas: [a.sha], on });
-    a.starred = on;
-    if (S.gview) {
-      await loadGroup();
-      const idx = viewerList().findIndex((x) => x.sha === a.sha);
-      if (idx < 0) {
-        closeViewer();
-        await loadGroups();
-        toast(on ? "已收藏" : "已取消收藏");
-        return;
-      }
-      vIndex = idx;
-      renderViewer();
-      await loadGroups();
-      toast(on ? "已收藏" : "已取消收藏");
-      return;
-    }
-    renderViewer();
-    toast(on ? "已收藏" : "已取消收藏");
-    await refresh();
-    const idx = S.items.findIndex((x) => x.sha === a.sha);
-    if (idx >= 0) vIndex = idx;
-    renderViewer();
   } catch (err) {
     toast("操作失败：" + err);
+    return;
   }
+  // 只更新收藏按钮与后端状态；当前预览的图片顺序（vStack）保持不动，
+  // 所以取消收藏不会让这张图从当前列表里消失，退出详情页时才刷新。
+  a.starred = on;
+  vCache.set(a.sha, a);
+  vDirty = true;
+  renderViewer();
+  toast(on ? "已收藏" : "已取消收藏");
 });
 $("v-addto").addEventListener("click", () => {
   const a = viewerAsset();
@@ -3691,8 +3707,8 @@ function lbReset() {
 function lbShow(sha) {
   if (!sha) return;
   $("lb-img").src = thumbUrl(sha, true);
-  const list = viewerList();
-  $("lb-count").textContent = `${list.length ? vIndex + 1 : 0} / ${list.length}`;
+  const total = viewerCount();
+  $("lb-count").textContent = `${total ? vIndex + 1 : 0} / ${total}`;
   lbReset();
 }
 function openLightbox(sha) {
