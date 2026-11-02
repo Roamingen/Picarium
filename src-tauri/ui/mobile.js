@@ -34,6 +34,8 @@ const SVG = {
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
   starFill: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>',
+  heartFill: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>',
 };
 
 let selMode = false;
@@ -1396,19 +1398,19 @@ function renderViewer() {
   $("v-meta").textContent = bits.join(" · ");
   const tags = [];
   (a.groups || []).forEach((g) => tags.push(`<span class="vtag">${escapeHtml(g)}</span>`));
-  tags.push(`<span class="vtag">${a.animated ? "GIF" : "图片"}</span>`);
+  const ext = String(a.ext || "").toLowerCase();
+  tags.push(`<span class="vtag type">${escapeHtml(ext || (a.animated ? "gif" : "文件"))}</span>`);
   (a.tags || []).forEach((t) => tags.push(`<span class="vtag tag">${escapeHtml(t)}</span>`));
   tags.push('<span class="vtag plus" id="v-tag-add">+ 标签</span>');
-  tags.push(`<button class="vtag addgrp" id="v-addgroup">${SVG.folder}加入分组</button>`);
   $("v-tags").innerHTML = tags.join("");
   const on = !!a.starred;
-  $("v-star").innerHTML = (on ? SVG.starFill : SVG.star) + `<span>${on ? "已收藏" : "收藏"}</span>`;
+  // 图标一律用 SVG（不用字体字形）；跟随「收藏样式」偏好显示爱心或星形
+  const starPref = localStorage.getItem("sb.fav") === "star";
+  const onIcon = starPref ? SVG.starFill : SVG.heartFill;
+  const offIcon = starPref ? SVG.star : SVG.heart;
+  $("v-star").innerHTML = (on ? onIcon : offIcon) + `<span>${on ? "已收藏" : "收藏"}</span>`;
   $("v-star").classList.toggle("on", on);
   resetViewerTransform();
-  const hint = $("v-hint");
-  hint.classList.remove("fade");
-  clearTimeout(window.__vhintTimer);
-  window.__vhintTimer = setTimeout(() => hint.classList.add("fade"), 2400);
 }
 
 function openViewer(sha) {
@@ -3553,6 +3555,10 @@ $("v-star").addEventListener("click", async () => {
     toast("操作失败：" + err);
   }
 });
+$("v-addto").addEventListener("click", () => {
+  const a = viewerAsset();
+  if (a && a.sha) openMoveSheet([a.sha]);
+});
 $("v-del").addEventListener("click", async () => {
   const a = viewerAsset();
   if (!a.sha) return;
@@ -3573,10 +3579,6 @@ $("v-del").addEventListener("click", async () => {
 });
 $("v-tags").addEventListener("click", (e) => {
   if (e.target.closest("#v-tag-add")) toast("标签编辑在后面的批次接上");
-  if (e.target.closest("#v-addgroup")) {
-    const a = viewerAsset();
-    if (a && a.sha) openMoveSheet([a.sha]);
-  }
 });
 $("v-more").addEventListener("click", () => {
   const a = viewerAsset();
@@ -3591,15 +3593,19 @@ $("v-more").addEventListener("click", () => {
   openSheet("文件信息", `<div class="kv">${rows.map(([k, v]) => `<div class="kvrow"><span>${k}</span><b>${escapeHtml(String(v))}</b></div>`).join("")}</div>`);
 });
 
-// 预览详情：双指缩放 / 放大后单指平移 / 左右滑动切换 / 单击进全屏看图
+// 预览详情：整块区域（顶栏 + 图片）都能左右滑切图；双指缩放 / 放大后单指平移 / 点图片进全屏看图
 (function wireViewerGestures() {
-  const stage = $("v-stage");
+  const area = $("v-swipe");
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   let sx = 0, sy = 0, down = false, moved = false, multi = false;
+  let tracking = false, fromStage = false;
 
-  stage.addEventListener("pointerdown", (e) => {
-    try { stage.setPointerCapture(e.pointerId); } catch {}
+  area.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("button")) return; // 顶栏按钮自己处理，手势不接管
+    tracking = true;
+    if (vPointers.size === 0) fromStage = !!e.target.closest("#v-stage");
+    try { area.setPointerCapture(e.pointerId); } catch {}
     vPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (vPointers.size === 2) {
       const [a, b] = [...vPointers.values()];
@@ -3614,7 +3620,7 @@ $("v-more").addEventListener("click", () => {
     }
   });
 
-  stage.addEventListener("pointermove", (e) => {
+  area.addEventListener("pointermove", (e) => {
     if (!vPointers.has(e.pointerId)) return;
     vPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (vPointers.size >= 2 && vPinch) {
@@ -3641,27 +3647,30 @@ $("v-more").addEventListener("click", () => {
     if (down && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) moved = true;
   });
 
-  stage.addEventListener("pointerup", (e) => {
+  area.addEventListener("pointerup", (e) => {
+    if (!tracking) return;
     vPointers.delete(e.pointerId);
     if (vPointers.size < 2) vPinch = null;
     if (vPointers.size !== 0) return;
     const panned = !!(vPan && vPan.moved);
     vPan = null;
     down = false;
+    tracking = false;
     if (vScale < 1.05) resetViewerTransform();
     if (multi) { multi = false; return; }
     if (panned) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
     if (vScale <= 1.05 && Math.abs(dx) > 48 && Math.abs(dy) < 70) { stepViewer(dx < 0 ? 1 : -1); return; }
-    if (!moved) openLightbox(viewerAsset().sha);
+    if (!moved && fromStage) openLightbox(viewerAsset().sha);
   });
 
-  stage.addEventListener("pointercancel", (e) => {
+  area.addEventListener("pointercancel", (e) => {
     vPointers.delete(e.pointerId);
     if (vPointers.size < 2) vPinch = null;
     vPan = null;
     down = false;
     multi = false;
+    tracking = false;
   });
 })();
 
@@ -3682,6 +3691,8 @@ function lbReset() {
 function lbShow(sha) {
   if (!sha) return;
   $("lb-img").src = thumbUrl(sha, true);
+  const list = viewerList();
+  $("lb-count").textContent = `${list.length ? vIndex + 1 : 0} / ${list.length}`;
   lbReset();
 }
 function openLightbox(sha) {
