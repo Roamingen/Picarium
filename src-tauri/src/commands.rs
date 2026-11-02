@@ -743,20 +743,28 @@ pub fn share_assets(state: State<'_, AppState>, shas: Vec<String>) -> Result<(),
 /// 存到系统相册（安卓写 MediaStore；桌面端请用导出功能）。
 #[tauri::command]
 pub fn save_to_gallery(state: State<'_, AppState>, sha: String) -> Result<(), String> {
-    let path = {
+    let (path, display) = {
         let lib = state.lib.lock().map_err(|e| e.to_string())?;
-        lib.find(&sha)
-            .map(|a| std::path::PathBuf::from(&a.path))
-            .ok_or_else(|| "图片不存在".to_string())?
+        let a = lib.find(&sha).ok_or_else(|| "图片不存在".to_string())?;
+        let display = if a.name.trim().is_empty() {
+            std::path::Path::new(&a.path)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("stickerbox")
+                .to_string()
+        } else {
+            format!("{}.{}", a.name.trim(), a.ext)
+        };
+        (std::path::PathBuf::from(&a.path), display)
     };
     #[cfg(target_os = "android")]
     {
         use crate::platform::Gallery;
-        crate::platform::android::platform().save_to_gallery(&path)
+        crate::platform::android::platform().save_to_gallery(&path, &display)
     }
     #[cfg(not(target_os = "android"))]
     {
-        let _ = path;
+        let _ = (path, display);
         Err("桌面端请用导出功能".to_string())
     }
 }
@@ -768,6 +776,24 @@ pub fn pick_gallery_images() -> Result<Vec<String>, String> {
     {
         use crate::platform::Gallery;
         let paths = crate::platform::android::platform().pick_from_gallery()?;
+        Ok(paths
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect())
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        Err("桌面端请用拖拽或导入按钮".to_string())
+    }
+}
+
+/// 打开系统文件选择器多选图片；返回已拷到缓存目录的本地路径（安卓专用）。
+#[tauri::command]
+pub fn pick_file_images() -> Result<Vec<String>, String> {
+    #[cfg(target_os = "android")]
+    {
+        use crate::platform::Gallery;
+        let paths = crate::platform::android::platform().pick_from_files()?;
         Ok(paths
             .into_iter()
             .map(|p| p.to_string_lossy().to_string())

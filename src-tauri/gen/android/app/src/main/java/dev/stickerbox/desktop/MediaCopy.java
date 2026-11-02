@@ -26,12 +26,72 @@ public class MediaCopy {
             while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
         }
         String ext = sniff(tmp);
-        File dst = new File(dir, prefix + ext);
+        // 文件名优先用系统给的原始名字（相册/分享面板都带 DISPLAY_NAME），
+        // 拿不到再退回调用方的前缀，避免库里出现 pick-1753... 这种名字
+        String base = displayName(ctx, uri);
+        if (base == null || base.isEmpty()) base = prefix;
+        base = sanitize(base);
+        File dst = unique(dir, base, ext);
         if (!tmp.renameTo(dst)) {
             tmp.delete();
             throw new IOException("重命名失败");
         }
         return dst;
+    }
+
+    private static String displayName(Context ctx, Uri uri) {
+        String name = queryName(ctx, uri);
+        // 相册选择器（Photo Picker）有时把 DISPLAY_NAME 填成纯数字 id，
+        // 这种名字对用户没意义，换成对应的 MediaStore URI 再查一次真实文件名
+        if (isUselessName(name, uri.getLastPathSegment())) {
+            try {
+                Uri media = android.provider.MediaStore.getMediaUri(ctx, uri);
+                if (media != null) {
+                    String real = queryName(ctx, media);
+                    if (!isUselessName(real, media.getLastPathSegment())) name = real;
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return name;
+    }
+
+    private static String queryName(Context ctx, Uri uri) {
+        try (android.database.Cursor c = ctx.getContentResolver().query(
+                uri, new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (c != null && c.moveToFirst()) {
+                int i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                if (i >= 0) return c.getString(i);
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    /** 空名，或者名字就是 URI 末尾那串数字 id，都算没拿到真实文件名。 */
+    private static boolean isUselessName(String name, String lastSegment) {
+        if (name == null || name.isEmpty()) return true;
+        String base = name.replaceAll("\\.[A-Za-z0-9]{1,5}$", "");
+        return lastSegment != null && !lastSegment.isEmpty() && base.equals(lastSegment);
+    }
+
+    /** 去掉扩展名和文件系统不认的字符，过长截断。 */
+    private static String sanitize(String name) {
+        String base = name.replaceAll("\\.[A-Za-z0-9]{1,5}$", "");
+        base = base.replaceAll("[\\\\/:*?\"<>|\\p{Cntrl}]", "_").trim();
+        if (base.isEmpty()) base = "image";
+        if (base.length() > 60) base = base.substring(0, 60).trim();
+        return base;
+    }
+
+    /** 同一批里可能有重名（同一张图选两次），加序号避免互相覆盖。 */
+    private static File unique(File dir, String base, String ext) {
+        File f = new File(dir, base + ext);
+        int i = 1;
+        while (f.exists()) {
+            f = new File(dir, base + " (" + (i++) + ")" + ext);
+        }
+        return f;
     }
 
     private static String sniff(File f) {

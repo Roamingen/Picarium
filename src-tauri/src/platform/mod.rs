@@ -33,10 +33,14 @@ pub trait ShareOut {
 /// 系统相册：存进去、从里面选。
 pub trait Gallery {
     /// 存一份到系统相册（桌面 = 导出到用户选的文件夹）。
-    fn save_to_gallery(&self, path: &Path) -> Result<(), String>;
+    /// `name` 是写进相册的显示文件名（带扩展名）。
+    fn save_to_gallery(&self, path: &Path, name: &str) -> Result<(), String>;
 
     /// 从系统相册选图（桌面 = 文件选择器；安卓 = Photo Picker）。
     fn pick_from_gallery(&self) -> Result<Vec<PathBuf>, String>;
+
+    /// 从系统文件选择器选图（安卓 = SAF，能保留原始文件名）。
+    fn pick_from_files(&self) -> Result<Vec<PathBuf>, String>;
 }
 
 /// 系统文件选择器。导入图片、选导出目录都走它。

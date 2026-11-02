@@ -46,6 +46,13 @@ class MainActivity : TauriActivity() {
     webView.isVerticalScrollBarEnabled = false
     webView.isHorizontalScrollBarEnabled = false
     webView.scrollBarStyle = WebView.SCROLLBARS_INSIDE_OVERLAY
+    // 关掉 WebView 自带的捏合缩放：否则任何页面（图库、分组页）都能被双指放大，
+    // 缩放只由前端在看图详情/全屏看图里自己处理。
+    webView.settings.apply {
+      setSupportZoom(false)
+      builtInZoomControls = false
+      displayZoomControls = false
+    }
     if (backCallback != null) return
     val cb = object : OnBackPressedCallback(true) {
       override fun handleOnBackPressed() {

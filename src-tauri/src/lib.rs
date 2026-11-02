@@ -71,7 +71,7 @@ pub fn run() {
             commands::rename_group,
             commands::remove_group,
             commands::share_assets,
-            commands::save_to_gallery, commands::pick_gallery_images, commands::import_paths_simple, commands::take_shared_paths
+            commands::save_to_gallery, commands::pick_gallery_images, commands::pick_file_images, commands::import_paths_simple, commands::take_shared_paths
         ]);
 
     thumb::register(builder)

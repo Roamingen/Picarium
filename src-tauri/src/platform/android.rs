@@ -102,22 +102,25 @@ impl ShareOut for Android {
 }
 
 impl Gallery for Android {
-    fn save_to_gallery(&self, path: &Path) -> Result<(), String> {
+    fn save_to_gallery(&self, path: &Path, name: &str) -> Result<(), String> {
         use jni::objects::JValue;
 
         let mime = mime_of(path);
-        let name = path
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("stickerbox.png")
-            .to_string();
+        let display = if name.trim().is_empty() {
+            path.file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("stickerbox.png")
+                .to_string()
+        } else {
+            name.to_string()
+        };
         let full = path.to_string_lossy().to_string();
         with_activity(|env, activity| {
             let pj = env
                 .new_string(full)
                 .map_err(|e| format!("路径转字符串失败：{e}"))?;
             let nj = env
-                .new_string(name)
+                .new_string(display)
                 .map_err(|e| format!("文件名转字符串失败：{e}"))?;
             let mj = env
                 .new_string(mime)
@@ -140,6 +143,10 @@ impl Gallery for Android {
 
     fn pick_from_gallery(&self) -> Result<Vec<PathBuf>, String> {
         pick_images_impl()
+    }
+
+    fn pick_from_files(&self) -> Result<Vec<PathBuf>, String> {
+        pick_files_impl()
     }
 }
 
@@ -203,46 +210,61 @@ impl Opener for Android {
     }
 }
 
-/// 相册选图：Photo Picker（Android 13+）或 OPEN_DOCUMENT 兜底，
+/// 选图：Photo Picker（相册）或 ACTION_OPEN_DOCUMENT（系统文件选择器），
 /// 选中后由 Java 侧拷进 cache/import/，这里只负责把返回的路径转成 PathBuf。
-fn pick_images_impl() -> Result<Vec<PathBuf>, String> {
+fn pick_impl(from_files: bool) -> Result<Vec<PathBuf>, String> {
     use jni::objects::{JObjectArray, JString, JValue};
 
     with_activity(|env, context| {
-        let max = JValue::Int(100);
-        let result = env
-            .call_static_method(
+        let result = if from_files {
+            env.call_static_method(
+                "dev/stickerbox/desktop/PickerBridge",
+                "pickFiles",
+                "(Landroid/content/Context;)[Ljava/lang/String;",
+                &[JValue::Object(context)],
+            )
+        } else {
+            env.call_static_method(
                 "dev/stickerbox/desktop/PickerBridge",
                 "pickImages",
                 "(Landroid/content/Context;I)[Ljava/lang/String;",
-                &[JValue::Object(context), max],
+                &[JValue::Object(context), JValue::Int(100)],
             )
-            .map_err(|e| format!("打开相册失败：{e}"))?;
+        }
+        .map_err(|e| format!("打开选图界面失败：{e}"))?;
         let arr: JObjectArray = result
             .l()
-            .map_err(|e| format!("相册返回异常：{e}"))?
+            .map_err(|e| format!("选图返回异常：{e}"))?
             .into();
         if env.exception_check().unwrap_or(false) {
-            return Err("打开相册失败（系统抛异常）".to_string());
+            return Err("打开选图界面失败（系统抛异常）".to_string());
         }
         if arr.is_null() {
             return Ok(Vec::new());
         }
         let len = env
             .get_array_length(&arr)
-            .map_err(|e| format!("读取相册结果失败：{e}"))?;
+            .map_err(|e| format!("读取选图结果失败：{e}"))?;
         let mut out = Vec::with_capacity(len as usize);
         for i in 0..len {
             let item = env
                 .get_object_array_element(&arr, i)
-                .map_err(|e| format!("读取相册路径失败：{e}"))?;
+                .map_err(|e| format!("读取选图路径失败：{e}"))?;
             let js: JString = item.into();
             let text: String = env
                 .get_string(&js)
-                .map_err(|e| format!("相册路径转字符串失败：{e}"))?
+                .map_err(|e| format!("选图路径转字符串失败：{e}"))?
                 .into();
             out.push(PathBuf::from(text));
         }
         Ok(out)
     })
+}
+
+fn pick_images_impl() -> Result<Vec<PathBuf>, String> {
+    pick_impl(false)
+}
+
+fn pick_files_impl() -> Result<Vec<PathBuf>, String> {
+    pick_impl(true)
 }

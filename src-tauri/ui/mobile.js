@@ -268,8 +268,7 @@ function renderPins() {
   const card = (name) => {
     const g = S.groupList.find((x) => x.name === name) || { name, count: 0 };
     return `<button class="pin" data-group="${escapeAttr(name)}">
-      <div class="pc">${g.cover ? `<img src="${thumbUrl(g.cover, g.animated)}" alt="" loading="lazy" onerror="this.remove()">` : folderIcon(g.name)}
-        ${g.animated && g.cover ? '<span class="gb">GIF</span>' : ""}</div>
+      <div class="pc">${g.cover ? `<img src="${thumbUrl(g.cover, g.animated)}" alt="" loading="lazy" onerror="this.remove()">` : folderIcon(g.name)}</div>
       <div class="pn">${escapeHtml(name)}</div>
     </button>`;
   };
@@ -366,7 +365,7 @@ function folderCard(g, picked) {
   return `<button class="folder${on ? " sel" : ""}${g.pinned ? " pinned" : ""}" data-group="${escapeAttr(g.name)}">
     ${g.pinned ? `<span class="gpin" title="已置顶">${SVG.pin}</span>` : ""}
     <span class="fcheck">${SVG.check}</span>
-    <div class="fc">${cover}${g.animated && g.cover ? '<span class="gb">GIF</span>' : ""}</div>
+    <div class="fc">${cover}</div>
     <div class="fb"><span class="fname">${escapeHtml(g.name)}</span><span class="fsub">${g.count} 张</span></div>
   </button>`;
 }
@@ -416,8 +415,9 @@ function renderFolders(keepScroll) {
     for (const el of folderBox.querySelectorAll(".folder[data-group]")) {
       el.classList.add("cross-target");
     }
+    // 收藏夹永远可以当拖拽目标（加入 = 收藏，复制语义）
     const fav = folderBox.querySelector(".folder[data-fav]");
-    if (fav && crossDrag.source === FAV_NAME) fav.classList.add("cross-target");
+    if (fav) fav.classList.add("cross-target");
   } else {
     folderBox.classList.remove("crossing");
   }
@@ -543,7 +543,7 @@ async function loadGroup(opts = {}) {
   $("gd-pin").hidden = isFav || !(g && g.pinned);
   $("btn-gdsel").hidden = false;
   const removeLabel = document.querySelector('#gdactbar [data-gdact="remove"] span');
-  if (removeLabel) removeLabel.textContent = isFav ? "取消收藏" : "移出当前分组";
+  if (removeLabel) removeLabel.textContent = isFav ? "取消收藏" : "移出分组";
   $("gd-meta").textContent = baseMeta;
   $("gd-grid").innerHTML = '<div class="spinner">正在读取…</div>';
   try {
@@ -1258,15 +1258,23 @@ async function endCrossDrag() {
   try {
     const mode = dragMode();
     const same = source === target;
-    if (!same) await invokeRetry("add_to_group", { shas, group: target });
+    // 收藏夹是虚拟分组：永远按「复制」处理，源分组保持不动
+    const toFav = target === FAV_NAME;
+    if (toFav) {
+      if (!same) await invokeRetry("batch_star", { shas, on: true });
+    } else if (!same) {
+      await invokeRetry("add_to_group", { shas, group: target });
+    }
     await invokeRetry("set_asset_order", { key: gdParam(target), shas: order });
-    if (!same && mode === "cut" && source) {
+    if (!same && !toFav && mode === "cut" && source) {
       if (source === FAV_NAME) await invokeRetry("batch_star", { shas, on: false });
       else await invokeRetry("batch_ungroup", { shas, group: source });
     }
     await loadGroups();
     await openGroup(target);
-    toast(same ? `已调整 ${count} 张顺序` : `已${mode === "cut" ? "剪切" : "复制"} ${count} 张到「${gdDisplayName(target)}」`);
+    if (same) toast(`已调整 ${count} 张顺序`);
+    else if (toFav) toast("已添加到最喜欢的分组！");
+    else toast(`已${mode === "cut" ? "剪切" : "复制"} ${count} 张到「${gdDisplayName(target)}」`);
   } catch (e) {
     toast("加入失败：" + String(e));
     await loadGroups();
@@ -1535,6 +1543,24 @@ function closeGmenu() {
   if (m) m.hidden = true;
 }
 
+/** 存一批图到系统相册（安卓写 Pictures/StickerBox）。 */
+async function saveAlbum(shas) {
+  const done = [];
+  let fail = 0;
+  for (const sha of shas) {
+    try {
+      await invoke("save_to_gallery", { sha });
+      done.push(sha);
+    } catch {
+      fail += 1;
+    }
+  }
+  if (done.length) await markUsed(done);
+  if (!fail) toast(`已存 ${done.length} 张到相册 Pictures/StickerBox`);
+  else if (!done.length) toast(`保存失败 ${fail} 张`);
+  else toast(`已存 ${done.length} 张，${fail} 张失败`);
+}
+
 async function gdAction(act) {
   const shas = [...gdSel];
   if (!shas.length) return;
@@ -1551,6 +1577,10 @@ async function gdAction(act) {
   if (act === "tag") return toast("标签在后面的批次接上");
   if (act === "add") {
     openGroupPicker(shas);
+    return;
+  }
+  if (act === "album") {
+    await saveAlbum(shas);
     return;
   }
   if (act === "remove") {
@@ -2693,18 +2723,18 @@ function wire() {
     suppressClick = false;
     holdInfo = { name: f.dataset.group, card: f, x: e.clientX, y: e.clientY, armed: false, moved: false };
     clearTimeout(holdTimer);
-    holdTimer = setTimeout(() => armFolderHold(), 340);
+    holdTimer = setTimeout(() => armFolderHold(), 350);
     try { f.setPointerCapture(e.pointerId); } catch (_) {}
   });
   folders.addEventListener("pointermove", (e) => {
     if (!holdInfo) return;
     const d = Math.hypot(e.clientX - holdInfo.x, e.clientY - holdInfo.y);
     if (!holdInfo.armed) {
-      if (d > 8) resetHold();
+      if (d > 12) resetHold();
       return;
     }
     e.preventDefault();
-    if (!dragCtx && !selMode && d > 8) beginFolderDrag(e);
+    if (!dragCtx && !selMode && d > 12) beginFolderDrag(e);
     if (dragCtx) updateFolderDrag(e);
   }, { passive: false });
   folders.addEventListener("pointerup", () => {
@@ -2805,13 +2835,13 @@ function wire() {
       if (!gdHoldInfo) return;
       gdHoldInfo.armed = true;
       if (navigator.vibrate) navigator.vibrate(8);
-    }, 340);
+    }, 350);
   });
   gdGrid.addEventListener("pointermove", (e) => {
     if (gdDrag || crossDrag) return;
     if (!gdHoldInfo) return;
     const dist = Math.hypot(e.clientX - gdHoldInfo.x, e.clientY - gdHoldInfo.y);
-    if (dist <= 8) return;
+    if (dist <= 12) return;
     if (!gdHoldInfo.armed) {
       clearTimeout(gdHoldTimer);
       gdHoldInfo = null;
@@ -2874,31 +2904,39 @@ function wire() {
   const gridEl = $("grid");
   gridEl.addEventListener("pointerdown", (e) => {
     const c = e.target.closest(".card");
-    if (!c) return;
+    if (!c || e.button > 0) return;
     imgHoldFired = false;
-    imgHoldInfo = { sha: c.dataset.sha, x: e.clientX, y: e.clientY, el: c };
+    imgHoldInfo = { sha: c.dataset.sha, x: e.clientX, y: e.clientY, el: c, armed: false };
     clearTimeout(imgHoldTimer);
     imgHoldTimer = setTimeout(() => {
       if (!imgHoldInfo) return;
-      imgHoldFired = true;
-      imgSel.add(imgHoldInfo.sha);
-      setImgSelMode(true);
+      imgHoldInfo.armed = true;
       imgHoldInfo.el.classList.add("lift");
-      setTimeout(() => imgHoldInfo && imgHoldInfo.el && imgHoldInfo.el.classList.remove("lift"), 160);
       if (navigator.vibrate) navigator.vibrate(12);
-      imgHoldInfo = null;
-      // 长按后浏览器可能不派发 click；600ms 后自动解除，避免吞掉下一次点击
-      setTimeout(() => { imgHoldFired = false; }, 600);
-    }, 340);
+    }, 350);
   });
   gridEl.addEventListener("pointermove", (e) => {
     if (!imgHoldInfo) return;
-    if (Math.hypot(e.clientX - imgHoldInfo.x, e.clientY - imgHoldInfo.y) > 8) {
+    if (Math.hypot(e.clientX - imgHoldInfo.x, e.clientY - imgHoldInfo.y) > 12) {
       clearTimeout(imgHoldTimer);
+      if (imgHoldInfo.el) imgHoldInfo.el.classList.remove("lift");
       imgHoldInfo = null;
     }
   });
-  const endHold = () => { clearTimeout(imgHoldTimer); imgHoldInfo = null; };
+  // 长按到点只「上膛」；未移动就松手才算选中，避免和滚动/拖拽打架
+  const endHold = () => {
+    clearTimeout(imgHoldTimer);
+    const info = imgHoldInfo;
+    imgHoldInfo = null;
+    if (!info) return;
+    if (info.el) info.el.classList.remove("lift");
+    if (!info.armed) return;
+    imgHoldFired = true;
+    imgSel.add(info.sha);
+    setImgSelMode(true);
+    // 长按后浏览器可能不派发 click；600ms 后自动解除，避免吞掉下一次点击
+    setTimeout(() => { imgHoldFired = false; }, 600);
+  };
   gridEl.addEventListener("pointerup", endHold);
   gridEl.addEventListener("pointercancel", endHold);
   gridEl.addEventListener("click", (e) => {
@@ -3095,9 +3133,9 @@ $("trashsel").addEventListener("click", (e) => {
   if (b.dataset.tact === "restore") trashBatchRestore();
   if (b.dataset.tact === "delete") trashBatchDelete();
 });
-async function importFromGallery() {
+async function importPicked(cmd) {
   try {
-    const paths = await invoke("pick_gallery_images");
+    const paths = await invoke(cmd);
     if (!paths || !paths.length) return;
     toast(`正在导入 ${paths.length} 张…`);
     const r = await invokeRetry("import_paths_simple", { paths });
@@ -3110,9 +3148,20 @@ async function importFromGallery() {
   }
 }
 
+/** 系统相册选择器（Photo Picker）：上手快，但系统不给真实文件名。 */
+function importFromGallery() {
+  return importPicked("pick_gallery_images");
+}
+
+/** 系统「文件」选择器（SAF）：能保留原始文件名，多选要长按。 */
+function importFromFiles() {
+  return importPicked("pick_file_images");
+}
+
 function openImportSheet() {
   openSheet("导入图片", `<div class="menu">
       <button data-act="gallery">从手机相册导入</button>
+      <button data-act="files">从系统文件选择器导入</button>
       <button data-act="cancel">取消</button>
     </div>`);
   $("sheet-body").onclick = (e) => {
@@ -3120,10 +3169,12 @@ function openImportSheet() {
     if (!b) return;
     closeSheet();
     if (b.dataset.act === "gallery") importFromGallery();
+    if (b.dataset.act === "files") importFromFiles();
   };
 }
 
 $("me-gallery").addEventListener("click", importFromGallery);
+$("me-files").addEventListener("click", importFromFiles);
 $("me-inbox").addEventListener("click", () => {
   if (S.sharedPaths.length) {
     setTab("gallery");
@@ -3197,6 +3248,10 @@ $("actbar").addEventListener("click", async (e) => {
   }
   if (act === "add") {
     openMoveSheet(shas);
+    return;
+  }
+  if (act === "album") {
+    await saveAlbum(shas);
     return;
   }
   if (act === "delete") {
@@ -3535,24 +3590,78 @@ $("v-more").addEventListener("click", () => {
   openSheet("文件信息", `<div class="kv">${rows.map(([k, v]) => `<div class="kvrow"><span>${k}</span><b>${escapeHtml(String(v))}</b></div>`).join("")}</div>`);
 });
 
-// 预览：点图片进全屏；左右滑动切换
+// 预览详情：双指缩放 / 放大后单指平移 / 左右滑动切换 / 单击进全屏看图
 (function wireViewerGestures() {
   const stage = $("v-stage");
-  let sx = 0, sy = 0, down = false, moved = false;
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  let sx = 0, sy = 0, down = false, moved = false, multi = false;
+
   stage.addEventListener("pointerdown", (e) => {
-    down = true; moved = false; sx = e.clientX; sy = e.clientY;
+    try { stage.setPointerCapture(e.pointerId); } catch {}
+    vPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (vPointers.size === 2) {
+      const [a, b] = [...vPointers.values()];
+      vPinch = { d0: dist(a, b) || 1, s0: vScale, mid0: mid(a, b), tx0: vTx, ty0: vTy };
+      vPan = null;
+      multi = true;
+      moved = true;
+    } else if (vPointers.size === 1) {
+      down = true; moved = false; multi = false;
+      sx = e.clientX; sy = e.clientY;
+      vPan = { x: e.clientX, y: e.clientY, tx: vTx, ty: vTy, moved: false };
+    }
   });
+
   stage.addEventListener("pointermove", (e) => {
+    if (!vPointers.has(e.pointerId)) return;
+    vPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (vPointers.size >= 2 && vPinch) {
+      const [a, b] = [...vPointers.values()];
+      const m = mid(a, b);
+      vScale = clampViewScale(vPinch.s0 * (dist(a, b) / vPinch.d0));
+      vTx = vPinch.tx0 + (m.x - vPinch.mid0.x);
+      vTy = vPinch.ty0 + (m.y - vPinch.mid0.y);
+      applyViewerTransform();
+      moved = true;
+      e.preventDefault();
+      return;
+    }
+    if (vPointers.size === 1 && vPan && vScale > 1) {
+      const dx = e.clientX - vPan.x, dy = e.clientY - vPan.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) vPan.moved = true;
+      vTx = vPan.tx + dx;
+      vTy = vPan.ty + dy;
+      applyViewerTransform();
+      moved = true;
+      e.preventDefault();
+      return;
+    }
     if (down && Math.hypot(e.clientX - sx, e.clientY - sy) > 8) moved = true;
   });
+
   stage.addEventListener("pointerup", (e) => {
-    if (!down) return;
+    vPointers.delete(e.pointerId);
+    if (vPointers.size < 2) vPinch = null;
+    if (vPointers.size !== 0) return;
+    const panned = !!(vPan && vPan.moved);
+    vPan = null;
     down = false;
+    if (vScale < 1.05) resetViewerTransform();
+    if (multi) { multi = false; return; }
+    if (panned) return;
     const dx = e.clientX - sx, dy = e.clientY - sy;
-    if (Math.abs(dx) > 48 && Math.abs(dy) < 70) { stepViewer(dx < 0 ? 1 : -1); return; }
+    if (vScale <= 1.05 && Math.abs(dx) > 48 && Math.abs(dy) < 70) { stepViewer(dx < 0 ? 1 : -1); return; }
     if (!moved) openLightbox(viewerAsset().sha);
   });
-  stage.addEventListener("pointercancel", () => { down = false; });
+
+  stage.addEventListener("pointercancel", (e) => {
+    vPointers.delete(e.pointerId);
+    if (vPointers.size < 2) vPinch = null;
+    vPan = null;
+    down = false;
+    multi = false;
+  });
 })();
 
 // 全屏看图（黑色沉浸，仅这一层用黑底）
