@@ -76,11 +76,12 @@ pwsh -NoProfile -File scripts/install-release.ps1
 $env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
 $env:NDK_HOME="$env:LOCALAPPDATA\Android\Sdk\ndk\28.2.13676358"
 $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
+pwsh -NoProfile -File scripts/android-emu.ps1        # 起模拟器 + 装包 + 拉起 App（-Shot .demo/x.png 顺带截图）
 npx tauri android build --debug --apk --target x86_64 --ci
 npx tauri android build --apk --target aarch64 --ci        # release（已配签名）
 ```
 
-模拟器、签名、打包与验收的完整步骤见 **`docs/25-安卓构建、签名与模拟器.md`**（含「同 AVD 已在运行」等常见错误）。
+模拟器、签名、打包与验收的完整步骤见 **`docs/25-安卓构建、签名与模拟器.md`**（含「同 AVD 已在运行」等常见错误）；日常起模拟器只看 **`docs/26-安卓模拟器速查.md`**（一条 `scripts/android-emu.ps1` 搞定，别自己拼 adb 路径）。
 
 注意：`~/.gradle/gradle.properties` 里的代理已注释（代理 7890 当时没开）；Gradle wrapper 已指向腾讯镜像。开代理后可自行恢复。
 
