@@ -78,8 +78,10 @@ $env:NDK_HOME="$env:LOCALAPPDATA\Android\Sdk\ndk\28.2.13676358"
 $env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
 pwsh -NoProfile -File scripts/android-emu.ps1        # 起模拟器 + 装包 + 拉起 App（-Shot .demo/x.png 顺带截图）
 npx tauri android build --debug --apk --target x86_64 --ci
-npx tauri android build --apk --target aarch64 --ci        # release（已配签名）
+npx tauri android build --apk --target aarch64 --ci        # release（已配签名，只打 arm64）
 ```
+
+**发版只打 arm64-v8a**（`--target aarch64`），不要 universal：四个 ABI 各塞一份 ~11 MB 的 `libstickerbox_lib.so`，包会从 13.5 MB 涨到 48 MB。只有明确要发布到 GitHub Release 或单独要某个架构时，才**按架构分别**出包，不做 all-in-one。
 
 模拟器、签名、打包与验收的完整步骤见 **`docs/25-安卓构建、签名与模拟器.md`**（含「同 AVD 已在运行」等常见错误）；日常起模拟器只看 **`docs/26-安卓模拟器速查.md`**（一条 `scripts/android-emu.ps1` 搞定，别自己拼 adb 路径）。
 
