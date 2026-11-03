@@ -464,17 +464,11 @@
         <div class="pickbar" id="pickbar">
           <div class="search psearch">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-            <input id="pq" placeholder="搜索分组" autocomplete="off" spellcheck="false" />
+            <input id="pq" placeholder="搜索或新建分组" autocomplete="off" spellcheck="false" />
             <button class="clr" id="pq-clear" hidden aria-label="清空搜索">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>
           </div>
-          <button class="newbtn" id="pick-new" aria-label="新建分组" title="新建分组"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
-        </div>
-        <div class="newrow" id="pick-newrow" hidden>
-          <input id="pick-nq" placeholder="新分组名" autocomplete="off" spellcheck="false" />
-          <button class="mini" id="pick-ncancel">取消</button>
-          <button class="mini ok" id="pick-nok">创建</button>
         </div>
         <div class="folders picks" id="pick-folders"></div>
         <div class="sheet-actions ffoot">

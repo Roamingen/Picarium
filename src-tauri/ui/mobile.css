@@ -1066,19 +1066,6 @@ html[data-fav="star"] .card .fav::before { content: "★"; }
 }
 .pick .fhead .iconbtn { display: none; }
 .pick.tall .fhead .iconbtn { display: flex; }
-/* 新建分组：内联输入行（替换搜索行） */
-.newrow { display: flex; gap: 8px; padding: 0 0 10px; flex: 0 0 auto; }
-.newrow input {
-  flex: 1 1 auto; height: 40px; border-radius: 12px;
-  border: 1px solid var(--accent); background: var(--surface2); color: var(--fg);
-  padding: 0 12px; font: inherit; font-size: 13px; outline: none;
-}
-.newrow .mini {
-  flex: 0 0 auto; height: 40px; padding: 0 14px; border-radius: 12px;
-  border: 0; background: var(--surface2); color: var(--dim);
-  font: inherit; font-size: 13px;
-}
-.newrow .mini.ok { background: var(--accent); color: var(--on-accent); font-weight: 600; }
 /* 键盘弹起时底栏整条收起，不跟着往上飘 */
 body.kbd .ffoot { display: none; }
 .fhead { display: flex; align-items: center; gap: 8px; padding: 8px 0 10px; flex: 0 0 auto; }
@@ -1104,20 +1091,30 @@ body.kbd .ffoot { display: none; }
 /* 加入分组 */
 .pickbar { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; padding-bottom: 10px; }
 .psearch { flex: 1 1 auto; margin: 0; }
-.newbtn {
-  flex: 0 0 auto; height: 42px; width: 44px; padding: 0; border-radius: 12px;
-  border: 1px solid rgba(110, 168, 254, .42); background: rgba(110, 168, 254, .14);
-  color: var(--accent); font: inherit;
-  display: flex; align-items: center; justify-content: center;
+/* 搜不到时的新建行：搜索框兼新建，点一下/回车建组 */
+.pickcreate {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 12px; border-radius: 14px;
+  border: 1px dashed rgba(110, 168, 254, .45);
+  background: rgba(110, 168, 254, .08);
+  color: var(--fg); font: inherit; font-size: 13px; text-align: left;
 }
-.newbtn svg { width: 20px; height: 20px; }
-.newbtn:active { background: rgba(110, 168, 254, .28); }
+.pickcreate:active { background: rgba(110, 168, 254, .16); }
+.pickcreate .plus {
+  flex: 0 0 auto; width: 20px; height: 20px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(110, 168, 254, .16); color: var(--accent);
+}
+.pickcreate .plus svg { width: 13px; height: 13px; }
+.pickcreate b { color: var(--accent); font-weight: 600; }
+.pickcreate .hint { margin-left: auto; font-size: 11px; color: var(--dim2); }
 .picks { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; align-content: start; grid-auto-rows: max-content; padding: 0 2px 10px; }
 .picks .folder { align-self: start; }
 .ghead .iconbtn + .mgt { margin-left: 0; }
 .picks:empty::after,
 .picks .pempty {
-  content: "还没有分组，点右上角「＋ 新建」";
+  content: "还没有分组，搜索框输入名字就能新建";
   display: block; padding: 26px 8px; text-align: center;
   color: var(--dim); font-size: 13px;
 }

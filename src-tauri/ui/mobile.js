@@ -3408,8 +3408,17 @@ let pickSel = "";
 
 function starredCount() { return (S.stats && S.stats.starred) || 0; }
 
+function pickExactName(raw) {
+  const q = (raw || "").trim().toLowerCase();
+  if (!q) return "";
+  if (q === FAV_NAME.toLowerCase() || q === "收藏夹") return FAV_NAME;
+  const g = (S.groupList || []).find((x) => x.name.toLowerCase() === q);
+  return g ? g.name : "";
+}
+
 function renderPicker() {
-  const q = ($("pq").value || "").trim().toLowerCase();
+  const raw = ($("pq").value || "").trim();
+  const q = raw.toLowerCase();
   const order = (a, b) => {
     const pa = S.pinned.indexOf(a.name), pb = S.pinned.indexOf(b.name);
     if (pa >= 0 && pb >= 0) return pa - pb;
@@ -3425,29 +3434,36 @@ function renderPicker() {
   $("pick-ok").textContent = !pickSel ? "未选择分组" : pickSel === FAV_NAME ? "加入收藏夹" : `加入「${pickSel}」`;
   $("pick-ok").disabled = !pickSel;
   const favHit = !q || FAV_NAME.includes(q) || "收藏夹".includes(q);
+  const exact = pickExactName(raw);
+  const showCreate = !!raw && !exact;
+  const createRow = showCreate
+    ? `<button class="pickcreate" type="button" data-name="${escapeAttr(raw)}">
+         <span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+         <span>新建分组「<b>${escapeHtml(raw)}</b>」</span>
+         <span class="hint">回车</span>
+       </button>`
+    : "";
   $("pick-folders").innerHTML =
+    createRow +
     (favHit ? favCard(starredCount(), pickSel === FAV_NAME) : "") +
     (list.length ? list.map((g) => folderCard(g, pickSel === g.name)).join("") : "") +
-    (favHit || list.length ? "" : '<div class="pempty">没有匹配的分组</div>');
+    (showCreate || favHit || list.length ? "" : '<div class="pempty">没有匹配的分组</div>');
 }
 
-let pickNewMode = false;
-
-function setPickNewMode(on) {
-  pickNewMode = !!on;
-  const bar = $("pickbar"), row = $("pick-newrow");
-  if (bar) bar.hidden = pickNewMode;
-  if (row) row.hidden = !pickNewMode;
-  if (pickNewMode) {
-    $("pick-nq").value = "";
-    setTimeout(() => $("pick-nq").focus(), 30);
-  } else {
-    $("pick-nq").blur();
-  }
+function clearPickQuery() {
+  $("pq").value = "";
+  const c = $("pq-clear");
+  if (c) c.hidden = true;
+  $("pq").blur();
 }
 
-async function createPickGroup() {
-  const name = ($("pick-nq").value || "").trim();
+function revealPicked() {
+  const el = $("pick-folders").querySelector(".folder.sel");
+  if (el) el.scrollIntoView({ block: "nearest" });
+}
+
+async function createPickGroup(nameArg) {
+  const name = (typeof nameArg === "string" ? nameArg : ($("pq").value || "")).trim();
   if (!name) { toast("先写个分组名"); return; }
   try {
     await invokeRetry("create_group", { name });
@@ -3457,8 +3473,9 @@ async function createPickGroup() {
   }
   await loadGroups();
   pickSel = name;
-  setPickNewMode(false);
+  clearPickQuery();
   renderPicker();
+  revealPicked();
   toast(`已建「${name}」，点右下角加入`);
 }
 
@@ -3475,8 +3492,7 @@ function exitPicker() {
 function openGroupPicker(shas) {
   pickShas = (shas || []).slice();
   pickSel = "";
-  $("pq").value = "";
-  setPickNewMode(false);
+  clearPickQuery();
   resetSheetHeight($("picksheet"));
   renderPicker();
   $("pickmask").hidden = false;
@@ -3484,7 +3500,7 @@ function openGroupPicker(shas) {
 }
 
 function closeGroupPicker() {
-  setPickNewMode(false);
+  $("pq").blur();
   $("pickmask").hidden = true;
   syncGuard();
 }
@@ -4366,15 +4382,29 @@ $("btn-tfilter").addEventListener("click", () => openFilters("trash"));
 $("pick-close").addEventListener("click", closeGroupPicker);
 $("pick-ok").addEventListener("click", pickerMoveIn);
 $("pick-out").addEventListener("click", pickerMoveOut);
-$("pick-new").addEventListener("click", () => setPickNewMode(true));
-$("pick-ncancel").addEventListener("click", () => setPickNewMode(false));
-$("pick-nok").addEventListener("click", createPickGroup);
-$("pick-nq").addEventListener("keydown", (e) => { if (e.key === "Enter") createPickGroup(); });
 $("pick-close").addEventListener("click", exitPicker);
 $("pq").addEventListener("input", renderPicker);
+$("pq").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || e.isComposing || e.keyCode === 229) return;
+  const raw = ($("pq").value || "").trim();
+  if (!raw) return;
+  e.preventDefault();
+  const exact = pickExactName(raw);
+  if (exact) {
+    pickSel = exact;
+    clearPickQuery();
+    renderPicker();
+    revealPicked();
+  } else {
+    createPickGroup(raw);
+  }
+});
 $("pick-folders").addEventListener("click", (e) => {
+  const c = e.target.closest(".pickcreate");
+  if (c) { createPickGroup(c.dataset.name); return; }
   const b = e.target.closest(".folder");
   if (!b) return;
+  if (document.activeElement === $("pq")) $("pq").blur();
   const name = b.dataset.fav ? FAV_NAME : b.dataset.group;
   pickSel = pickSel === name ? "" : name;
   renderPicker();
