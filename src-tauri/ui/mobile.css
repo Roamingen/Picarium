@@ -1699,3 +1699,82 @@ body.cross-dragging {
   align-content: start;
 }
 #gddrop { z-index: 98 !important; }
+
+/* ---------- 多选加标签面板（图库 / 分组内共用） ---------- */
+/* 比「添加到」的 80% 轻，露出背景里的多选头部；高度仍可用把手拖拽 */
+.tagsheet { --sheet-h: 66%; }
+.tagsheet .fsect { display: flex; align-items: center; gap: 6px; }
+.tagsheet .fsect b { color: var(--fg); }
+.tagsearch { flex: 0 0 auto; padding-bottom: 10px; }
+.tagsearch .search { margin: 0; }
+
+.fhint { margin-left: auto; font-size: 11px; color: var(--dim2); font-weight: 400; }
+.fsect .fhint { flex: 0 0 auto; }
+
+.tagsel { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 4px; }
+.tagsel:empty { display: none; }
+.selchip {
+  height: 32px; padding: 0 9px 0 12px; border-radius: 999px;
+  border: 1px solid rgba(110, 168, 254, .45);
+  background: rgba(110, 168, 254, .14); color: #a9c7f2;
+  font-family: inherit; font-size: 12.5px;
+  display: inline-flex; align-items: center; gap: 6px; user-select: none;
+}
+.selchip svg { width: 13px; height: 13px; opacity: .75; flex: 0 0 auto; }
+.selchip.new {
+  border-style: dashed; border-color: rgba(110, 168, 254, .6);
+  color: var(--accent); background: rgba(110, 168, 254, .08);
+}
+
+.tagwrap { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 0 6px; }
+.tagchip {
+  height: 36px; padding: 0 13px; border-radius: 10px;
+  border: 1px solid var(--line2); background: var(--surface2);
+  color: var(--fg); font-family: inherit; font-size: 13px;
+  display: inline-flex; align-items: center; gap: 7px;
+  user-select: none;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.tagchip em { font-style: normal; font-size: 11px; color: var(--dim); }
+.tagchip.on { border-color: var(--accent); background: rgba(110, 168, 254, .16); color: var(--accent); }
+.tagchip.on em { color: var(--accent); opacity: .8; }
+.tagchip.done { color: var(--dim2); background: transparent; border-color: var(--line); }
+.tagchip.done em { color: var(--dim2); }
+.tagchip:disabled { opacity: 1; }
+
+.createrow {
+  display: flex; align-items: center; gap: 9px;
+  width: 100%; height: 44px; margin: 0 0 10px; padding: 0 12px;
+  border: 1px dashed rgba(110, 168, 254, .6); border-radius: 12px;
+  background: rgba(110, 168, 254, .07); color: #bfd6f8;
+  font-family: inherit; font-size: 13px; text-align: left; flex: 0 0 auto;
+}
+.createrow .plus {
+  width: 20px; height: 20px; border-radius: 50%; flex: 0 0 auto;
+  background: rgba(110, 168, 254, .18);
+  display: flex; align-items: center; justify-content: center;
+}
+.createrow .plus svg { width: 13px; height: 13px; }
+.createrow b { color: var(--accent); font-weight: 600; }
+.ckbd {
+  margin-left: auto; flex: 0 0 auto;
+  font-size: 11px; color: var(--dim2);
+  border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px;
+}
+
+.tnone { padding: 10px 2px; font-size: 12px; color: var(--dim2); }
+.tempty {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 8px; padding: 26px 18px 10px; color: var(--dim2);
+}
+.te-ic {
+  width: 52px; height: 52px; border-radius: 16px;
+  background: var(--surface3); border: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: center; color: var(--dim2);
+}
+.te-ic svg { width: 24px; height: 24px; }
+.tempty b { font-size: 14px; color: var(--fg); font-weight: 600; }
+.tempty span { font-size: 12px; line-height: 1.7; max-width: 240px; }
+
+/* 键盘弹起时底栏照常留在面板底部（覆盖全局「整条收起」） */
+body.kbd .tagsheet .ffoot { display: flex; }

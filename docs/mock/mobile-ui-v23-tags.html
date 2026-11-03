@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StickerBox 移动端 v23 · 多选加标签</title>
+<style>
+:root{
+  --bg:#14161a; --bg2:#1b1e24; --surface:#0f1115; --surface2:#232833; --surface3:#1c212a;
+  --line:#2a2f38; --line2:#333a47; --fg:#e8eaed; --dim:#8b93a1; --dim2:#5d6573;
+  --accent:#6ea8fe; --on-accent:#0d1420; --danger:#ff5d6c; --icon:#8b93a1;
+  --sheet-bg:#191d24; --card-bg:#171a20; --card-line:#252a33;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:#08090b;color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+.canvas{max-width:1000px;margin:0 auto;padding:42px 24px 90px}
+.pagehead{text-align:center}
+.pagehead h1{margin:0 0 8px;font-size:26px;letter-spacing:.4px}
+.pagehead p{margin:0;font-size:13.5px;color:var(--dim)}
+.pagehead .meta{margin-top:10px;font-size:12px;color:var(--dim2)}
+.row{display:flex;gap:40px;justify-content:center;flex-wrap:wrap;margin-top:38px}
+.item{width:390px}
+.cap{display:flex;align-items:baseline;gap:10px;margin:0 2px 12px;font-size:12px;color:var(--dim2)}
+.cap b{font-size:13px;color:var(--fg);font-weight:600;white-space:nowrap}
+.cap span{line-height:1.5}
+.ic{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+/* ---------- 手机框 ---------- */
+.phone{position:relative;width:390px;height:844px;border-radius:38px;background:var(--bg);
+  border:1px solid #262b33;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 30px 60px rgba(0,0,0,.55)}
+.status{height:40px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;font-size:13px;font-weight:600;color:#f2f4f8}
+.sicons{display:flex;align-items:center;gap:6px;color:#f2f4f8}
+.sicons svg{display:block}
+.screen{position:relative;flex:1;overflow:hidden;background:var(--bg)}
+
+/* ---------- 背景：图库多选 / 组内多选 ---------- */
+.app{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg)}
+.selhead{display:flex;align-items:center;gap:10px;padding:6px 18px 10px;flex:0 0 auto}
+.iconbtn{width:40px;height:40px;border:0;border-radius:20px;background:transparent;color:var(--fg);
+  display:flex;align-items:center;justify-content:center;padding:0}
+.iconbtn .ic{width:22px;height:22px}
+.selcount{flex:1;text-align:center;font-size:16px;font-weight:650;color:var(--fg)}
+.selcount b{color:var(--accent);font-weight:700}
+.allbtn{border:0;background:transparent;color:var(--accent);font-size:13px;font-weight:650;padding:6px 2px}
+.search{margin:2px 18px 10px;height:46px;border-radius:14px;background:var(--surface3);
+  border:1px solid var(--line);display:flex;align-items:center;gap:9px;padding:0 6px 0 13px;flex:0 0 auto}
+.search .ic{width:18px;height:18px;color:var(--dim)}
+.search .qph{flex:1;min-width:0;font-size:14px;color:var(--dim2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fbtn{width:36px;height:36px;border:0;border-radius:10px;background:var(--surface2);color:var(--icon);
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0}
+.fbtn .ic{width:19px;height:19px}
+.gdsearchrow{display:flex;align-items:center;gap:9px;padding:2px 18px 10px;flex:0 0 auto}
+.gdsearchrow .search{margin:0;flex:1}
+.fbtn.sq{width:46px;height:46px;border-radius:14px;background:var(--surface3);border:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 18px 18px;align-content:start}
+.card{position:relative;aspect-ratio:1/1;border-radius:16px;border:1px solid rgba(255,255,255,.05);
+  display:flex;align-items:center;justify-content:center;font-size:33px;overflow:hidden}
+.card.sel::after{content:"";position:absolute;inset:0;border:2px solid var(--accent);
+  border-radius:inherit;pointer-events:none;z-index:3}
+.fcheck{position:absolute;right:8px;top:8px;width:22px;height:22px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.55);background:rgba(10,12,16,.35);
+  display:flex;align-items:center;justify-content:center;color:#fff;opacity:0;z-index:2}
+.fcheck .ic{width:12px;height:12px;stroke-width:3}
+.card.sel .fcheck{opacity:1;background:var(--accent);border-color:var(--accent)}
+.actbar{position:absolute;left:0;right:0;bottom:0;height:74px;z-index:5;display:flex;
+  border-top:1px solid var(--line);background:var(--bg)}
+.actbar button{flex:1;border:0;background:transparent;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;font-size:11px;color:var(--icon);padding:0}
+.actbar button .ic{width:22px;height:22px}
+.actbar button.primary{color:var(--accent);font-weight:600}
+.actbar button.danger{color:var(--danger)}
+.actbar button.hl{color:var(--accent)}
+
+/* ---------- 标签面板 ---------- */
+.sheetmask{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:50;display:flex;align-items:flex-end}
+.sheet{width:100%;height:66%;background:var(--sheet-bg);border-radius:22px 22px 0 0;
+  padding:10px 16px 14px;display:flex;flex-direction:column;overflow:hidden}
+.grabzone{display:flex;justify-content:center;padding:2px 0 8px;flex:0 0 auto;touch-action:none}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--line2);touch-action:none;cursor:grab}
+.fhead{display:flex;align-items:center;gap:8px;padding:4px 0 10px;flex:0 0 auto}
+.fhead b{font-size:16px;font-weight:600}
+.fscope{font-size:12px;color:var(--dim);background:var(--surface3);border:1px solid var(--line);
+  padding:2px 9px;border-radius:999px;white-space:nowrap;max-width:45%;overflow:hidden;text-overflow:ellipsis}
+.xbtn{margin-left:auto;width:34px;height:34px;border:0;border-radius:17px;background:transparent;
+  color:var(--dim);display:flex;align-items:center;justify-content:center;padding:0}
+.xbtn .ic{width:18px;height:18px}
+.tsearch{height:44px;border-radius:13px;background:var(--surface3);border:1px solid var(--line);
+  display:flex;align-items:center;gap:9px;padding:0 7px 0 13px;flex:0 0 auto;margin-bottom:6px}
+.tsearch:focus-within{border-color:rgba(110,168,254,.6)}
+.tsearch .ic{width:17px;height:17px;color:var(--dim)}
+.tin{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--fg);
+  font-family:inherit;font-size:14px;line-height:44px;padding:0}
+.tin::placeholder{color:var(--dim2)}
+.tclr{width:28px;height:28px;flex:0 0 28px;border:0;border-radius:50%;background:var(--surface2);
+  color:var(--dim2);display:flex;align-items:center;justify-content:center;padding:0}
+.tclr .ic{width:14px;height:14px}
+.fbody{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding-top:2px}
+.fsect{display:flex;align-items:center;gap:6px;padding:12px 2px 8px;flex:0 0 auto;
+  font-size:12px;color:var(--dim2)}
+.fsect b{color:var(--fg);font-weight:600}
+.fsect .fhint{margin-left:auto;font-size:11px;color:var(--dim2);font-weight:400}
+.selchips{display:flex;flex-wrap:wrap;gap:8px}
+.selchip{height:32px;padding:0 9px 0 12px;border-radius:999px;border:1px solid rgba(110,168,254,.45);
+  background:rgba(110,168,254,.14);color:#a9c7f2;font-size:12.5px;display:inline-flex;
+  align-items:center;gap:6px;user-select:none}
+.selchip .ic{width:13px;height:13px;opacity:.75}
+.selchip.new{border-style:dashed;border-color:rgba(110,168,254,.6);color:var(--accent);
+  background:rgba(110,168,254,.08)}
+.tagwrap{display:flex;flex-wrap:wrap;gap:8px}
+.tg{height:36px;padding:0 13px;border-radius:10px;border:1px solid var(--line2);
+  background:var(--surface2);color:var(--fg);font-size:13px;display:inline-flex;
+  align-items:center;gap:7px;user-select:none;transition:background .12s,border-color .12s,color .12s}
+.tg em{font-style:normal;font-size:11px;color:var(--dim)}
+.tg.on{border-color:var(--accent);background:rgba(110,168,254,.16);color:var(--accent)}
+.tg.on em{color:var(--accent);opacity:.8}
+.tg.done{color:var(--dim2);background:transparent;border-color:var(--line)}
+.tg.done em{color:var(--dim2)}
+.tg .ic{width:13px;height:13px;stroke-width:2.6}
+.createrow{display:flex;align-items:center;gap:9px;width:100%;height:44px;margin:0 0 8px;
+  padding:0 12px;border:1px dashed rgba(110,168,254,.6);border-radius:12px;
+  background:rgba(110,168,254,.07);color:#bfd6f8;font-size:13px;text-align:left;flex:0 0 auto}
+.createrow .plus{width:20px;height:20px;border-radius:50%;background:rgba(110,168,254,.18);
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.createrow .plus .ic{width:13px;height:13px;stroke-width:2.4}
+.createrow b{color:var(--accent);font-weight:600}
+.createrow .ckbd{margin-left:auto;font-size:11px;color:var(--dim2);border:1px solid var(--line);
+  border-radius:6px;padding:1px 6px}
+.tnone{padding:10px 2px;font-size:12px;color:var(--dim2)}
+.tempty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;
+  padding:26px 18px 10px;color:var(--dim2)}
+.te-ic{width:52px;height:52px;border-radius:16px;background:var(--surface3);
+  border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--dim2)}
+.te-ic .ic{width:24px;height:24px}
+.tempty b{font-size:14px;color:var(--fg);font-weight:600}
+.tempty span{font-size:12px;line-height:1.7;max-width:240px}
+.ffoot{flex:0 0 auto;padding-top:10px;padding-bottom:2px}
+.apply{width:100%;height:46px;border-radius:14px;border:1px solid var(--accent);
+  background:var(--accent);color:var(--on-accent);font-size:15px;font-weight:650;
+  transition:background .15s,color .15s}
+.apply:disabled{background:var(--surface2);border-color:var(--line);color:var(--dim2);cursor:default}
+.mtoast{position:absolute;left:50%;bottom:96px;transform:translateX(-50%) translateY(8px);
+  background:#2a303c;border:1px solid var(--line2);border-radius:12px;padding:10px 16px;
+  font-size:13px;color:#eef2f8;opacity:0;transition:opacity .2s,transform .2s;z-index:90;
+  white-space:nowrap;pointer-events:none}
+.mtoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ---------- 状态卡 ---------- */
+.statecard{width:390px;background:#101318;border:1px solid var(--line);border-radius:18px;padding:22px}
+.statecard h3{margin:0 0 10px;font-size:12px;font-weight:600;color:var(--dim);letter-spacing:.3px}
+.statecard h3:not(:first-child){margin-top:26px}
+.scrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.schint{margin:9px 0 0;font-size:11.5px;line-height:1.7;color:var(--dim2)}
+.toastdemo{display:inline-block;background:#2a303c;border:1px solid var(--line2);border-radius:12px;
+  padding:10px 16px;font-size:13px;color:#eef2f8}
+
+/* ---------- 说明 ---------- */
+.note{max-width:940px;margin:52px auto 0;background:#0f1217;border:1px solid var(--line);
+  border-radius:16px;padding:26px 30px;display:grid;grid-template-columns:1.12fr .88fr;gap:40px}
+.note h3{margin:0 0 10px;font-size:13.5px;color:#fff;font-weight:600}
+.note h3:not(:first-child){margin-top:24px}
+.note ul,.note ol{margin:0 0 6px;padding-left:18px}
+.note li,.note p{font-size:12.5px;line-height:1.85;color:var(--dim);margin:0 0 7px}
+.note b{color:var(--fg);font-weight:600}
+.note code{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:11.5px;
+  background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#cfe0f5}
+.note .foot{grid-column:1/-1;border-top:1px solid var(--line);padding-top:14px;margin-top:6px;
+  font-size:11.5px;color:var(--dim2)}
+@media (max-width:960px){
+  .note{grid-template-columns:1fr;gap:20px}
+  .note .foot{grid-column:auto}
+}
+</style>
+</head>
+<body>
+<main class="canvas">
+  <header class="pagehead">
+    <h1>v23 · 多选加标签</h1>
+    <p>图库多选 / 分组内多选 → 底栏「标签」→ 同一个面板，点选多个标签后一次提交。</p>
+    <p class="meta">390×844 · 深色主题 · 面板高度 66% · 可直接点选体验</p>
+  </header>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4-4 4M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z"/><circle cx="7.5" cy="7.5" r="1.2"/></symbol>
+    <symbol id="i-add" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M12 11v6m-3-3h6"/></symbol>
+    <symbol id="i-remove" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 13h6"/></symbol>
+    <symbol id="i-album" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v6m-3-3 3 3 3-3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  </svg>
+
+  <!-- ================= A · 图库多选 ================= -->
+  <section class="row">
+    <div class="item">
+      <div class="cap"><b>A · 图库多选</b><span>已选 5 张，已点「搞笑」「猫」；「日常」全都有 → 已加</span></div>
+      <div class="phone">
+        <div class="status">
+          <span>9:41</span>
+          <span class="sicons">
+            <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor" opacity=".45"/></svg>
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.2a10 10 0 0 1 14 0"/><path d="M3.6 6.9a6.2 6.2 0 0 1 8.8 0"/><circle cx="8" cy="9.6" r="1" fill="currentColor" stroke="none"/></svg>
+            <svg width="24" height="11" viewBox="0 0 24 11"><rect x="0.5" y="0.5" width="20" height="10" rx="2.6" fill="none" stroke="currentColor" opacity=".5"/><rect x="2.5" y="2.5" width="14" height="6" rx="1.4" fill="currentColor"/><path d="M22 4v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".5"/></svg>
+          </span>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <header class="selhead">
+              <button class="iconbtn" aria-label="退出多选"><svg class="ic"><use href="#i-x"/></svg></button>
+              <div class="selcount">已选 <b>5</b> 张</div>
+              <button class="allbtn">全选</button>
+            </header>
+            <div class="search">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <span class="qph">搜名字 / 拼音 / 首字母</span>
+              <button class="fbtn" aria-label="筛选"><svg class="ic"><use href="#i-filter"/></svg></button>
+            </div>
+            <main class="grid">
+              <div class="card sel" style="background:linear-gradient(160deg,#5c4a74,#342a46)"><span>🐱</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a4a55,#432832)"><span>🌸</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#5a6240,#333a26)"><span>🐶</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a5a38,#443222)"><span>🍜</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#3f6070,#263a44)"><span>😂</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f4a70,#262e44)"><span>🌙</span></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f6a63,#264038)"><span>🐟</span></div>
+              <div class="card" style="background:linear-gradient(160deg,#6a5f3f,#403a26)"><span>☕</span></div>
+              <div class="card" style="background:linear-gradient(160deg,#6a3f5c,#402636)"><span>🐰</span></div>
+            </main>
+            <nav class="actbar">
+              <button class="primary"><svg class="ic"><use href="#i-send"/></svg><span>发送</span></button>
+              <button class="hl"><svg class="ic"><use href="#i-tag"/></svg><span>标签</span></button>
+              <button><svg class="ic"><use href="#i-add"/></svg><span>添加到</span></button>
+              <button><svg class="ic"><use href="#i-album"/></svg><span>存相册</span></button>
+              <button class="danger"><svg class="ic"><use href="#i-trash"/></svg><span>删除</span></button>
+            </nav>
+          </div>
+        </div>
+
+        <div class="sheetmask">
+          <div class="sheet" data-scope="5">
+            <div class="grabzone"><div class="grab"></div></div>
+            <div class="fhead">
+              <b>加标签</b>
+              <span class="fscope">已选 5 张</span>
+              <button class="xbtn" aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="tsearch">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input class="tin" placeholder="搜索或新建标签" autocomplete="off" spellcheck="false" enterkeyhint="done">
+              <button class="tclr" hidden aria-label="清空"><svg class="ic"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="fbody">
+              <div class="selbox">
+                <div class="fsect">将添加 <b class="seln">2</b> 个标签<span class="fhint">点 × 取消</span></div>
+                <div class="selchips"></div>
+              </div>
+              <div class="fsect">全部标签<span class="fhint">数字为全库图片数</span></div>
+              <button class="createrow" hidden>
+                <span class="plus"><svg class="ic"><use href="#i-plus"/></svg></span>
+                <span>新建标签「<b class="cname"></b>」</span>
+                <span class="ckbd">回车</span>
+              </button>
+              <div class="tnone" hidden>没有匹配的标签</div>
+              <div class="tagwrap">
+                <button class="tg" data-tag="聊天">聊天 <em>44</em></button>
+                <button class="tg" data-tag="保存">保存 <em>33</em></button>
+                <button class="tg done" data-tag="日常" disabled>日常 <em>已加</em></button>
+                <button class="tg" data-tag="梗图">梗图 <em>18</em></button>
+                <button class="tg" data-tag="可爱">可爱 <em>15</em></button>
+                <button class="tg on" data-tag="搞笑">搞笑 <em>12</em></button>
+                <button class="tg on" data-tag="猫">猫 <em>9</em></button>
+                <button class="tg" data-tag="表情包">表情包 <em>7</em></button>
+                <button class="tg" data-tag="摸鱼">摸鱼 <em>6</em></button>
+              </div>
+              <div class="tempty" hidden>
+                <span class="te-ic"><svg class="ic"><use href="#i-tag"/></svg></span>
+                <b>还没有标签</b>
+                <span>输入一个名字，给这 5 张图打上第一个标签</span>
+              </div>
+            </div>
+            <div class="ffoot"><button class="apply">添加 2 个标签</button></div>
+          </div>
+        </div>
+        <div class="mtoast"></div>
+      </div>
+    </div>
+
+    <!-- ================= B · 分组内多选 ================= -->
+    <div class="item">
+      <div class="cap"><b>B · 分组内多选</b><span>已选 4 张；搜「奶龙」没有 → 列表上方现场新建</span></div>
+      <div class="phone">
+        <div class="status">
+          <span>9:41</span>
+          <span class="sicons">
+            <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor" opacity=".45"/></svg>
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.2a10 10 0 0 1 14 0"/><path d="M3.6 6.9a6.2 6.2 0 0 1 8.8 0"/><circle cx="8" cy="9.6" r="1" fill="currentColor" stroke="none"/></svg>
+            <svg width="24" height="11" viewBox="0 0 24 11"><rect x="0.5" y="0.5" width="20" height="10" rx="2.6" fill="none" stroke="currentColor" opacity=".5"/><rect x="2.5" y="2.5" width="14" height="6" rx="1.4" fill="currentColor"/><path d="M22 4v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".5"/></svg>
+          </span>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <header class="selhead">
+              <button class="iconbtn" aria-label="退出多选"><svg class="ic"><use href="#i-x"/></svg></button>
+              <div class="selcount">已选 <b>4</b> 张</div>
+              <button class="allbtn">全选</button>
+            </header>
+            <div class="gdsearchrow">
+              <div class="search">
+                <svg class="ic"><use href="#i-search"/></svg>
+                <span class="qph">搜组内图片</span>
+              </div>
+              <button class="fbtn sq" aria-label="筛选"><svg class="ic"><use href="#i-filter"/></svg></button>
+            </div>
+            <main class="grid">
+              <div class="card sel" style="background:linear-gradient(160deg,#5c4a74,#342a46)"><span>🐱</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a4a55,#432832)"><span>🌸</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#5a6240,#333a26)"><span>🐶</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a5a38,#443222)"><span>🍜</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f6070,#263a44)"><span>😂</span></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f4a70,#262e44)"><span>🌙</span></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f6a63,#264038)"><span>🐟</span></div>
+              <div class="card" style="background:linear-gradient(160deg,#6a5f3f,#403a26)"><span>☕</span></div>
+              <div class="card" style="background:linear-gradient(160deg,#6a3f5c,#402636)"><span>🐰</span></div>
+            </main>
+            <nav class="actbar">
+              <button class="primary"><svg class="ic"><use href="#i-send"/></svg><span>发送</span></button>
+              <button class="hl"><svg class="ic"><use href="#i-tag"/></svg><span>标签</span></button>
+              <button><svg class="ic"><use href="#i-add"/></svg><span>添加到</span></button>
+              <button><svg class="ic"><use href="#i-remove"/></svg><span>移出分组</span></button>
+              <button><svg class="ic"><use href="#i-album"/></svg><span>存相册</span></button>
+              <button class="danger"><svg class="ic"><use href="#i-trash"/></svg><span>删除</span></button>
+            </nav>
+          </div>
+        </div>
+
+        <div class="sheetmask">
+          <div class="sheet" data-scope="4">
+            <div class="grabzone"><div class="grab"></div></div>
+            <div class="fhead">
+              <b>加标签</b>
+              <span class="fscope">已选 4 张</span>
+              <button class="xbtn" aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="tsearch">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input class="tin" value="奶龙" autocomplete="off" spellcheck="false" enterkeyhint="done">
+              <button class="tclr" aria-label="清空"><svg class="ic"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="fbody">
+              <div class="selbox">
+                <div class="fsect">将添加 <b class="seln">2</b> 个标签<span class="fhint">点 × 取消</span></div>
+                <div class="selchips"></div>
+              </div>
+              <div class="fsect">全部标签<span class="fhint">数字为全库图片数</span></div>
+              <button class="createrow">
+                <span class="plus"><svg class="ic"><use href="#i-plus"/></svg></span>
+                <span>新建标签「<b class="cname">奶龙</b>」</span>
+                <span class="ckbd">回车</span>
+              </button>
+              <div class="tnone" hidden>没有匹配的标签</div>
+              <div class="tagwrap">
+                <button class="tg" data-tag="聊天">聊天 <em>44</em></button>
+                <button class="tg" data-tag="保存">保存 <em>33</em></button>
+                <button class="tg" data-tag="梗图">梗图 <em>18</em></button>
+                <button class="tg" data-tag="可爱">可爱 <em>15</em></button>
+                <button class="tg on" data-tag="搞笑">搞笑 <em>12</em></button>
+                <button class="tg on" data-tag="猫">猫 <em>9</em></button>
+                <button class="tg" data-tag="表情包">表情包 <em>7</em></button>
+              </div>
+              <div class="tempty" hidden>
+                <span class="te-ic"><svg class="ic"><use href="#i-tag"/></svg></span>
+                <b>还没有标签</b>
+                <span>输入一个名字，给这 4 张图打上第一个标签</span>
+              </div>
+            </div>
+            <div class="ffoot"><button class="apply">添加 2 个标签</button></div>
+          </div>
+        </div>
+        <div class="mtoast"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= C · 空标签库 + 状态卡 ================= -->
+  <section class="row">
+    <div class="item">
+      <div class="cap"><b>C · 第一次用（空标签库）</b><span>不给空列表，直接告诉用户可以现场建</span></div>
+      <div class="phone">
+        <div class="status">
+          <span>9:41</span>
+          <span class="sicons">
+            <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor" opacity=".45"/></svg>
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.2a10 10 0 0 1 14 0"/><path d="M3.6 6.9a6.2 6.2 0 0 1 8.8 0"/><circle cx="8" cy="9.6" r="1" fill="currentColor" stroke="none"/></svg>
+            <svg width="24" height="11" viewBox="0 0 24 11"><rect x="0.5" y="0.5" width="20" height="10" rx="2.6" fill="none" stroke="currentColor" opacity=".5"/><rect x="2.5" y="2.5" width="14" height="6" rx="1.4" fill="currentColor"/><path d="M22 4v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".5"/></svg>
+          </span>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <header class="selhead">
+              <button class="iconbtn" aria-label="退出多选"><svg class="ic"><use href="#i-x"/></svg></button>
+              <div class="selcount">已选 <b>3</b> 张</div>
+              <button class="allbtn">全选</button>
+            </header>
+            <div class="search">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <span class="qph">搜名字 / 拼音 / 首字母</span>
+              <button class="fbtn" aria-label="筛选"><svg class="ic"><use href="#i-filter"/></svg></button>
+            </div>
+            <main class="grid">
+              <div class="card sel" style="background:linear-gradient(160deg,#5c4a74,#342a46)"><span>🐱</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a4a55,#432832)"><span>🌸</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#5a6240,#333a26)"><span>🐶</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card" style="background:linear-gradient(160deg,#7a5a38,#443222)"><span>🍜</span></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f6070,#263a44)"><span>😂</span></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f4a70,#262e44)"><span>🌙</span></div>
+            </main>
+            <nav class="actbar">
+              <button class="primary"><svg class="ic"><use href="#i-send"/></svg><span>发送</span></button>
+              <button class="hl"><svg class="ic"><use href="#i-tag"/></svg><span>标签</span></button>
+              <button><svg class="ic"><use href="#i-add"/></svg><span>添加到</span></button>
+              <button><svg class="ic"><use href="#i-album"/></svg><span>存相册</span></button>
+              <button class="danger"><svg class="ic"><use href="#i-trash"/></svg><span>删除</span></button>
+            </nav>
+          </div>
+        </div>
+
+        <div class="sheetmask">
+          <div class="sheet" data-scope="3">
+            <div class="grabzone"><div class="grab"></div></div>
+            <div class="fhead">
+              <b>加标签</b>
+              <span class="fscope">已选 3 张</span>
+              <button class="xbtn" aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="tsearch">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input class="tin" placeholder="搜索或新建标签" autocomplete="off" spellcheck="false" enterkeyhint="done">
+              <button class="tclr" hidden aria-label="清空"><svg class="ic"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="fbody">
+              <div class="selbox" hidden>
+                <div class="fsect">将添加 <b class="seln">0</b> 个标签<span class="fhint">点 × 取消</span></div>
+                <div class="selchips"></div>
+              </div>
+              <div class="fsect">全部标签<span class="fhint">数字为全库图片数</span></div>
+              <button class="createrow" hidden>
+                <span class="plus"><svg class="ic"><use href="#i-plus"/></svg></span>
+                <span>新建标签「<b class="cname"></b>」</span>
+                <span class="ckbd">回车</span>
+              </button>
+              <div class="tnone" hidden>没有匹配的标签</div>
+              <div class="tagwrap"></div>
+              <div class="tempty">
+                <span class="te-ic"><svg class="ic"><use href="#i-tag"/></svg></span>
+                <b>还没有标签</b>
+                <span>输入一个名字，给这 3 张图打上第一个标签</span>
+              </div>
+            </div>
+            <div class="ffoot"><button class="apply" disabled>添加标签</button></div>
+          </div>
+        </div>
+        <div class="mtoast"></div>
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="cap"><b>状态速查</b><span>标签 chip 四态、底栏两态、应用反馈</span></div>
+      <div class="statecard">
+        <h3>标签 CHIP</h3>
+        <div class="scrow">
+          <button class="tg">搞笑 <em>12</em></button>
+          <button class="tg on">猫 <em>9</em></button>
+          <button class="tg done" disabled>日常 <em>已加</em></button>
+        </div>
+        <p class="schint">普通 / 已选 / 已加（所选的图全都有，禁用并说明原因）</p>
+
+        <h3>已选区 CHIP</h3>
+        <div class="scrow">
+          <button class="selchip">搞笑<svg class="ic"><use href="#i-x"/></svg></button>
+          <button class="selchip new">奶龙<svg class="ic"><use href="#i-x"/></svg></button>
+        </div>
+        <p class="schint">已有标签 / 待新建（虚线）；点 × 取消</p>
+
+        <h3>底栏</h3>
+        <button class="apply">添加 2 个标签</button>
+        <button class="apply" disabled style="margin-top:8px">添加标签</button>
+        <p class="schint">选了才可点；按钮上直接带数量，省掉一个确认框</p>
+
+        <h3>应用后</h3>
+        <div class="toastdemo">已为 5 张添加 2 个标签</div>
+        <p class="schint">关面板、保持多选；失败时只换 toast 文案，面板不关</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 说明 ================= -->
+  <section class="note">
+    <div>
+      <h3>为什么这么设计</h3>
+      <ul>
+        <li><b>一个面板，两个入口。</b>图库多选和分组内多选的底栏本来就有「标签」，两处打开同一个面板；scope 统一显示「已选 N 张」，分组名在背景里已经看得见，不再重复。</li>
+        <li><b>先选后提交。</b>点标签先本地选中，底部「添加 N 个标签」一次提交；和「添加到」同一节奏，多选场景少写盘、少 toast，误触还能再点一下取消。</li>
+        <li><b>搜索框兼新建。</b>输入不存在的名字，列表上方出现「新建标签「xxx」」，点一下进待新建区，回车同效；trim 后和现有标签同名时不重复建，直接选中已有。</li>
+        <li><b>数字用全库数量</b>（沿用筛选面板）；所选的图全都有这个标签时显示「✓ 已加」并禁用，避免无效点击。</li>
+        <li><b>应用后</b>关面板 + toast「已为 5 张添加 2 个标签」，保持多选；失败时 toast 原因，面板不关、已选不清空。</li>
+        <li><b>键盘弹起</b>时底栏保持可见（不套用全局 <code>body.kbd .ffoot</code> 的隐藏规则），列表区压缩滚动。</li>
+      </ul>
+    </div>
+    <div>
+      <h3>需要你拍板</h3>
+      <ol>
+        <li>确认式（现在这版）还是点一下立即生效？建议确认式，和「添加到」一致。</li>
+        <li>数字用全库总数，还是「已选里已有几张」（如 3/5）？现在用全库总数。</li>
+        <li>应用成功后要不要自动退出多选？现在保持选中。</li>
+      </ol>
+      <h3>实现备注（本次只出 mock，不动代码）</h3>
+      <p>批量提交沿用 <code>add_tags(shas, tags)</code>，成功后刷新 <code>tag_stats</code> 写回 <code>S.tags</code>；面板高度 66%，比「添加到」的 80% 轻，能露出背景里的多选头部。</p>
+    </div>
+    <div class="foot">本 mock 可点：标签多选、搜索过滤、新建标签、底部提交（toast）。遮罩和 ✕ 不模拟真实关闭；底栏蓝色的「标签」只是标出入口（实际 App 里按钮不高亮），两处入口只在 5 键 / 6 键底栏上不同。</div>
+  </section>
+</main>
+
+<script>
+(function(){
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  document.querySelectorAll('.sheet').forEach(setup);
+
+  function setup(sheet){
+    const phone = sheet.closest('.phone');
+    const input = sheet.querySelector('.tin');
+    const clr = sheet.querySelector('.tclr');
+    const list = sheet.querySelector('.tagwrap');
+    const selWrap = sheet.querySelector('.selchips');
+    const selBox = sheet.querySelector('.selbox');
+    const selN = sheet.querySelector('.seln');
+    const createRow = sheet.querySelector('.createrow');
+    const cname = sheet.querySelector('.cname');
+    const none = sheet.querySelector('.tnone');
+    const empty = sheet.querySelector('.tempty');
+    const apply = sheet.querySelector('.apply');
+    const toast = phone.querySelector('.mtoast');
+    const scope = parseInt(sheet.dataset.scope || '0', 10);
+    let toastTimer = 0;
+
+    const tags = Array.from(list.querySelectorAll('.tg')).map(el => ({
+      name: el.dataset.tag,
+      el,
+      done: el.disabled
+    }));
+    const selected = new Set(tags.filter(t => t.el.classList.contains('on')).map(t => t.name));
+
+    function showToast(msg){
+      toast.textContent = msg;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
+    }
+
+    function render(){
+      tags.forEach(t => t.el.classList.toggle('on', selected.has(t.name)));
+
+      const names = Array.from(selected);
+      selWrap.innerHTML = names.map(name => {
+        const isNew = !tags.some(t => t.name === name);
+        return '<button class="selchip' + (isNew ? ' new' : '') + '" data-name="' + esc(name) + '">' +
+          esc(name) + '<svg class="ic"><use href="#i-x"/></svg></button>';
+      }).join('');
+
+      selBox.hidden = names.length === 0;
+      if (selN) selN.textContent = names.length;
+      apply.disabled = names.length === 0;
+      apply.textContent = names.length ? '添加 ' + names.length + ' 个标签' : '添加标签';
+      if (empty) empty.hidden = tags.length > 0;
+    }
+
+    function filter(){
+      const raw = input.value;
+      const q = raw.trim().toLowerCase();
+      clr.hidden = !raw;
+
+      let visible = 0;
+      tags.forEach(t => {
+        const hit = !q || t.name.toLowerCase().indexOf(q) !== -1;
+        t.el.hidden = !hit;
+        if (hit) visible++;
+      });
+
+      const exists = tags.some(t => t.name.toLowerCase() === q) ||
+                     Array.from(selected).some(n => n.toLowerCase() === q);
+      const showCreate = !!q && !exists;
+      createRow.hidden = !showCreate;
+      if (cname) cname.textContent = input.value.trim();
+      if (none) none.hidden = !(q && visible === 0);
+    }
+
+    list.addEventListener('click', e => {
+      const el = e.target.closest('.tg');
+      if (!el || el.disabled) return;
+      const name = el.dataset.tag;
+      if (selected.has(name)) selected.delete(name);
+      else selected.add(name);
+      render();
+    });
+
+    selWrap.addEventListener('click', e => {
+      const chip = e.target.closest('.selchip');
+      if (!chip) return;
+      selected.delete(chip.dataset.name);
+      render();
+      filter();
+    });
+
+    createRow.addEventListener('click', () => {
+      const name = input.value.trim();
+      if (!name) return;
+      selected.add(name);
+      input.value = '';
+      filter();
+      render();
+      input.focus();
+    });
+
+    input.addEventListener('input', filter);
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!createRow.hidden) createRow.click();
+      }
+    });
+
+    clr.addEventListener('click', () => {
+      input.value = '';
+      filter();
+      input.focus();
+    });
+
+    apply.addEventListener('click', () => {
+      if (!selected.size) return;
+      const n = selected.size;
+      apply.disabled = true;
+      apply.textContent = '添加中…';
+      setTimeout(() => {
+        showToast('已为 ' + scope + ' 张添加 ' + n + ' 个标签');
+        render();
+      }, 420);
+    });
+
+    filter();
+    render();
+  }
+})();
+</script>
+</body>
+</html>

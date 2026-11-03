@@ -429,6 +429,13 @@ pub fn tag_stats(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, S
         .collect())
 }
 
+/// 批量加标签：core 会 trim/去空/去重，已存在的标签不会重复写
+#[tauri::command]
+pub fn add_tags(state: State<'_, AppState>, shas: Vec<String>, tags: Vec<String>) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.add_tags(&shas, tags).map_err(|e| format!("{e:#}"))
+}
+
 #[tauri::command]
 pub fn library_stats(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let lib = state.lib.lock().map_err(|e| e.to_string())?;

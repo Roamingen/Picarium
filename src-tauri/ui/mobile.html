@@ -458,6 +458,50 @@
       </div>
     </div>
 
+    <!-- 加标签：图库/分组多选共用；搜索框兼新建，底部一次提交 -->
+    <div class="sheetmask" id="tagmask" hidden>
+      <div class="sheet fsheet tagsheet" id="tagsheet">
+        <div class="grabzone"><div class="grab"></div></div>
+        <div class="fhead">
+          <b>加标签</b><span class="fscope" id="tag-scope">已选 0 张</span>
+          <button class="iconbtn ghost" id="tag-close" title="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="tagsearch">
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="tagq" placeholder="搜索或新建标签" autocomplete="off" spellcheck="false" enterkeyhint="done" />
+            <button class="clr" id="tagq-clear" hidden aria-label="清空搜索">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="fbody" id="tag-body">
+          <div id="tag-selbox" hidden>
+            <div class="fsect">将添加 <b id="tag-seln">0</b> 个标签<span class="fhint">点 × 取消</span></div>
+            <div class="tagsel" id="tag-sel"></div>
+          </div>
+          <div class="fsect">全部标签<span class="fhint">数字为全库图片数</span></div>
+          <button class="createrow" id="tag-create" hidden>
+            <span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+            <span>新建标签「<b id="tag-cname"></b>」</span>
+            <span class="ckbd">回车</span>
+          </button>
+          <div class="tnone" id="tag-none" hidden>没有匹配的标签</div>
+          <div class="tagwrap" id="tag-list"></div>
+          <div class="tempty" id="tag-empty" hidden>
+            <span class="te-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></span>
+            <b>还没有标签</b>
+            <span id="tag-empty-hint">输入一个名字，给这 5 张图打上第一个标签</span>
+          </div>
+        </div>
+        <div class="sheet-actions ffoot tagfoot">
+          <button class="primary" id="tag-ok" disabled>添加标签</button>
+        </div>
+      </div>
+    </div>
+
     <div class="toast" id="toast" hidden></div>
   </div>
   <script src="mobile.js" defer></script>

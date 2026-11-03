@@ -1534,6 +1534,7 @@ function activeLayer() {
   if (shown("gmenu")) return { close: () => closeGmenu() };
   if (shown("filtermask")) return { close: () => { $("filtermask").hidden = true; syncGuard(); } };
   if (shown("pickmask")) return { close: exitPicker };
+  if (shown("tagmask")) return { close: () => closeTagSheet() };
   if (imgSelMode) return { close: () => setImgSelMode(false) };
   if (shown("viewer")) return { close: () => closeViewer() };
   if (trashSelMode) return { close: () => setTrashSelMode(false) };
@@ -1632,7 +1633,7 @@ async function gdAction(act) {
     }
     return;
   }
-  if (act === "tag") return toast("标签在后面的批次接上");
+  if (act === "tag") { openTagSheet(shas); return; }
   if (act === "add") {
     openGroupPicker(shas);
     return;
@@ -3293,7 +3294,7 @@ $("actbar").addEventListener("click", async (e) => {
     return;
   }
   if (act === "tag") {
-    toast("标签编辑下一批上线");
+    openTagSheet(shas);
     return;
   }
   if (act === "send") {
@@ -3332,6 +3333,7 @@ function sheetCloser(sheet) {
   const id = wrap && wrap.id;
   if (id === "filtermask") return () => { $("filtermask").hidden = true; syncGuard(); };
   if (id === "pickmask") return () => closeGroupPicker();
+  if (id === "tagmask") return () => closeTagSheet();
   if (id === "sheetmask") return () => { if (sheetResolve) { sheetResolve(false); sheetResolve = null; } closeSheet(); };
   return () => { if (wrap) wrap.hidden = true; syncGuard(); };
 }
@@ -3553,6 +3555,181 @@ async function pickerMoveOut() {
 function openMoveSheet(shas) {
   openGroupPicker(shas);
 }
+
+/* 多选加标签：图库与分组内共用同一面板；本地多选后一次提交 */
+let tagShas = [];
+let tagSel = new Set();
+let tagNewNames = new Set();
+
+// 选中图对应的资产对象（图库取 S.items，分组内取 gdItems）
+function tagAssets() {
+  const src = S.gview ? gdItems : S.items;
+  const map = new Map((src || []).map((a) => [a.sha, a]));
+  return tagShas.map((sha) => map.get(sha)).filter(Boolean);
+}
+
+function tagAllHave(name, assets) {
+  return assets.length > 0 && assets.length === tagShas.length && assets.every((a) => (a.tags || []).includes(name));
+}
+
+function renderTagSheet() {
+  const q = ($("tagq").value || "").trim();
+  const ql = q.toLowerCase();
+  const assets = tagAssets();
+  const selList = [...tagSel];
+
+  $("tag-scope").textContent = `已选 ${tagShas.length} 张`;
+  $("tag-seln").textContent = String(selList.length);
+  $("tag-selbox").hidden = selList.length === 0;
+  $("tag-sel").innerHTML = selList
+    .map(
+      (name) =>
+        `<button class="selchip${tagNewNames.has(name) ? " new" : ""}" data-untag="${escapeAttr(name)}">${escapeHtml(name)}` +
+        `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>`
+    )
+    .join("");
+
+  const all = S.tags || [];
+  const filtered = all.filter((t) => !ql || t.name.toLowerCase().includes(ql));
+  const exact = all.find((t) => t.name.toLowerCase() === ql);
+  const showCreate = !!q && !exact && !tagSel.has(q);
+  $("tag-create").hidden = !showCreate;
+  if (showCreate) $("tag-cname").textContent = q;
+  $("tag-none").hidden = !(ql && filtered.length === 0 && !showCreate);
+  $("tag-empty").hidden = !(all.length === 0 && !q);
+  $("tag-empty-hint").textContent = `输入一个名字，给这 ${tagShas.length} 张图打上第一个标签`;
+
+  $("tag-list").innerHTML = filtered
+    .map((t) => {
+      const on = tagSel.has(t.name);
+      const done = !on && tagAllHave(t.name, assets);
+      return (
+        `<button class="tagchip${on ? " on" : ""}${done ? " done" : ""}" data-tag="${escapeAttr(t.name)}"${done ? " disabled" : ""}>` +
+        `${escapeHtml(t.name)} <em>${done ? "已加" : t.count}</em></button>`
+      );
+    })
+    .join("");
+
+  $("tag-ok").textContent = selList.length ? `添加 ${selList.length} 个标签` : "添加标签";
+  $("tag-ok").disabled = selList.length === 0;
+}
+
+function addTagFromQuery() {
+  const q = ($("tagq").value || "").trim();
+  if (!q) return;
+  const hit = (S.tags || []).find((t) => t.name.toLowerCase() === q.toLowerCase());
+  const name = hit ? hit.name : q;
+  if (!hit) tagNewNames.add(name);
+  tagSel.add(name);
+  $("tagq").value = "";
+  $("tagq-clear").hidden = true;
+  renderTagSheet();
+  $("tagq").focus();
+}
+
+function toggleTag(name) {
+  if (tagSel.has(name)) {
+    tagSel.delete(name);
+    tagNewNames.delete(name);
+  } else {
+    if (tagAllHave(name, tagAssets())) return; // 选中的图都已有这个标签
+    tagSel.add(name);
+  }
+  renderTagSheet();
+}
+
+function openTagSheet(shas) {
+  tagShas = (shas || []).slice();
+  tagSel = new Set();
+  tagNewNames = new Set();
+  $("tagq").value = "";
+  $("tagq-clear").hidden = true;
+  resetSheetHeight($("tagsheet"));
+  renderTagSheet();
+  $("tagmask").hidden = false;
+  syncGuard();
+}
+
+function closeTagSheet() {
+  $("tagmask").hidden = true;
+  $("tagq").blur();
+  tagShas = [];
+  tagSel.clear();
+  tagNewNames.clear();
+  syncGuard();
+}
+
+async function applyTags() {
+  const tags = [...tagSel];
+  if (!tags.length) return;
+  const n = tagShas.length;
+  const btn = $("tag-ok");
+  btn.disabled = true;
+  btn.textContent = "添加中…";
+  try {
+    await invokeRetry("add_tags", { shas: tagShas, tags });
+  } catch (e) {
+    toast("添加失败：" + String(e));
+    renderTagSheet();
+    return;
+  }
+  // 本地回写标签，退出多选/进详情时不用等整页刷新
+  const keep = new Set(tagShas);
+  for (const pool of [S.items, gdItems]) {
+    for (const a of pool || []) {
+      if (!keep.has(a.sha)) continue;
+      a.tags = [...new Set([...(a.tags || []), ...tags])];
+    }
+  }
+  if (vCache) {
+    for (const a of vCache.values()) {
+      if (!keep.has(a.sha)) continue;
+      a.tags = [...new Set([...(a.tags || []), ...tags])];
+    }
+  }
+  closeTagSheet();
+  toast(`已为 ${n} 张添加 ${tags.length} 个标签`);
+  try {
+    S.tags = (await invokeRetry("tag_stats")) || [];
+  } catch (_) {
+    /* 统计刷新失败不影响已写入的标签 */
+  }
+}
+
+$("tag-close").addEventListener("click", closeTagSheet);
+$("tagmask").addEventListener("click", (e) => {
+  if (e.target === $("tagmask")) closeTagSheet();
+});
+$("tagq").addEventListener("input", () => {
+  $("tagq-clear").hidden = !$("tagq").value;
+  renderTagSheet();
+});
+$("tagq").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || e.isComposing) return;
+  e.preventDefault();
+  if (!$("tag-create").hidden) addTagFromQuery();
+  else $("tagq").blur();
+});
+$("tagq-clear").addEventListener("click", () => {
+  $("tagq").value = "";
+  $("tagq-clear").hidden = true;
+  renderTagSheet();
+  $("tagq").focus();
+});
+$("tag-create").addEventListener("click", addTagFromQuery);
+$("tag-list").addEventListener("click", (e) => {
+  const b = e.target.closest(".tagchip");
+  if (!b || b.disabled) return;
+  toggleTag(b.dataset.tag);
+});
+$("tag-sel").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-untag]");
+  if (!b) return;
+  tagSel.delete(b.dataset.untag);
+  tagNewNames.delete(b.dataset.untag);
+  renderTagSheet();
+});
+$("tag-ok").addEventListener("click", applyTags);
 
 $("v-close").addEventListener("click", closeViewer);
 $("v-share").addEventListener("click", async () => {
