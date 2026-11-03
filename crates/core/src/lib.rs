@@ -97,6 +97,9 @@ struct IndexFile {
     /// 分组登记表：允许存在「0 张」的空分组
     #[serde(default)]
     groups: Vec<String>,
+    /// 标签登记表：允许存在「0 张」的空标签（标签管理里新建的）
+    #[serde(default)]
+    tags: Vec<String>,
     /// 手动排序：key（分组名 / __star__）→ sha 顺序
     #[serde(default)]
     orders: std::collections::BTreeMap<String, Vec<String>>,
@@ -118,6 +121,7 @@ pub struct Library {
     root: PathBuf,
     assets: Vec<Asset>,
     known_groups: Vec<String>,
+    known_tags: Vec<String>,
     orders: std::collections::BTreeMap<String, Vec<String>>,
     seen: HashSet<String>,
     seen_ungrouped_at: String,
@@ -138,6 +142,7 @@ impl Library {
         let mut assets: Vec<Asset> = Vec::new();
         let mut seen_ungrouped_at = String::new();
         let mut known_groups: Vec<String> = Vec::new();
+        let mut known_tags: Vec<String> = Vec::new();
         let mut orders: std::collections::BTreeMap<String, Vec<String>> =
             std::collections::BTreeMap::new();
         let mut group_order: Vec<String> = Vec::new();
@@ -153,6 +158,7 @@ impl Library {
                     assets = f.assets;
                     seen_ungrouped_at = f.seen_ungrouped_at;
                     known_groups = f.groups;
+                    known_tags = f.tags;
                     orders = f.orders;
                     group_order = f.group_order;
                     group_covers = f.group_covers;
@@ -243,6 +249,25 @@ impl Library {
             known_groups = known.into_iter().collect();
         }
 
+        // 标签登记表：老库没有 tags 字段，把资产里出现过的标签补进来；空标签保留
+        {
+            let before = known_tags.clone();
+            let mut known: std::collections::BTreeSet<String> = known_tags
+                .into_iter()
+                .map(|t| t.trim().to_string())
+                .filter(|t| !t.is_empty())
+                .collect();
+            for a in &assets {
+                for t in &a.tags {
+                    known.insert(t.clone());
+                }
+            }
+            known_tags = known.into_iter().collect();
+            if known_tags != before {
+                migrated = true;
+            }
+        }
+
         // 分组顺序：老库没有顺序表时按名字排；表里缺的补到末尾
         {
             let known: std::collections::HashSet<String> = known_groups.iter().cloned().collect();
@@ -277,6 +302,7 @@ impl Library {
             root,
             assets,
             known_groups,
+            known_tags,
             orders,
             seen,
             seen_ungrouped_at,
@@ -767,8 +793,165 @@ impl Library {
                 n += 1;
             }
         }
+        if n > 0 {
+            for t in &tags {
+                if !self.known_tags.iter().any(|x| x == t) {
+                    self.known_tags.push(t.clone());
+                }
+            }
+            self.known_tags = clean_list(std::mem::take(&mut self.known_tags));
+        }
         self.save()?;
         Ok(n)
+    }
+
+    /// 新建一个空标签（管理页用）；同名返回 false
+    pub fn create_tag(&mut self, name: &str) -> Result<bool> {
+        let name = name.trim();
+        if name.is_empty() {
+            anyhow::bail!("标签名不能为空");
+        }
+        if self.known_tags.iter().any(|t| t == name) {
+            return Ok(false);
+        }
+        self.known_tags.push(name.to_string());
+        self.save()?;
+        Ok(true)
+    }
+
+    /// 重命名标签；新名字已存在时等价于合并。返回受影响的图片数。
+    pub fn rename_tag(&mut self, old: &str, new: &str) -> Result<usize> {
+        let new = new.trim();
+        if new.is_empty() {
+            anyhow::bail!("标签名不能为空");
+        }
+        if old == new {
+            return Ok(0);
+        }
+        self.known_tags.retain(|t| t != old);
+        if !self.known_tags.iter().any(|t| t == new) {
+            self.known_tags.push(new.to_string());
+        }
+        self.known_tags = clean_list(std::mem::take(&mut self.known_tags));
+
+        let mut n = 0;
+        for a in &mut self.assets {
+            if a.tags.iter().any(|t| t == old) {
+                a.tags.retain(|t| t != old);
+                if !a.tags.iter().any(|t| t == new) {
+                    a.tags.push(new.to_string());
+                }
+                n += 1;
+            }
+        }
+        let mut items = self.read_trash();
+        let mut changed = false;
+        for it in &mut items {
+            if it.asset.tags.iter().any(|t| t == old) {
+                it.asset.tags.retain(|t| t != old);
+                if !it.asset.tags.iter().any(|t| t == new) {
+                    it.asset.tags.push(new.to_string());
+                }
+                changed = true;
+            }
+        }
+        if changed {
+            self.write_trash(&items)?;
+        }
+        self.save()?;
+        Ok(n)
+    }
+
+    /// 合并标签：把 from 并入 to，from 从登记表和所有图片上移除
+    pub fn merge_tags(&mut self, from: &str, to: &str) -> Result<usize> {
+        let to = to.trim();
+        if to.is_empty() {
+            anyhow::bail!("标签名不能为空");
+        }
+        if from == to {
+            return Ok(0);
+        }
+        self.known_tags.retain(|t| t != from);
+        if !self.known_tags.iter().any(|t| t == to) {
+            self.known_tags.push(to.to_string());
+        }
+        self.known_tags = clean_list(std::mem::take(&mut self.known_tags));
+
+        let mut n = 0;
+        for a in &mut self.assets {
+            if a.tags.iter().any(|t| t == from) {
+                a.tags.retain(|t| t != from);
+                if !a.tags.iter().any(|t| t == to) {
+                    a.tags.push(to.to_string());
+                }
+                n += 1;
+            }
+        }
+        let mut items = self.read_trash();
+        let mut changed = false;
+        for it in &mut items {
+            if it.asset.tags.iter().any(|t| t == from) {
+                it.asset.tags.retain(|t| t != from);
+                if !it.asset.tags.iter().any(|t| t == to) {
+                    it.asset.tags.push(to.to_string());
+                }
+                changed = true;
+            }
+        }
+        if changed {
+            self.write_trash(&items)?;
+        }
+        self.save()?;
+        Ok(n)
+    }
+
+    /// 彻底删除一个标签：登记表、在库图片、回收站里的引用一起清掉
+    pub fn delete_tag(&mut self, name: &str) -> Result<usize> {
+        let name = name.trim();
+        if name.is_empty() {
+            anyhow::bail!("标签名不能为空");
+        }
+        self.known_tags.retain(|t| t != name);
+        let mut n = 0;
+        for a in &mut self.assets {
+            if a.tags.iter().any(|t| t == name) {
+                a.tags.retain(|t| t != name);
+                n += 1;
+            }
+        }
+        let mut items = self.read_trash();
+        let mut changed = false;
+        for it in &mut items {
+            if it.asset.tags.iter().any(|t| t == name) {
+                it.asset.tags.retain(|t| t != name);
+                changed = true;
+            }
+        }
+        if changed {
+            self.write_trash(&items)?;
+        }
+        self.save()?;
+        Ok(n)
+    }
+
+    /// 整组替换某张图的标签（详情页保存用）；空列表表示清空
+    pub fn set_asset_tags(&mut self, sha: &str, tags: Vec<String>) -> Result<()> {
+        let tags = clean_list(tags);
+        {
+            let asset = self
+                .assets
+                .iter_mut()
+                .find(|a| a.sha == sha)
+                .ok_or_else(|| anyhow::anyhow!("图片不存在"))?;
+            asset.tags = tags.clone();
+        }
+        for t in tags {
+            if !self.known_tags.iter().any(|x| x == &t) {
+                self.known_tags.push(t);
+            }
+        }
+        self.known_tags = clean_list(std::mem::take(&mut self.known_tags));
+        self.save()
     }
 
     /// 记一次使用（复制）
@@ -842,9 +1025,13 @@ impl Library {
         self.save()
     }
 
-    /// 全部标签（按使用次数倒序），给多选控件用
+    /// 全部标签（按使用次数倒序），给多选控件用。
+    /// 管理页新建的空标签也会保留在列表里（count = 0）。
     pub fn tag_stats(&self) -> Vec<(String, usize)> {
         let mut map: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+        for t in &self.known_tags {
+            map.insert(t.clone(), 0);
+        }
         for a in &self.assets {
             for t in &a.tags {
                 *map.entry(t.clone()).or_insert(0) += 1;
@@ -1155,6 +1342,7 @@ impl Library {
             assets: self.assets.clone(),
             seen_ungrouped_at: self.seen_ungrouped_at.clone(),
             groups: self.known_groups.clone(),
+            tags: self.known_tags.clone(),
             group_order: self.group_order.clone(),
             group_covers: self.group_covers.clone(),
             pinned_groups: self.pinned_groups.clone(),
@@ -1690,6 +1878,86 @@ mod tests {
         assert!(names.contains(&"新名字".to_string()));
         assert!(!names.contains(&"旧名字".to_string()));
         std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn tag_registry_lifecycle() {
+        let base = std::env::temp_dir().join(format!("sb-tags-{}", std::process::id()));
+        let src = base.join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        for (i, name) in ["t0.png", "t1.png"].iter().enumerate() {
+            image::RgbaImage::from_pixel(2, 2, image::Rgba([i as u8 + 1, 2, 3, 255]))
+                .save(src.join(name))
+                .unwrap();
+        }
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        lib.scan_folder(&src).unwrap();
+        let shas: Vec<String> = lib.assets().iter().map(|a| a.sha.clone()).collect();
+
+        assert!(lib.create_tag("空标签").unwrap());
+        assert!(!lib.create_tag("空标签").unwrap());
+        assert!(lib
+            .tag_stats()
+            .iter()
+            .any(|(n, c)| n == "空标签" && *c == 0));
+
+        lib.add_tags(&shas, vec!["甲".into(), "乙".into()]).unwrap();
+        let count = |lib: &Library, name: &str| {
+            lib.tag_stats()
+                .into_iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, c)| c)
+                .unwrap_or(0)
+        };
+        assert_eq!(count(&lib, "甲"), 2);
+        assert_eq!(count(&lib, "乙"), 2);
+
+        lib.set_asset_tags(&shas[0], vec!["乙".into()]).unwrap();
+        assert_eq!(count(&lib, "甲"), 1);
+        assert_eq!(count(&lib, "乙"), 2);
+
+        lib.rename_tag("甲", "丙").unwrap();
+        assert_eq!(count(&lib, "甲"), 0);
+        assert_eq!(count(&lib, "丙"), 1);
+
+        lib.merge_tags("乙", "丙").unwrap();
+        assert_eq!(count(&lib, "乙"), 0);
+        assert_eq!(count(&lib, "丙"), 2);
+
+        lib.delete_tag("丙").unwrap();
+        assert_eq!(count(&lib, "丙"), 0);
+        assert!(!lib
+            .assets()
+            .iter()
+            .any(|a| a.tags.iter().any(|t| t == "丙")));
+
+        // 重开：空标签还在，删掉的标签不会回来
+        let lib = Library::open(base.join("lib")).unwrap();
+        assert!(lib
+            .tag_stats()
+            .iter()
+            .any(|(n, c)| n == "空标签" && *c == 0));
+        assert!(!lib.tag_stats().iter().any(|(n, _)| n == "丙"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn delete_tag_also_clears_trash() {
+        let base = std::env::temp_dir().join(format!("sb-tag-trash-{}", std::process::id()));
+        let src = base.join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([4, 5, 6, 255]))
+            .save(src.join("trash.png"))
+            .unwrap();
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        lib.scan_folder(&src).unwrap();
+        let sha = lib.assets()[0].sha.clone();
+        lib.add_tags(&[sha.clone()], vec!["甲".into()]).unwrap();
+        lib.remove(&sha).unwrap();
+        lib.delete_tag("甲").unwrap();
+        lib.restore(&sha).unwrap();
+        assert!(!lib.assets()[0].tags.iter().any(|t| t == "甲"));
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

@@ -437,6 +437,43 @@ pub fn add_tags(state: State<'_, AppState>, shas: Vec<String>, tags: Vec<String>
 }
 
 #[tauri::command]
+pub fn remove_tags(state: State<'_, AppState>, shas: Vec<String>, tags: Vec<String>) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.remove_tags(&shas, &tags).map_err(|e| format!("{e:#}"))
+}
+
+/// 详情页单图保存：整组替换这张图的标签
+#[tauri::command]
+pub fn set_asset_tags(state: State<'_, AppState>, sha: String, tags: Vec<String>) -> Result<(), String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.set_asset_tags(&sha, tags).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn create_tag(state: State<'_, AppState>, name: String) -> Result<bool, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.create_tag(&name).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn rename_tag(state: State<'_, AppState>, old: String, new: String) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.rename_tag(&old, &new).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn merge_tags(state: State<'_, AppState>, from: String, to: String) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.merge_tags(&from, &to).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn delete_tag(state: State<'_, AppState>, name: String) -> Result<usize, String> {
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.delete_tag(&name).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
 pub fn library_stats(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     let lib = state.lib.lock().map_err(|e| e.to_string())?;
     serde_json::to_value(lib.stats()).map_err(|e| e.to_string())

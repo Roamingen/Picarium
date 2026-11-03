@@ -412,6 +412,10 @@
         <button data-pinrows="1">1 行</button><button data-pinrows="2">2 行</button><button data-pinrows="3">3 行</button>
       </div></div>
       </div>
+      <div class="sect">标签</div>
+      <div class="mcard">
+      <div class="merow tap" id="me-tags"><span>标签管理</span><i id="me-tags-n">0 个</i></div>
+      </div>
       <div class="sect">导入</div>
       <div class="mcard">
       <div class="merow tap" id="me-gallery"><span>从手机相册导入</span><i>最多 100 张</i></div>
@@ -423,6 +427,28 @@
       <div class="merow"><span>版本</span><i>预览版</i></div>
       <div class="merow"><span>存储位置</span><i class="ell" id="me-home">…</i></div>
       </div>
+    </section>
+
+    <!-- 标签管理：重命名 / 合并 / 删除 / 新建 -->
+    <section class="gview" id="tagview" hidden>
+      <header class="ghead">
+        <button class="iconbtn back" id="tagv-back" title="返回">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg>
+        </button>
+        <div class="gtitle">标签管理<small id="tagv-count"></small></div>
+        <button class="iconbtn ghost" id="tagv-new" title="新建标签">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </header>
+      <div class="search gsearch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="tagv-q" placeholder="搜索标签" autocomplete="off" spellcheck="false" />
+        <button class="clr" id="tagv-qc" hidden aria-label="清空搜索">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="mcard" id="tagv-list"></div>
+      <div class="gempty" id="tagv-empty" hidden>还没有标签</div>
     </section>
 
     <!-- 加入分组：复用分组页的双列封面卡，80% 叠加层 -->
@@ -463,10 +489,13 @@
       <div class="sheet fsheet tagsheet" id="tagsheet">
         <div class="grabzone"><div class="grab"></div></div>
         <div class="fhead">
-          <b>加标签</b><span class="fscope" id="tag-scope">已选 0 张</span>
-          <button class="iconbtn ghost" id="tag-close" title="关闭">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-          </button>
+          <b id="tag-title">加标签</b><span class="fscope" id="tag-scope">已选 0 张</span>
+          <span class="fright">
+            <button class="ftmanage" id="tag-manage">管理</button>
+            <button class="iconbtn ghost" id="tag-close" title="关闭">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </span>
         </div>
         <div class="tagsearch">
           <div class="search">
@@ -479,7 +508,7 @@
         </div>
         <div class="fbody" id="tag-body">
           <div id="tag-selbox" hidden>
-            <div class="fsect">将添加 <b id="tag-seln">0</b> 个标签<span class="fhint">点 × 取消</span></div>
+            <div class="fsect" id="tag-selhead"></div>
             <div class="tagsel" id="tag-sel"></div>
           </div>
           <div class="fsect">全部标签<span class="fhint">数字为全库图片数</span></div>
@@ -496,6 +525,7 @@
             <span id="tag-empty-hint">输入一个名字，给这 5 张图打上第一个标签</span>
           </div>
         </div>
+        <div class="tagdiff" id="tag-diff" hidden></div>
         <div class="sheet-actions ffoot tagfoot">
           <button class="primary" id="tag-ok" disabled>添加标签</button>
         </div>

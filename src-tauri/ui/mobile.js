@@ -1535,6 +1535,7 @@ function activeLayer() {
   if (shown("filtermask")) return { close: () => { $("filtermask").hidden = true; syncGuard(); } };
   if (shown("pickmask")) return { close: exitPicker };
   if (shown("tagmask")) return { close: () => closeTagSheet() };
+  if (tagManage) return { close: () => closeTagManage() };
   if (imgSelMode) return { close: () => setImgSelMode(false) };
   if (shown("viewer")) return { close: () => closeViewer() };
   if (trashSelMode) return { close: () => setTrashSelMode(false) };
@@ -1560,6 +1561,7 @@ window.__sbBack = sbBack;
 
 function openSheet(title, bodyHtml) {
   resetSheetHeight(document.querySelector("#sheetmask .sheet"));
+  if (!$("tagmask").hidden) $("sheetmask").classList.add("above");
   $("sheet-title").textContent = title;
   $("sheet-body").innerHTML = bodyHtml;
   $("sheetmask").hidden = false;
@@ -1567,6 +1569,7 @@ function openSheet(title, bodyHtml) {
 }
 function closeSheet() {
   $("sheetmask").hidden = true;
+  $("sheetmask").classList.remove("above");
   $("sheet-body").innerHTML = "";
   syncGuard();
 }
@@ -2577,6 +2580,7 @@ function renderMe() {
   for (const b of document.querySelectorAll("#seg-gnew button")) b.classList.toggle("on", b.dataset.gnew === groupNewPos());
   for (const b of document.querySelectorAll("#seg-pinrow button")) b.classList.toggle("on", +b.dataset.pinrow === S.pinsPerRow);
   for (const b of document.querySelectorAll("#seg-pinrows button")) b.classList.toggle("on", +b.dataset.pinrows === S.pinRows);
+  $("me-tags-n").textContent = `${(S.tags || []).length} 个`;
 }
 
 /* 同一个筛选组件，三种宿主：图库 / 分组详情 / 回收站 */
@@ -2610,8 +2614,9 @@ function renderFilterSheet() {
   [...$("f-type").children].forEach((el) => el.classList.toggle("on", (el.dataset.type || "") === f.type));
   [...$("f-days").children].forEach((el) => el.classList.toggle("on", Number(el.dataset.days || 0) === f.days));
   [...$("f-sort").children].forEach((el) => el.classList.toggle("on", (el.dataset.sort || "") === f.sort));
-  $("f-tags").innerHTML = S.tags.length
-    ? S.tags
+  const fTags = S.tags.filter((t) => t.count > 0 || f.tags.includes(t.name));
+  $("f-tags").innerHTML = fTags.length
+    ? fTags
         .map((t) => `<button class="opt${f.tags.includes(t.name) ? " on" : ""}" data-tag="${escapeHtml(t.name)}">${escapeHtml(t.name)} <em>${t.count}</em></button>`)
         .join("")
     : `<span class="fnote">还没有标签</span>`;
@@ -2677,7 +2682,9 @@ function setTab(tab) {
   $("groupsview").hidden = !isGroups || !!S.gview;
   $("groupdetail").hidden = !isGroups || !S.gview;
   $("trashview").hidden = tab !== "trash";
-  $("meview").hidden = tab !== "me";
+  if (tab !== "me") tagManage = false;
+  $("meview").hidden = tab !== "me" || tagManage;
+  $("tagview").hidden = !(tab === "me" && tagManage);
 
   if (isGallery) renderPins();
   if (isGroups) {
@@ -2690,7 +2697,10 @@ function setTab(tab) {
   }
   if (tab !== "trash" && trashSelMode) setTrashSelMode(false);
   if (tab === "trash") loadTrash();
-  if (tab === "me") renderMe();
+  if (tab === "me") {
+    renderMe();
+    if (tagManage) renderTagManage();
+  }
   syncGuard();
 }
 
@@ -3560,6 +3570,9 @@ function openMoveSheet(shas) {
 let tagShas = [];
 let tagSel = new Set();
 let tagNewNames = new Set();
+let tagMode = "add"; // add | edit
+let tagSaved = new Set(); // edit 模式的原始标签
+let tagManage = false;
 
 // 选中图对应的资产对象（图库取 S.items，分组内取 gdItems）
 function tagAssets() {
@@ -3572,15 +3585,32 @@ function tagAllHave(name, assets) {
   return assets.length > 0 && assets.length === tagShas.length && assets.every((a) => (a.tags || []).includes(name));
 }
 
+function tagDiff() {
+  let add = 0;
+  let rem = 0;
+  for (const n of tagSel) if (!tagSaved.has(n)) add += 1;
+  for (const n of tagSaved) if (!tagSel.has(n)) rem += 1;
+  return { add, rem };
+}
+
+function tagDirty() {
+  const d = tagDiff();
+  return d.add + d.rem > 0;
+}
+
 function renderTagSheet() {
   const q = ($("tagq").value || "").trim();
   const ql = q.toLowerCase();
   const assets = tagAssets();
   const selList = [...tagSel];
+  const edit = tagMode === "edit";
 
-  $("tag-scope").textContent = `已选 ${tagShas.length} 张`;
-  $("tag-seln").textContent = String(selList.length);
+  $("tag-title").textContent = edit ? "标签" : "加标签";
+  $("tag-scope").textContent = edit ? "这张图" : `已选 ${tagShas.length} 张`;
   $("tag-selbox").hidden = selList.length === 0;
+  $("tag-selhead").innerHTML = edit
+    ? `这张图的标签 <b>${selList.length}</b><span class="fhint">点 × 移出这张图</span>`
+    : `将添加 <b>${selList.length}</b> 个标签<span class="fhint">点 × 取消</span>`;
   $("tag-sel").innerHTML = selList
     .map(
       (name) =>
@@ -3602,7 +3632,7 @@ function renderTagSheet() {
   $("tag-list").innerHTML = filtered
     .map((t) => {
       const on = tagSel.has(t.name);
-      const done = !on && tagAllHave(t.name, assets);
+      const done = !edit && !on && tagAllHave(t.name, assets);
       return (
         `<button class="tagchip${on ? " on" : ""}${done ? " done" : ""}" data-tag="${escapeAttr(t.name)}"${done ? " disabled" : ""}>` +
         `${escapeHtml(t.name)} <em>${done ? "已加" : t.count}</em></button>`
@@ -3610,8 +3640,18 @@ function renderTagSheet() {
     })
     .join("");
 
-  $("tag-ok").textContent = selList.length ? `添加 ${selList.length} 个标签` : "添加标签";
-  $("tag-ok").disabled = selList.length === 0;
+  if (edit) {
+    const d = tagDiff();
+    const changed = d.add + d.rem > 0;
+    $("tag-diff").hidden = false;
+    $("tag-diff").innerHTML = changed ? `添加 <b>${d.add}</b> · 移出 <b>${d.rem}</b>` : "未改动";
+    $("tag-ok").textContent = "保存更改";
+    $("tag-ok").disabled = !changed;
+  } else {
+    $("tag-diff").hidden = true;
+    $("tag-ok").textContent = selList.length ? `添加 ${selList.length} 个标签` : "添加标签";
+    $("tag-ok").disabled = selList.length === 0;
+  }
 }
 
 function addTagFromQuery() {
@@ -3632,15 +3672,18 @@ function toggleTag(name) {
     tagSel.delete(name);
     tagNewNames.delete(name);
   } else {
-    if (tagAllHave(name, tagAssets())) return; // 选中的图都已有这个标签
+    if (tagMode === "add" && tagAllHave(name, tagAssets())) return; // 选中的图都已有这个标签
     tagSel.add(name);
   }
   renderTagSheet();
 }
 
-function openTagSheet(shas) {
+function openTagSheet(shas, opts = {}) {
+  tagMode = opts.mode === "edit" ? "edit" : "add";
   tagShas = (shas || []).slice();
-  tagSel = new Set();
+  const a = tagMode === "edit" ? viewerAsset() : null;
+  tagSaved = new Set(tagMode === "edit" ? a.tags || [] : []);
+  tagSel = new Set(tagSaved);
   tagNewNames = new Set();
   $("tagq").value = "";
   $("tagq-clear").hidden = true;
@@ -3656,11 +3699,43 @@ function closeTagSheet() {
   tagShas = [];
   tagSel.clear();
   tagNewNames.clear();
+  tagSaved.clear();
+  tagMode = "add";
   syncGuard();
 }
 
 async function applyTags() {
+  const edit = tagMode === "edit";
   const tags = [...tagSel];
+  if (edit) {
+    const sha = tagShas[0];
+    if (!sha || !tagDirty()) return;
+    const btn = $("tag-ok");
+    btn.disabled = true;
+    btn.textContent = "保存中…";
+    try {
+      await invokeRetry("set_asset_tags", { sha, tags });
+    } catch (e) {
+      toast("保存失败：" + String(e));
+      renderTagSheet();
+      return;
+    }
+    const set = (a) => {
+      if (a && a.sha === sha) a.tags = tags.slice();
+    };
+    (S.items || []).forEach(set);
+    (gdItems || []).forEach(set);
+    if (vCache) vCache.forEach(set);
+    try {
+      S.tags = (await invokeRetry("tag_stats")) || [];
+    } catch (_) {
+      /* 统计刷新失败不影响已保存的标签 */
+    }
+    closeTagSheet();
+    renderViewer();
+    toast("标签已保存");
+    return;
+  }
   if (!tags.length) return;
   const n = tagShas.length;
   const btn = $("tag-ok");
@@ -3694,6 +3769,193 @@ async function applyTags() {
   } catch (_) {
     /* 统计刷新失败不影响已写入的标签 */
   }
+}
+
+/* 标签管理：新建 / 重命名 / 合并 / 删除 */
+async function reloadTagData() {
+  try {
+    await refresh();
+  } catch (_) {
+    /* 刷新失败时保留当前列表 */
+  }
+  if (tagManage) renderTagManage();
+  renderMe();
+}
+
+function renderTagManage() {
+  const q = ($("tagv-q").value || "").trim().toLowerCase();
+  const all = S.tags || [];
+  const list = all.filter((t) => !q || t.name.toLowerCase().includes(q));
+  $("tagv-count").textContent = `${all.length} 个`;
+  $("tagv-list").hidden = list.length === 0;
+  $("tagv-empty").hidden = list.length !== 0;
+  $("tagv-empty").textContent = all.length === 0 ? "还没有标签，点右上角 + 新建" : "没有匹配的标签";
+  $("tagv-list").innerHTML = list
+    .map(
+      (t) =>
+        `<div class="merow tap" data-tag="${escapeAttr(t.name)}"><span>${escapeHtml(t.name)}</span><i>${t.count} 张</i></div>`
+    )
+    .join("");
+}
+
+function openTagManage() {
+  tagManage = true;
+  if (!$("viewer").hidden) closeViewer();
+  setTab("me");
+  renderTagManage();
+  syncGuard();
+}
+
+function closeTagManage() {
+  tagManage = false;
+  setTab("me");
+}
+
+async function goTagManage() {
+  if (tagMode === "edit" && tagDirty() && !(await confirmSheet("放弃未保存的修改？", "管理标签"))) return;
+  closeTagSheet();
+  openTagManage();
+}
+
+function openTagPrompt(title, value, okText, onOk) {
+  openSheet(
+    title,
+    `<input class="minput" id="tagp-in" value="${escapeAttr(value || "")}" autocomplete="off" spellcheck="false" />` +
+      `<div class="sheet-actions"><button id="sheet-cancel">取消</button><button class="primary" id="tagp-ok">${okText}</button></div>`
+  );
+  const input = $("tagp-in");
+  input.focus();
+  input.setSelectionRange(0, input.value.length);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing) {
+      e.preventDefault();
+      $("tagp-ok").click();
+    }
+  });
+  $("sheet-body").onclick = async (e) => {
+    if (e.target.id === "sheet-cancel") {
+      closeSheet();
+      return;
+    }
+    if (e.target.id !== "tagp-ok") return;
+    const v = input.value.trim();
+    if (!v) {
+      toast("标签名不能为空");
+      return;
+    }
+    try {
+      await onOk(v);
+    } catch (err) {
+      toast(String(err));
+    }
+  };
+}
+
+function newTagFlow() {
+  openTagPrompt("新建标签", "", "新建", async (name) => {
+    const ok = await invokeRetry("create_tag", { name });
+    closeSheet();
+    if (!ok) {
+      toast("已有同名标签");
+      return;
+    }
+    try {
+      S.tags = (await invokeRetry("tag_stats")) || [];
+    } catch (_) {}
+    renderTagManage();
+    renderMe();
+    toast(`已新建标签「${name}」`);
+  });
+}
+
+function renameTagFlow(name) {
+  openTagPrompt(`重命名「${name}」`, name, "保存", async (next) => {
+    if (next === name) {
+      closeSheet();
+      return;
+    }
+    const n = await invokeRetry("rename_tag", { old: name, new: next });
+    closeSheet();
+    await reloadTagData();
+    toast(n ? `已重命名，${n} 张图受影响` : "已重命名");
+  });
+}
+
+function mergeTagFlow(name, count) {
+  const others = (S.tags || []).filter((t) => t.name !== name);
+  if (!others.length) {
+    toast("没有其他标签可以合并");
+    return;
+  }
+  openSheet(
+    "合并到…",
+    `<div class="snote">「${name}」的 ${count} 张图会并入目标标签，然后删除「${name}」。合并后不可撤销。</div>` +
+      `<div class="tacts">${others
+        .map(
+          (t) =>
+            `<button class="tact" data-merge="${escapeAttr(t.name)}"><span>${escapeHtml(t.name)}</span><i>${t.count} 张 · 并入后最多 ${t.count + count} 张</i></button>`
+        )
+        .join("")}</div>` +
+      `<div class="sheet-actions"><button id="sheet-cancel">取消</button></div>`
+  );
+  $("sheet-body").onclick = async (e) => {
+    if (e.target.id === "sheet-cancel") {
+      closeSheet();
+      return;
+    }
+    const b = e.target.closest("[data-merge]");
+    if (!b) return;
+    const to = b.dataset.merge;
+    const ok = await confirmSheet(`把「${name}」并入「${to}」？`, "合并标签", "合并");
+    if (!ok) return;
+    try {
+      const n = await invokeRetry("merge_tags", { from: name, to });
+      await reloadTagData();
+      toast(`已合并，${n} 张图受影响`);
+    } catch (err) {
+      toast("合并失败：" + String(err));
+    }
+  };
+}
+
+async function deleteTagFlow(name, count) {
+  const ok = await confirmSheet(
+    `删除标签「${name}」？将从 ${count} 张图中移除，图片本身不受影响，删除后无法撤销。`,
+    "删除标签",
+    "删除"
+  );
+  if (!ok) return;
+  try {
+    const n = await invokeRetry("delete_tag", { name });
+    await reloadTagData();
+    toast(n ? `已删除标签「${name}」，${n} 张图已移除` : `已删除标签「${name}」`);
+  } catch (e) {
+    toast("删除失败：" + String(e));
+  }
+}
+
+function openTagActions(name, count) {
+  openSheet(
+    `${name} · ${count} 张`,
+    `<div class="tacts">` +
+      `<button class="tact" data-tagact="rename"><span>重命名</span><i>所有图片上的这个标签一起改</i></button>` +
+      `<button class="tact" data-tagact="merge"><span>合并到…</span><i>把它的图片并给另一个标签</i></button>` +
+      `<button class="tact danger" data-tagact="delete"><span>删除标签</span><i>从所有图片移出，不可撤销</i></button>` +
+      `</div><div class="sheet-actions"><button id="sheet-cancel">取消</button></div>`
+  );
+  $("sheet-body").onclick = (e) => {
+    if (e.target.id === "sheet-cancel") {
+      closeSheet();
+      return;
+    }
+    const b = e.target.closest("[data-tagact]");
+    if (!b) return;
+    const act = b.dataset.tagact;
+    closeSheet();
+    if (act === "rename") renameTagFlow(name);
+    else if (act === "merge") mergeTagFlow(name, count);
+    else deleteTagFlow(name, count);
+  };
 }
 
 $("tag-close").addEventListener("click", closeTagSheet);
@@ -3730,6 +3992,26 @@ $("tag-sel").addEventListener("click", (e) => {
   renderTagSheet();
 });
 $("tag-ok").addEventListener("click", applyTags);
+$("tag-manage").addEventListener("click", goTagManage);
+$("me-tags").addEventListener("click", openTagManage);
+$("tagv-back").addEventListener("click", closeTagManage);
+$("tagv-new").addEventListener("click", newTagFlow);
+$("tagv-q").addEventListener("input", () => {
+  $("tagv-qc").hidden = !$("tagv-q").value;
+  renderTagManage();
+});
+$("tagv-qc").addEventListener("click", () => {
+  $("tagv-q").value = "";
+  $("tagv-qc").hidden = true;
+  renderTagManage();
+  $("tagv-q").focus();
+});
+$("tagv-list").addEventListener("click", (e) => {
+  const row = e.target.closest("[data-tag]");
+  if (!row) return;
+  const t = (S.tags || []).find((x) => x.name === row.dataset.tag);
+  openTagActions(row.dataset.tag, t ? t.count : 0);
+});
 
 $("v-close").addEventListener("click", closeViewer);
 $("v-share").addEventListener("click", async () => {
@@ -3819,7 +4101,9 @@ $("v-del").addEventListener("click", async () => {
   }
 });
 $("v-tags").addEventListener("click", (e) => {
-  if (e.target.closest("#v-tag-add")) toast("标签编辑在后面的批次接上");
+  if (!e.target.closest("#v-tag-add") && !e.target.closest(".vtag.tag")) return;
+  const a = viewerAsset();
+  if (a.sha) openTagSheet([a.sha], { mode: "edit" });
 });
 $("v-more").addEventListener("click", () => {
   const a = viewerAsset();
