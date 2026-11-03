@@ -39,6 +39,7 @@
 - 不在用户真实库 `C:\Users\13066\StickerBox` 上做删除/批量测试；测试用 `STICKERBOX_HOME` 临时库。
 - 不擅自改用户全局配置；必须改时先备份并明确告知（Gradle 代理已有先例：`~/.gradle/gradle.properties.bak-stickerbox`）。
 - 不重复跑 release 构建；release 只在交付/装机器时跑。
+- 不用 `scripts/android-emu.ps1` 起模拟器（会弹终端）；不关用户正在用的模拟器。
 - 不为了“顺手”扩大范围；发现别的问题先记到交接，不要立刻开修。
 
 ## 4. 项目速览
@@ -72,18 +73,19 @@ pwsh -NoProfile -File scripts/install-release.ps1
 
 安卓（仅在用户明确要做 M2 时）：
 
-```powershell
-$env:ANDROID_HOME="$env:LOCALAPPDATA\Android\Sdk"
-$env:NDK_HOME="$env:LOCALAPPDATA\Android\Sdk\ndk\28.2.13676358"
-$env:JAVA_HOME="C:\Program Files\Android\Android Studio\jbr"
-pwsh -NoProfile -File scripts/android-emu.ps1        # 起模拟器 + 装包 + 拉起 App（-Shot .demo/x.png 顺带截图）
+```bash
+export ANDROID_HOME="${ANDROID_HOME:-${LOCALAPPDATA:-$HOME/AppData/Local}/Android/Sdk}"
+export NDK_HOME="$ANDROID_HOME/ndk/28.2.13676358"
+export JAVA_HOME="C:/Program Files/Android/Android Studio/jbr"
+# 起模拟器：ops_bash 后台直接跑 emulator（不要用 scripts/android-emu.ps1，会弹终端；起来后别关）
+"$ANDROID_HOME/emulator/emulator.exe" -avd Medium_Phone_API_35 -no-boot-anim -gpu swiftshader_indirect > .demo/emulator.out.log 2>&1
 npx tauri android build --debug --apk --target x86_64 --ci
 npx tauri android build --apk --target aarch64 --ci        # release（已配签名，只打 arm64）
 ```
 
 **发版只打 arm64-v8a**（`--target aarch64`），不要 universal：四个 ABI 各塞一份 ~11 MB 的 `libstickerbox_lib.so`，包会从 13.5 MB 涨到 48 MB。只有明确要发布到 GitHub Release 或单独要某个架构时，才**按架构分别**出包，不做 all-in-one。
 
-模拟器、签名、打包与验收的完整步骤见 **`docs/25-安卓构建、签名与模拟器.md`**（含「同 AVD 已在运行」等常见错误）；日常起模拟器只看 **`docs/26-安卓模拟器速查.md`**（一条 `scripts/android-emu.ps1` 搞定，别自己拼 adb 路径）。
+模拟器、签名、打包与验收的完整步骤见 **`docs/25-安卓构建、签名与模拟器.md`**（含「同 AVD 已在运行」等常见错误）；日常起模拟器只看 **`docs/26-安卓模拟器速查.md`**（用 `ops_bash` 后台直接跑 emulator，别用 ps1、别拼 adb 路径）。**模拟器起来后不要关**，用户还要在上面测。
 
 注意：`~/.gradle/gradle.properties` 里的代理已注释（代理 7890 当时没开）；Gradle wrapper 已指向腾讯镜像。开代理后可自行恢复。
 
