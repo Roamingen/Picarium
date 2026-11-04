@@ -500,43 +500,73 @@
   </div>
 
   <div id="filter-panel" class="filter-panel" hidden>
-    <div class="fp-head">筛选</div>
-    <div class="fp-row"><span>大小</span>
-      <input id="f-min-mb" class="num-input" type="number" step="0.1" placeholder="min" />
-      <span class="dim">–</span>
-      <input id="f-max-mb" class="num-input" type="number" step="0.1" placeholder="max" />
-      <span class="dim">MB</span>
+    <div class="fp-head">
+      <span class="fp-title">筛选</span>
+      <span id="fp-active" class="fp-badge" hidden>0 项生效</span>
+      <div class="spacer"></div>
+      <button id="fp-close" class="tm-x" type="button" title="关闭">✕</button>
     </div>
-    <div class="fp-row"><span>宽度</span>
-      <input id="f-min-w" class="num-input" type="number" placeholder="min" />
-      <span class="dim">–</span>
-      <input id="f-max-w" class="num-input" type="number" placeholder="max" />
-      <span class="dim">px</span>
-    </div>
-    <div class="fp-row"><span>高度</span>
-      <input id="f-min-h" class="num-input" type="number" placeholder="min" />
-      <span class="dim">–</span>
-      <input id="f-max-h" class="num-input" type="number" placeholder="max" />
-      <span class="dim">px</span>
-    </div>
-    <div class="fp-row"><span>格式</span>
-      <label><input type="checkbox" class="f-ext" value="gif" /> GIF</label>
-      <label><input type="checkbox" class="f-ext" value="png" /> PNG</label>
-      <label><input type="checkbox" class="f-ext" value="jpg" /> JPG</label>
-      <label><input type="checkbox" class="f-ext" value="webp" /> WebP</label>
-      <label><input type="checkbox" class="f-ext" value="bmp" /> BMP</label>
-    </div>
-    <div class="fp-row"><span>标签</span><div id="f-tags" class="f-tag-list picker"></div><button id="f-tags-manage" class="fp-link" type="button" title="打开标签管理">管理</button></div>
-    <div class="fp-row"><span>来源</span><div id="f-source" class="source-picker"></div></div>
-    <div class="fp-row"><span>日期</span>
-      <input id="f-from" class="num-input" type="date" />
-      <span class="dim">–</span>
-      <input id="f-to" class="num-input" type="date" />
-    </div>
-    <div class="fp-presets">
-      <label class="f-tag"><input type="checkbox" id="f-pre1" /> 微信动图 ≤1MB</label>
-      <label class="f-tag"><input type="checkbox" id="f-pre10" /> 微信可发 ≤10MB</label>
-      <label class="f-tag"><input type="checkbox" id="f-pre1000" /> 宽≤1000px</label>
+    <div class="fp-body">
+      <section class="fp-sec">
+        <div class="fp-sec-head"><span>尺寸与体积</span><span class="fp-sec-note">留空表示不限</span></div>
+        <div class="fp-line">
+          <span class="fp-lab">体积</span>
+          <label class="fp-field"><input id="f-min-mb" class="num-input" type="number" step="0.1" placeholder="最小" /><span class="fp-unit">MB</span></label>
+          <span class="fp-dash">–</span>
+          <label class="fp-field"><input id="f-max-mb" class="num-input" type="number" step="0.1" placeholder="最大" /><span class="fp-unit">MB</span></label>
+        </div>
+        <div class="fp-line">
+          <span class="fp-lab">宽</span>
+          <label class="fp-field"><input id="f-min-w" class="num-input" type="number" placeholder="最小" /><span class="fp-unit">px</span></label>
+          <span class="fp-dash">–</span>
+          <label class="fp-field"><input id="f-max-w" class="num-input" type="number" placeholder="最大" /><span class="fp-unit">px</span></label>
+        </div>
+        <div class="fp-line">
+          <span class="fp-lab">高</span>
+          <label class="fp-field"><input id="f-min-h" class="num-input" type="number" placeholder="最小" /><span class="fp-unit">px</span></label>
+          <span class="fp-dash">–</span>
+          <label class="fp-field"><input id="f-max-h" class="num-input" type="number" placeholder="最大" /><span class="fp-unit">px</span></label>
+        </div>
+      </section>
+
+      <section class="fp-sec">
+        <div class="fp-sec-head"><span>格式</span><span class="fp-sec-note">不选 = 全部</span></div>
+        <div class="fp-chips" id="f-exts">
+          <button class="fp-chip f-ext" type="button" data-ext="gif">GIF</button>
+          <button class="fp-chip f-ext" type="button" data-ext="png">PNG</button>
+          <button class="fp-chip f-ext" type="button" data-ext="jpg">JPG</button>
+          <button class="fp-chip f-ext" type="button" data-ext="webp">WebP</button>
+          <button class="fp-chip f-ext" type="button" data-ext="bmp">BMP</button>
+        </div>
+      </section>
+
+      <section class="fp-sec">
+        <div class="fp-sec-head"><span>标签</span><button id="f-tags-manage" class="fp-link" type="button" title="打开标签管理">管理</button></div>
+        <div id="f-tags" class="f-tag-list picker fp-tags"></div>
+      </section>
+
+      <section class="fp-sec">
+        <div class="fp-sec-head"><span>来源</span></div>
+        <div id="f-source" class="source-picker fp-seg"></div>
+      </section>
+
+      <section class="fp-sec">
+        <div class="fp-sec-head"><span>日期</span><span class="fp-sec-note">按加入时间</span></div>
+        <div class="fp-line">
+          <label class="fp-field"><input id="f-from" class="num-input" type="date" /></label>
+          <span class="fp-dash">–</span>
+          <label class="fp-field"><input id="f-to" class="num-input" type="date" /></label>
+        </div>
+      </section>
+
+      <section class="fp-sec">
+        <div class="fp-sec-head"><span>常用筛选</span><span class="fp-sec-note">点一下叠加</span></div>
+        <div class="fp-chips" id="f-presets">
+          <button class="fp-chip f-pre" type="button" data-pre="w1">微信动图 ≤1MB</button>
+          <button class="fp-chip f-pre" type="button" data-pre="w10">微信可发 ≤10MB</button>
+          <button class="fp-chip f-pre" type="button" data-pre="w1000">宽 ≤1000px</button>
+        </div>
+      </section>
     </div>
     <div class="fp-foot">
       <button id="f-reset" class="btn small">清空</button>

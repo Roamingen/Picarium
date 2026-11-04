@@ -2955,6 +2955,22 @@ document.querySelectorAll('.set-tab').forEach((tab) => {
 $('filter-btn').addEventListener('click', () => (filterPanelOpen() ? closeFilterPanel() : openFilterPanel()));
 $('f-apply').addEventListener('click', applyFilters);
 $('f-reset').addEventListener('click', clearFilters);
+$('fp-close').addEventListener('click', closeFilterPanel);
+$('f-exts').addEventListener('click', (e) => {
+  const chip = e.target.closest('.fp-chip');
+  if (!chip) return;
+  chip.classList.toggle('on');
+  updateFilterBadge();
+});
+$('f-presets').addEventListener('click', (e) => {
+  const chip = e.target.closest('.fp-chip');
+  if (!chip) return;
+  chip.classList.toggle('on');
+  updateFilterBadge();
+});
+['f-min-mb', 'f-max-mb', 'f-min-w', 'f-max-w', 'f-min-h', 'f-max-h', 'f-from', 'f-to'].forEach((id) => {
+  $(id).addEventListener('input', updateFilterBadge);
+});
 
 document.addEventListener('mousedown', (e) => {
   if (!filterPanelOpen()) return;
@@ -4693,26 +4709,27 @@ function fillFilterPanel() {
   $('f-min-h').value = assetFilters.minHeight || '';
   $('f-max-h').value = assetFilters.maxHeight || '';
   $('f-source').value = (assetFilters.sourceKeys && assetFilters.sourceKeys[0]) || '';
-  $('f-pre1').checked = (assetFilters.presets || []).includes('w1');
-  $('f-pre10').checked = (assetFilters.presets || []).includes('w10');
-  $('f-pre1000').checked = (assetFilters.presets || []).includes('w1000');
   $('f-from').value = assetFilters.from || '';
   $('f-to').value = assetFilters.to || '';
 
-  document.querySelectorAll('.f-ext').forEach((c) => {
-    c.checked = (assetFilters.exts || []).includes(c.value);
+  document.querySelectorAll('#f-exts .fp-chip').forEach((c) => {
+    c.classList.toggle('on', (assetFilters.exts || []).includes(c.dataset.ext));
+  });
+  document.querySelectorAll('#f-presets .fp-chip').forEach((c) => {
+    c.classList.toggle('on', (assetFilters.presets || []).includes(c.dataset.pre));
   });
 
   panelTagSet = new Set(assetFilters.tags || []);
-  renderPicker('f-tags', allTags, panelTagSet, '点选或输入筛选标签', { allowNew: false });
+  renderPicker('f-tags', allTags, panelTagSet, '点选或输入筛选标签', {
+    allowNew: false,
+    onChange: () => updateFilterBadge(),
+  });
+  updateFilterBadge();
 }
 
 function readFilterPanel() {
   const mb2b = (v) => Math.round((Number(v) || 0) * 1024 * 1024);
-  const presets = [];
-  if ($('f-pre1').checked) presets.push('w1');
-  if ($('f-pre10').checked) presets.push('w10');
-  if ($('f-pre1000').checked) presets.push('w1000');
+  const presets = [...document.querySelectorAll('#f-presets .fp-chip.on')].map((c) => c.dataset.pre);
   const cap = (cur, limit) => (cur ? Math.min(cur, limit) : limit);
   let maxBytes = mb2b($('f-max-mb').value);
   if (presets.includes('w1')) maxBytes = cap(maxBytes, 1024 * 1024);
@@ -4727,7 +4744,7 @@ function readFilterPanel() {
     maxWidth,
     minHeight: Number($('f-min-h').value) || 0,
     maxHeight: Number($('f-max-h').value) || 0,
-    exts: [...document.querySelectorAll('.f-ext:checked')].map((c) => c.value),
+    exts: [...document.querySelectorAll('#f-exts .fp-chip.on')].map((c) => c.dataset.ext),
     tags: [...panelTagSet],
     source: '',
     sourceKeys: (assetFilters.sourceKeys || []).slice(),
@@ -4735,6 +4752,27 @@ function readFilterPanel() {
     from: $('f-from').value,
     to: $('f-to').value,
   };
+}
+
+function updateFilterBadge() {
+  const badge = $('fp-active');
+  if (!badge) return;
+  const num = (id) => (Number($(id).value) || 0) > 0;
+  let n = 0;
+  if (num('f-min-mb')) n++;
+  if (num('f-max-mb')) n++;
+  if (num('f-min-w')) n++;
+  if (num('f-max-w')) n++;
+  if (num('f-min-h')) n++;
+  if (num('f-max-h')) n++;
+  n += document.querySelectorAll('#f-exts .fp-chip.on').length;
+  n += panelTagSet.size;
+  if ((assetFilters.sourceKeys || []).length) n++;
+  if ($('f-from').value) n++;
+  if ($('f-to').value) n++;
+  n += document.querySelectorAll('#f-presets .fp-chip.on').length;
+  badge.textContent = `${n} 项生效`;
+  badge.hidden = n === 0;
 }
 
 function filterPanelOpen() {
@@ -4756,6 +4794,7 @@ function paintSourcePicker() {
     b.addEventListener('click', () => {
       assetFilters.sourceKeys = key ? [key] : [];
       paintSourcePicker();
+      if (filterPanelOpen()) updateFilterBadge();
     });
     box.appendChild(b);
   };
@@ -4780,14 +4819,18 @@ function openFilterPanel() {
   const btn = $('filter-btn');
   const panel = $('filter-panel');
   panel.hidden = false;
+  const body = panel.querySelector('.fp-body');
+  if (body) body.scrollTop = 0;
   if (btn) {
     const r = btn.getBoundingClientRect();
     const pr = panel.getBoundingClientRect();
     let left = r.left - 40;
     left = Math.max(12, Math.min(left, window.innerWidth - pr.width - 12));
+    const top = r.bottom + 8;
     panel.style.left = `${left}px`;
-    panel.style.top = `${r.bottom + 8}px`;
+    panel.style.top = `${top}px`;
     panel.style.right = 'auto';
+    panel.style.maxHeight = `${Math.max(240, Math.min(window.innerHeight - top - 12, 520))}px`;
   }
   loadSourceOptions();
 }
@@ -5073,8 +5116,8 @@ async function runAcceptSuite() {
 
     // 格式筛选（走 UI）
     await openFilterPanel();
-    const gifBox = document.querySelector('.f-ext[value="gif"]');
-    gifBox.checked = true;
+    const gifBox = document.querySelector('.f-ext[data-ext="gif"]');
+    gifBox.click();
     $('f-apply').click();
     await sleep(300);
     check(
@@ -5094,6 +5137,21 @@ async function runAcceptSuite() {
     await clearFilters();
     check('清空筛选恢复', shownItems.length > 1, `n=${shownItems.length}`);
     check('筛选按钮恢复', !$('filter-btn').classList.contains('active'));
+
+    // 筛选面板（新版 chip / 徽标 / 关闭）
+    await openFilterPanel();
+    const pngChip = document.querySelector('#f-exts .fp-chip[data-ext="png"]');
+    pngChip.click();
+    check(
+      '筛选 chip 可点选',
+      pngChip.classList.contains('on') && !$('fp-active').hidden,
+      `badge=${$('fp-active').textContent}`
+    );
+    pngChip.click();
+    check('筛选 chip 可取消', !pngChip.classList.contains('on'));
+    $('fp-close').click();
+    await sleep(60);
+    check('筛选面板关闭按钮可用', $('filter-panel').hidden);
 
     // 标签筛选
     await invoke('batch_tags', { shas: [shownItems[0].sha], tags: ['验收标签'] });
@@ -5351,8 +5409,8 @@ async function runAcceptSuite() {
       check('单图面板跳过（无卡片）', true, 'no items');
     }
 
-    // 标签管理
-    const tagsBefore = tagRows.length;
+    // 标签管理（用后端真值做基准，tagRows 可能还没刷过）
+    const tagsBefore = (await invoke('tag_stats')).length;
     await openTagManage();
     await sleep(150);
     check('标签管理可打开', !$('tagmanage').hidden, `rows=${tagRows.length}`);
@@ -5383,7 +5441,12 @@ async function runAcceptSuite() {
     await delPromise;
     await sleep(250);
     check('删除标签生效', !tagRows.some((t) => t.name === '验收标签2'), `n=${tagRows.length}`);
-    check('标签数回到初始', tagRows.length === tagsBefore, `${tagsBefore} -> ${tagRows.length}`);
+    const afterStats = await invoke('tag_stats');
+    check(
+      '标签数回到初始',
+      !afterStats.some((t) => t.name.startsWith('验收标签')) && tagRows.length === afterStats.length,
+      `stats=${afterStats.length} rows=${tagRows.length} before=${tagsBefore}`
+    );
     closeTagManage();
     check('标签管理可关闭', $('tagmanage').hidden);
 
@@ -5571,6 +5634,20 @@ window.addEventListener('unhandledrejection', (e) => {
     if (row) row.scrollIntoView({ block: 'center' });
   }
   if (ui === 'filters') openFilterPanel();
+  if (ui === 'filters:on') {
+    await openFilterPanel();
+    document.querySelector('#f-exts .fp-chip[data-ext="gif"]')?.click();
+    document.querySelector('#f-presets .fp-chip[data-pre="w1"]')?.click();
+    const mbIn = $('f-min-mb');
+    mbIn.value = '0.5';
+    mbIn.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  if (ui === 'filters:bottom') {
+    await openFilterPanel();
+    await new Promise((r) => setTimeout(r, 200));
+    const b = $('filter-panel').querySelector('.fp-body');
+    if (b) b.scrollTop = 9999;
+  }
   if (ui === 'filters-tag') {
     await openFilterPanel();
     await new Promise((r) => setTimeout(r, 300));
