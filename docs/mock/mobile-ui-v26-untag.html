@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StickerBox 移动端 v26 · 多选移除标签</title>
+<style>
+:root{
+  --bg:#14161a; --bg2:#1b1e24; --surface:#0f1115; --surface2:#232833; --surface3:#1c212a;
+  --line:#2a2f38; --line2:#333a47; --fg:#e8eaed; --dim:#8b93a1; --dim2:#5d6573;
+  --accent:#6ea8fe; --on-accent:#0d1420; --danger:#ff5d6c; --icon:#8b93a1;
+  --sheet-bg:#191d24; --card-bg:#171a20; --card-line:#252a33;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:#08090b;color:var(--fg);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+.canvas{max-width:1000px;margin:0 auto;padding:42px 24px 90px}
+.pagehead{text-align:center}
+.pagehead h1{margin:0 0 8px;font-size:26px;letter-spacing:.4px}
+.pagehead p{margin:0;font-size:13.5px;color:var(--dim)}
+.pagehead .meta{margin-top:10px;font-size:12px;color:var(--dim2)}
+.row{display:flex;gap:40px;justify-content:center;flex-wrap:wrap;margin-top:38px}
+.item{width:390px}
+.cap{display:flex;align-items:baseline;gap:10px;margin:0 2px 12px;font-size:12px;color:var(--dim2)}
+.cap b{font-size:13px;color:var(--fg);font-weight:600;white-space:nowrap}
+.cap span{line-height:1.5}
+.ic{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block}
+
+/* ---------- 手机框 ---------- */
+.phone{position:relative;width:390px;height:844px;border-radius:38px;background:var(--bg);
+  border:1px solid #262b33;overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:0 30px 60px rgba(0,0,0,.55)}
+.status{height:40px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;font-size:13px;font-weight:600;color:#f2f4f8}
+.sicons{display:flex;align-items:center;gap:6px;color:#f2f4f8}
+.sicons svg{display:block}
+.screen{position:relative;flex:1;overflow:hidden;background:var(--bg)}
+
+/* ---------- 背景：图库多选 ---------- */
+.app{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg)}
+.selhead{display:flex;align-items:center;gap:10px;padding:6px 18px 10px;flex:0 0 auto}
+.iconbtn{width:40px;height:40px;border:0;border-radius:20px;background:transparent;color:var(--fg);
+  display:flex;align-items:center;justify-content:center;padding:0}
+.iconbtn .ic{width:22px;height:22px}
+.selcount{flex:1;text-align:center;font-size:16px;font-weight:650;color:var(--fg)}
+.selcount b{color:var(--accent);font-weight:700}
+.allbtn{border:0;background:transparent;color:var(--accent);font-size:13px;font-weight:650;padding:6px 2px}
+.search{margin:2px 18px 10px;height:46px;border-radius:14px;background:var(--surface3);
+  border:1px solid var(--line);display:flex;align-items:center;gap:9px;padding:0 6px 0 13px;flex:0 0 auto}
+.search .ic{width:18px;height:18px;color:var(--dim)}
+.search .qph{flex:1;min-width:0;font-size:14px;color:var(--dim2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fbtn{width:36px;height:36px;border:0;border-radius:10px;background:var(--surface2);color:var(--icon);
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0}
+.fbtn .ic{width:19px;height:19px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 18px 18px;align-content:start}
+.card{position:relative;aspect-ratio:1/1;border-radius:16px;border:1px solid rgba(255,255,255,.05);
+  display:flex;align-items:center;justify-content:center;font-size:33px;overflow:hidden}
+.card.sel::after{content:"";position:absolute;inset:0;border:2px solid var(--accent);
+  border-radius:inherit;pointer-events:none;z-index:3}
+.fcheck{position:absolute;right:8px;top:8px;width:22px;height:22px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.55);background:rgba(10,12,16,.35);
+  display:flex;align-items:center;justify-content:center;color:#fff;opacity:0;z-index:2}
+.fcheck .ic{width:12px;height:12px;stroke-width:3}
+.card.sel .fcheck{opacity:1;background:var(--accent);border-color:var(--accent)}
+.actbar{position:absolute;left:0;right:0;bottom:0;height:74px;z-index:5;display:flex;
+  border-top:1px solid var(--line);background:var(--bg)}
+.actbar button{flex:1;border:0;background:transparent;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;font-size:11px;color:var(--icon);padding:0}
+.actbar button .ic{width:22px;height:22px}
+.actbar button.primary{color:var(--accent);font-weight:600}
+.actbar button.danger{color:var(--danger)}
+.actbar button.hl{color:var(--accent)}
+
+/* ---------- 标签面板 ---------- */
+.sheetmask{position:absolute;inset:0;background:rgba(0,0,0,.55);z-index:50;display:flex;align-items:flex-end}
+.sheet{width:100%;height:66%;background:var(--sheet-bg);border-radius:22px 22px 0 0;
+  padding:10px 16px 14px;display:flex;flex-direction:column;overflow:hidden}
+.grabzone{display:flex;justify-content:center;padding:2px 0 8px;flex:0 0 auto;touch-action:none}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--line2);touch-action:none;cursor:grab}
+.fhead{display:flex;align-items:center;gap:8px;padding:4px 0 10px;flex:0 0 auto}
+.fhead b{font-size:16px;font-weight:600}
+.fscope{font-size:12px;color:var(--dim);background:var(--surface3);border:1px solid var(--line);
+  padding:2px 9px;border-radius:999px;white-space:nowrap;max-width:45%;overflow:hidden;text-overflow:ellipsis}
+.fright{margin-left:auto;display:flex;align-items:center;gap:8px}
+.ftmanage{border:0;background:transparent;color:var(--accent);font-size:12.5px;font-weight:650;padding:6px 2px}
+.xbtn{width:34px;height:34px;border:0;border-radius:17px;background:transparent;
+  color:var(--dim);display:flex;align-items:center;justify-content:center;padding:0}
+.xbtn .ic{width:18px;height:18px}
+.tsearch{height:44px;border-radius:13px;background:var(--surface3);border:1px solid var(--line);
+  display:flex;align-items:center;gap:9px;padding:0 7px 0 13px;flex:0 0 auto;margin-bottom:6px}
+.tsearch:focus-within{border-color:rgba(110,168,254,.6)}
+.tsearch .ic{width:17px;height:17px;color:var(--dim)}
+.tin{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--fg);
+  font-family:inherit;font-size:14px;line-height:44px;padding:0}
+.tin::placeholder{color:var(--dim2)}
+.tclr{width:28px;height:28px;flex:0 0 28px;border:0;border-radius:50%;background:var(--surface2);
+  color:var(--dim2);display:flex;align-items:center;justify-content:center;padding:0}
+.tclr .ic{width:14px;height:14px}
+
+/* 模式段：添加 / 移除 */
+.modesw{display:flex;gap:4px;background:var(--surface3);border:1px solid var(--line);
+  border-radius:12px;padding:3px;margin-bottom:8px;flex:0 0 auto}
+.modesw button{flex:1;height:32px;border:0;border-radius:9px;background:transparent;
+  color:var(--dim);font-size:13px;font-weight:600;display:flex;align-items:center;
+  justify-content:center;gap:6px;transition:background .12s,color .12s}
+.modesw button .n{font-size:11px;font-weight:500;color:var(--dim2);font-variant-numeric:tabular-nums}
+.modesw button.on{background:var(--surface2);color:var(--fg)}
+.modesw button.on .n{color:var(--dim)}
+.modesw button.on.rm{background:rgba(255,93,108,.16);color:#ffbcc3}
+.modesw button.on.rm .n{color:rgba(255,188,195,.75)}
+
+.fbody{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding-top:2px}
+.fsect{display:flex;align-items:center;gap:6px;padding:12px 2px 8px;flex:0 0 auto;
+  font-size:12px;color:var(--dim2)}
+.fsect b{color:var(--fg);font-weight:600}
+.fsect .fhint{margin-left:auto;font-size:11px;color:var(--dim2);font-weight:400}
+.selchips{display:flex;flex-wrap:wrap;gap:8px}
+.selchip{height:32px;padding:0 9px 0 12px;border-radius:999px;border:1px solid rgba(110,168,254,.45);
+  background:rgba(110,168,254,.14);color:#a9c7f2;font-size:12.5px;display:inline-flex;
+  align-items:center;gap:6px;user-select:none}
+.selchip .ic{width:13px;height:13px;opacity:.75}
+.selchip.rm{border-color:rgba(255,93,108,.45);background:rgba(255,93,108,.13);color:#ffbcc3}
+.selchip.rm .ic{color:#ff9aa5;opacity:.9}
+.tagwrap{display:flex;flex-wrap:wrap;gap:8px}
+.tg{height:36px;padding:0 13px;border-radius:10px;border:1px solid var(--line2);
+  background:var(--surface2);color:var(--fg);font-size:13px;display:inline-flex;
+  align-items:center;gap:7px;user-select:none;transition:background .12s,border-color .12s,color .12s}
+.tg em{font-style:normal;font-size:11px;color:var(--dim)}
+.tg .cov{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.tg.on{border-color:var(--accent);background:rgba(110,168,254,.16);color:var(--accent)}
+.tg.on em{color:var(--accent);opacity:.8}
+.tg.done{color:var(--dim2);background:transparent;border-color:var(--line)}
+.tg.done em{color:var(--dim2)}
+.tg.rm{border-color:rgba(255,93,108,.55);background:rgba(255,93,108,.15);color:#ffbcc3}
+.tg.rm .cov{color:rgba(255,188,195,.7)}
+.tg.rm::before{content:"−";font-weight:700;margin-right:-2px;opacity:.85}
+.tg .cov.partial{color:#e8b45a}
+.createrow{display:flex;align-items:center;gap:9px;width:100%;height:44px;margin:0 0 8px;
+  padding:0 12px;border:1px dashed rgba(110,168,254,.6);border-radius:12px;
+  background:rgba(110,168,254,.07);color:#bfd6f8;font-size:13px;text-align:left;flex:0 0 auto}
+.createrow .plus{width:20px;height:20px;border-radius:50%;background:rgba(110,168,254,.18);
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.createrow .plus .ic{width:13px;height:13px;stroke-width:2.4}
+.createrow b{color:var(--accent);font-weight:600}
+.createrow .ckbd{margin-left:auto;font-size:11px;color:var(--dim2);border:1px solid var(--line);
+  border-radius:6px;padding:1px 6px}
+.tnone{padding:10px 2px;font-size:12px;color:var(--dim2)}
+.tempty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;
+  padding:26px 18px 10px;color:var(--dim2)}
+.te-ic{width:52px;height:52px;border-radius:16px;background:var(--surface3);
+  border:1px solid var(--line);display:flex;align-items:center;justify-content:center;color:var(--dim2)}
+.te-ic .ic{width:24px;height:24px}
+.tempty b{font-size:14px;color:var(--fg);font-weight:600}
+.tempty span{font-size:12px;line-height:1.7;max-width:240px}
+.tempty .go{margin-top:6px;height:36px;padding:0 16px;border-radius:10px;
+  border:1px solid rgba(110,168,254,.5);background:rgba(110,168,254,.1);
+  color:var(--accent);font-size:13px;font-weight:600}
+.rmhint{font-size:11.5px;color:var(--dim2);line-height:1.65;padding:0 2px 10px}
+.rmhint b{color:#ffbcc3;font-weight:600}
+.ffoot{flex:0 0 auto;padding-top:10px;padding-bottom:2px}
+.apply{width:100%;height:46px;border-radius:14px;border:1px solid var(--accent);
+  background:var(--accent);color:var(--on-accent);font-size:15px;font-weight:650;
+  transition:background .15s,color .15s}
+.apply:disabled{background:var(--surface2);border-color:var(--line);color:var(--dim2);cursor:default}
+.apply.danger{background:var(--danger);border-color:var(--danger);color:#210d10}
+.apply.danger:disabled{background:var(--surface2);border-color:var(--line);color:var(--dim2)}
+.mtoast{position:absolute;left:50%;bottom:96px;transform:translateX(-50%) translateY(8px);
+  background:#2a303c;border:1px solid var(--line2);border-radius:12px;padding:10px 16px;
+  font-size:13px;color:#eef2f8;opacity:0;transition:opacity .2s,transform .2s;z-index:90;
+  white-space:nowrap;pointer-events:none}
+.mtoast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* 模式互斥显示 */
+.sheet[data-mode="add"] .only-rm{display:none!important}
+.sheet[data-mode="remove"] .only-add{display:none!important}
+
+/* ---------- 状态卡 ---------- */
+.statecard{width:390px;background:#101318;border:1px solid var(--line);border-radius:18px;padding:22px}
+.statecard h3{margin:0 0 10px;font-size:12px;font-weight:600;color:var(--dim);letter-spacing:.3px}
+.statecard h3:not(:first-child){margin-top:26px}
+.scrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.schint{margin:9px 0 0;font-size:11.5px;line-height:1.7;color:var(--dim2)}
+.toastdemo{display:inline-block;background:#2a303c;border:1px solid var(--line2);border-radius:12px;
+  padding:10px 16px;font-size:13px;color:#eef2f8}
+
+/* ---------- 说明 ---------- */
+.note{max-width:940px;margin:52px auto 0;background:#0f1217;border:1px solid var(--line);
+  border-radius:16px;padding:26px 30px;display:grid;grid-template-columns:1.12fr .88fr;gap:40px}
+.note h3{margin:0 0 10px;font-size:13.5px;color:#fff;font-weight:600}
+.note h3:not(:first-child){margin-top:24px}
+.note ul,.note ol{margin:0 0 6px;padding-left:18px}
+.note li,.note p{font-size:12.5px;line-height:1.85;color:var(--dim);margin:0 0 7px}
+.note b{color:var(--fg);font-weight:600}
+.note code{font-family:ui-monospace,Consolas,"Courier New",monospace;font-size:11.5px;
+  background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:#cfe0f5}
+.note .foot{grid-column:1/-1;border-top:1px solid var(--line);padding-top:14px;margin-top:6px;
+  font-size:11.5px;color:var(--dim2)}
+@media (max-width:960px){
+  .note{grid-template-columns:1fr;gap:20px}
+  .note .foot{grid-column:auto}
+}
+</style>
+</head>
+<body>
+<main class="canvas">
+  <header class="pagehead">
+    <h1>v26 · 多选移除标签</h1>
+    <p>多选底栏「标签」→ 面板顶部切成「移除」→ 只列这几张图身上有的标签，点选后一次提交。</p>
+    <p class="meta">390×844 · 深色主题 · 面板高度 66% · 可点选体验（切模式、点标签、提交）</p>
+  </header>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 16V4m0 0 4 4m-4-4-4 4M4 14v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z"/><circle cx="7.5" cy="7.5" r="1.2"/></symbol>
+    <symbol id="i-add" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M12 11v6m-3-3h6"/></symbol>
+    <symbol id="i-remove" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 13h6"/></symbol>
+    <symbol id="i-album" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v6m-3-3 3 3 3-3"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+  </svg>
+
+  <!-- ================= A · 添加模式（现状 + 新分段） ================= -->
+  <section class="row">
+    <div class="item">
+      <div class="cap"><b>A · 「添加」模式（默认）</b><span>和老版一样，只在标题下面多了一段「添加 / 移除」</span></div>
+      <div class="phone">
+        <div class="status">
+          <span>9:41</span>
+          <span class="sicons">
+            <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor" opacity=".45"/></svg>
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.2a10 10 0 0 1 14 0"/><path d="M3.6 6.9a6.2 6.2 0 0 1 8.8 0"/><circle cx="8" cy="9.6" r="1" fill="currentColor" stroke="none"/></svg>
+            <svg width="24" height="11" viewBox="0 0 24 11"><rect x="0.5" y="0.5" width="20" height="10" rx="2.6" fill="none" stroke="currentColor" opacity=".5"/><rect x="2.5" y="2.5" width="14" height="6" rx="1.4" fill="currentColor"/><path d="M22 4v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".5"/></svg>
+          </span>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <header class="selhead">
+              <button class="iconbtn" aria-label="退出多选"><svg class="ic"><use href="#i-x"/></svg></button>
+              <div class="selcount">已选 <b>5</b> 张</div>
+              <button class="allbtn">全选</button>
+            </header>
+            <div class="search">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <span class="qph">搜名字 / 拼音 / 首字母</span>
+              <button class="fbtn" aria-label="筛选"><svg class="ic"><use href="#i-filter"/></svg></button>
+            </div>
+            <main class="grid">
+              <div class="card sel" style="background:linear-gradient(160deg,#5c4a74,#342a46)"><span>🐱</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a4a55,#432832)"><span>🌸</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#5a6240,#333a26)"><span>🐶</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a5a38,#443222)"><span>🍜</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#3f6070,#263a44)"><span>😂</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f4a70,#262e44)"><span>🌙</span></div>
+            </main>
+            <nav class="actbar">
+              <button class="primary"><svg class="ic"><use href="#i-send"/></svg><span>发送</span></button>
+              <button class="hl"><svg class="ic"><use href="#i-tag"/></svg><span>标签</span></button>
+              <button><svg class="ic"><use href="#i-add"/></svg><span>添加到</span></button>
+              <button><svg class="ic"><use href="#i-album"/></svg><span>存相册</span></button>
+              <button class="danger"><svg class="ic"><use href="#i-trash"/></svg><span>删除</span></button>
+            </nav>
+          </div>
+        </div>
+
+        <div class="sheetmask">
+          <div class="sheet" data-mode="add" data-scope="5">
+            <div class="grabzone"><div class="grab"></div></div>
+            <div class="fhead">
+              <b>标签</b>
+              <span class="fscope">已选 5 张</span>
+              <span class="fright">
+                <button class="ftmanage">管理</button>
+                <button class="xbtn" aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button>
+              </span>
+            </div>
+            <div class="tsearch">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input class="tin" placeholder="搜索或新建标签" autocomplete="off" spellcheck="false" enterkeyhint="done">
+              <button class="tclr" hidden aria-label="清空"><svg class="ic"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="modesw">
+              <button class="on" data-mode="add">添加<span class="n">2</span></button>
+              <button data-mode="remove">移除</button>
+            </div>
+            <div class="fbody">
+              <div class="selbox only-add">
+                <div class="fsect">将添加 <b class="seln">2</b> 个标签<span class="fhint">点 × 取消</span></div>
+                <div class="selchips">
+                  <span class="selchip">搞笑 <svg class="ic"><use href="#i-x"/></svg></span>
+                  <span class="selchip">猫 <svg class="ic"><use href="#i-x"/></svg></span>
+                </div>
+              </div>
+              <div class="fsect only-add">全部标签<span class="fhint">数字为全库图片数</span></div>
+              <div class="fsect only-rm">这 5 张图上的标签<span class="fhint">数字 = 其中有几张</span></div>
+              <button class="createrow only-add" hidden>
+                <span class="plus"><svg class="ic"><use href="#i-plus"/></svg></span>
+                <span>新建标签「<b class="cname"></b>」</span>
+                <span class="ckbd">回车</span>
+              </button>
+              <div class="tagwrap only-add">
+                <button class="tg" data-tag="聊天">聊天 <em>44</em></button>
+                <button class="tg" data-tag="保存">保存 <em>33</em></button>
+                <button class="tg done" data-tag="日常" disabled>日常 <em>已加</em></button>
+                <button class="tg" data-tag="梗图">梗图 <em>18</em></button>
+                <button class="tg" data-tag="可爱">可爱 <em>15</em></button>
+                <button class="tg on" data-tag="搞笑">搞笑 <em>12</em></button>
+                <button class="tg on" data-tag="猫">猫 <em>9</em></button>
+                <button class="tg" data-tag="表情包">表情包 <em>7</em></button>
+                <button class="tg" data-tag="摸鱼">摸鱼 <em>6</em></button>
+              </div>
+            </div>
+            <div class="ffoot"><button class="apply">添加 2 个标签</button></div>
+          </div>
+        </div>
+        <div class="mtoast"></div>
+      </div>
+    </div>
+
+    <!-- ================= B · 移除模式 ================= -->
+    <div class="item">
+      <div class="cap"><b>B · 「移除」模式</b><span>只列这 5 张有的标签；梗图 3/5、摸鱼 1/5 黄色数字＝只覆盖部分</span></div>
+      <div class="phone">
+        <div class="status">
+          <span>9:41</span>
+          <span class="sicons">
+            <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor" opacity=".45"/></svg>
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.2a10 10 0 0 1 14 0"/><path d="M3.6 6.9a6.2 6.2 0 0 1 8.8 0"/><circle cx="8" cy="9.6" r="1" fill="currentColor" stroke="none"/></svg>
+            <svg width="24" height="11" viewBox="0 0 24 11"><rect x="0.5" y="0.5" width="20" height="10" rx="2.6" fill="none" stroke="currentColor" opacity=".5"/><rect x="2.5" y="2.5" width="14" height="6" rx="1.4" fill="currentColor"/><path d="M22 4v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".5"/></svg>
+          </span>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <header class="selhead">
+              <button class="iconbtn" aria-label="退出多选"><svg class="ic"><use href="#i-x"/></svg></button>
+              <div class="selcount">已选 <b>5</b> 张</div>
+              <button class="allbtn">全选</button>
+            </header>
+            <div class="search">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <span class="qph">搜名字 / 拼音 / 首字母</span>
+              <button class="fbtn" aria-label="筛选"><svg class="ic"><use href="#i-filter"/></svg></button>
+            </div>
+            <main class="grid">
+              <div class="card sel" style="background:linear-gradient(160deg,#5c4a74,#342a46)"><span>🐱</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a4a55,#432832)"><span>🌸</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#5a6240,#333a26)"><span>🐶</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a5a38,#443222)"><span>🍜</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#3f6070,#263a44)"><span>😂</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f4a70,#262e44)"><span>🌙</span></div>
+            </main>
+            <nav class="actbar">
+              <button class="primary"><svg class="ic"><use href="#i-send"/></svg><span>发送</span></button>
+              <button class="hl"><svg class="ic"><use href="#i-tag"/></svg><span>标签</span></button>
+              <button><svg class="ic"><use href="#i-add"/></svg><span>添加到</span></button>
+              <button><svg class="ic"><use href="#i-album"/></svg><span>存相册</span></button>
+              <button class="danger"><svg class="ic"><use href="#i-trash"/></svg><span>删除</span></button>
+            </nav>
+          </div>
+        </div>
+
+        <div class="sheetmask">
+          <div class="sheet" data-mode="remove" data-scope="5">
+            <div class="grabzone"><div class="grab"></div></div>
+            <div class="fhead">
+              <b>标签</b>
+              <span class="fscope">已选 5 张</span>
+              <span class="fright">
+                <button class="ftmanage">管理</button>
+                <button class="xbtn" aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button>
+              </span>
+            </div>
+            <div class="tsearch">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input class="tin" placeholder="搜索这 5 张的标签" autocomplete="off" spellcheck="false" enterkeyhint="done">
+              <button class="tclr" hidden aria-label="清空"><svg class="ic"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="modesw">
+              <button data-mode="add">添加</button>
+              <button class="on rm" data-mode="remove">移除<span class="n">2</span></button>
+            </div>
+            <div class="fbody">
+              <div class="selbox only-rm">
+                <div class="fsect">将移除 <b class="seln">2</b> 个标签<span class="fhint">点 × 取消</span></div>
+                <div class="selchips">
+                  <span class="selchip rm">搞笑 <svg class="ic"><use href="#i-x"/></svg></span>
+                  <span class="selchip rm">猫 <svg class="ic"><use href="#i-x"/></svg></span>
+                </div>
+              </div>
+              <div class="fsect only-rm">这 5 张图上的标签<span class="fhint">数字 = 其中有几张</span></div>
+              <div class="tagwrap only-rm">
+                <button class="tg" data-tag="日常">日常 <span class="cov">5/5</span></button>
+                <button class="tg rm" data-tag="搞笑">搞笑 <span class="cov">5/5</span></button>
+                <button class="tg rm" data-tag="猫">猫 <span class="cov">5/5</span></button>
+                <button class="tg" data-tag="梗图">梗图 <span class="cov partial">3/5</span></button>
+                <button class="tg" data-tag="表情包">表情包 <span class="cov partial">2/5</span></button>
+                <button class="tg" data-tag="摸鱼">摸鱼 <span class="cov partial">1/5</span></button>
+              </div>
+              <div class="rmhint">移除只是把标签从这几张图上去掉，<b>标签本身和它的其它图片不受影响</b>；黄字＝只有部分选中有它。</div>
+            </div>
+            <div class="ffoot"><button class="apply danger">移除 2 个标签</button></div>
+          </div>
+        </div>
+        <div class="mtoast"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= C · 空态 / D · 结果 ================= -->
+  <section class="row">
+    <div class="item">
+      <div class="cap"><b>C · 这 5 张一张标签都没有</b><span>不给光秃秃的空列表，直接指回「添加」</span></div>
+      <div class="phone">
+        <div class="status">
+          <span>9:41</span>
+          <span class="sicons">
+            <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor" opacity=".45"/></svg>
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.2a10 10 0 0 1 14 0"/><path d="M3.6 6.9a6.2 6.2 0 0 1 8.8 0"/><circle cx="8" cy="9.6" r="1" fill="currentColor" stroke="none"/></svg>
+            <svg width="24" height="11" viewBox="0 0 24 11"><rect x="0.5" y="0.5" width="20" height="10" rx="2.6" fill="none" stroke="currentColor" opacity=".5"/><rect x="2.5" y="2.5" width="14" height="6" rx="1.4" fill="currentColor"/><path d="M22 4v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".5"/></svg>
+          </span>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <header class="selhead">
+              <button class="iconbtn" aria-label="退出多选"><svg class="ic"><use href="#i-x"/></svg></button>
+              <div class="selcount">已选 <b>2</b> 张</div>
+              <button class="allbtn">全选</button>
+            </header>
+            <div class="search">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <span class="qph">搜名字 / 拼音 / 首字母</span>
+              <button class="fbtn" aria-label="筛选"><svg class="ic"><use href="#i-filter"/></svg></button>
+            </div>
+            <main class="grid">
+              <div class="card sel" style="background:linear-gradient(160deg,#4a5c74,#2a3446)"><span>🌙</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#3f6a63,#264038)"><span>🐟</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card" style="background:linear-gradient(160deg,#6a5f3f,#403a26)"><span>☕</span></div>
+            </main>
+            <nav class="actbar">
+              <button class="primary"><svg class="ic"><use href="#i-send"/></svg><span>发送</span></button>
+              <button class="hl"><svg class="ic"><use href="#i-tag"/></svg><span>标签</span></button>
+              <button><svg class="ic"><use href="#i-add"/></svg><span>添加到</span></button>
+              <button><svg class="ic"><use href="#i-album"/></svg><span>存相册</span></button>
+              <button class="danger"><svg class="ic"><use href="#i-trash"/></svg><span>删除</span></button>
+            </nav>
+          </div>
+        </div>
+
+        <div class="sheetmask">
+          <div class="sheet" data-mode="remove" data-scope="2">
+            <div class="grabzone"><div class="grab"></div></div>
+            <div class="fhead">
+              <b>标签</b>
+              <span class="fscope">已选 2 张</span>
+              <span class="fright">
+                <button class="ftmanage">管理</button>
+                <button class="xbtn" aria-label="关闭"><svg class="ic"><use href="#i-x"/></svg></button>
+              </span>
+            </div>
+            <div class="tsearch">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <input class="tin" placeholder="搜索这 2 张的标签" autocomplete="off" spellcheck="false" enterkeyhint="done">
+              <button class="tclr" hidden aria-label="清空"><svg class="ic"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="modesw">
+              <button data-mode="add">添加</button>
+              <button class="on rm" data-mode="remove">移除</button>
+            </div>
+            <div class="fbody">
+              <div class="tempty only-rm">
+                <span class="te-ic"><svg class="ic"><use href="#i-tag"/></svg></span>
+                <b>这 2 张还没有标签</b>
+                <span>没有标签可移。要打标签就切到「添加」，<br>或从「管理」里新建一个。</span>
+                <button class="go" data-mode="add">去「添加」打标签</button>
+              </div>
+            </div>
+            <div class="ffoot"><button class="apply danger" disabled>移除标签</button></div>
+          </div>
+        </div>
+        <div class="mtoast"></div>
+      </div>
+    </div>
+
+    <div class="item">
+      <div class="cap"><b>D · 结果与状态</b><span>提交后 toast 收起面板；右侧是 chip / 按钮 / 文案的全套状态</span></div>
+      <div class="phone">
+        <div class="status">
+          <span>9:41</span>
+          <span class="sicons">
+            <svg width="17" height="11" viewBox="0 0 17 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" y="0" width="3" height="11" rx="1" fill="currentColor" opacity=".45"/></svg>
+            <svg width="16" height="11" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1 4.2a10 10 0 0 1 14 0"/><path d="M3.6 6.9a6.2 6.2 0 0 1 8.8 0"/><circle cx="8" cy="9.6" r="1" fill="currentColor" stroke="none"/></svg>
+            <svg width="24" height="11" viewBox="0 0 24 11"><rect x="0.5" y="0.5" width="20" height="10" rx="2.6" fill="none" stroke="currentColor" opacity=".5"/><rect x="2.5" y="2.5" width="14" height="6" rx="1.4" fill="currentColor"/><path d="M22 4v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".5"/></svg>
+          </span>
+        </div>
+        <div class="screen">
+          <div class="app">
+            <header class="selhead">
+              <button class="iconbtn" aria-label="退出多选"><svg class="ic"><use href="#i-x"/></svg></button>
+              <div class="selcount">已选 <b>5</b> 张</div>
+              <button class="allbtn">全选</button>
+            </header>
+            <div class="search">
+              <svg class="ic"><use href="#i-search"/></svg>
+              <span class="qph">搜名字 / 拼音 / 首字母</span>
+              <button class="fbtn" aria-label="筛选"><svg class="ic"><use href="#i-filter"/></svg></button>
+            </div>
+            <main class="grid">
+              <div class="card sel" style="background:linear-gradient(160deg,#5c4a74,#342a46)"><span>🐱</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a4a55,#432832)"><span>🌸</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#5a6240,#333a26)"><span>🐶</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#7a5a38,#443222)"><span>🍜</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card sel" style="background:linear-gradient(160deg,#3f6070,#263a44)"><span>😂</span><i class="fcheck"><svg class="ic"><use href="#i-check"/></svg></i></div>
+              <div class="card" style="background:linear-gradient(160deg,#3f4a70,#262e44)"><span>🌙</span></div>
+            </main>
+            <nav class="actbar">
+              <button class="primary"><svg class="ic"><use href="#i-send"/></svg><span>发送</span></button>
+              <button class="hl"><svg class="ic"><use href="#i-tag"/></svg><span>标签</span></button>
+              <button><svg class="ic"><use href="#i-add"/></svg><span>添加到</span></button>
+              <button><svg class="ic"><use href="#i-album"/></svg><span>存相册</span></button>
+              <button class="danger"><svg class="ic"><use href="#i-trash"/></svg><span>删除</span></button>
+            </nav>
+          </div>
+        </div>
+        <div class="mtoast show">已为 5 张移除 2 个标签</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="row">
+    <div class="statecard">
+      <h3>标签 chip · 移除模式</h3>
+      <div class="scrow">
+        <button class="tg">日常 <span class="cov">5/5</span></button>
+        <button class="tg rm">搞笑 <span class="cov">5/5</span></button>
+        <button class="tg">梗图 <span class="cov partial">3/5</span></button>
+      </div>
+      <p class="schint">中性＝没选；红底「−」＝将移除；黄字＝只有部分选中图有它（移除只影响那几张）。</p>
+
+      <h3>底部按钮</h3>
+      <div class="scrow" style="flex-direction:column;align-items:stretch">
+        <button class="apply" style="height:42px">添加 2 个标签</button>
+        <button class="apply danger" style="height:42px">移除 2 个标签</button>
+        <button class="apply danger" style="height:42px" disabled>移除标签</button>
+      </div>
+      <p class="schint">0 选中 → 置灰；两种模式按钮颜色不同，红＝破坏性操作。</p>
+
+      <h3>文案</h3>
+      <div class="toastdemo">已为 5 张移除 2 个标签</div>
+      <p class="schint">和添加的「已为 N 张添加 X 个标签」同一句式，只有动词不同。</p>
+    </div>
+
+    <div class="statecard">
+      <h3>为什么不是底栏再加一个按钮</h3>
+      <p class="schint">底栏已经 5 个（发送 / 标签 / 添加到 / 存相册 / 删除），再加「移标签」会挤到一屏放不下，而且它和「标签」共用搜索、共用列表、共用提交，本质是同一个面板的两个方向。</p>
+      <h3>为什么默认「添加」</h3>
+      <p class="schint">整理时加多于减；移除是纠正错误，是低频动作。默认停在移除会让人误以为系统只想让你删东西。</p>
+      <h3>为什么移除模式不显示「新建」</h3>
+      <p class="schint">移掉一个还不存在的标签没有意义；搜索框只做过滤，不出现「新建标签」行。</p>
+      <h3>和单图编辑的关系</h3>
+      <p class="schint">单图详情点「+ 标签」进的编辑模式本来就能点 × 移出这张图；这里补的是<b>多选批量移除</b>——现在多选只能加不能减。</p>
+    </div>
+  </section>
+
+  <div class="note">
+    <div>
+      <h3>数据与命令（零 Rust 改动）</h3>
+      <ul>
+        <li>命令已经存在且是批量的：<code>remove_tags { shas, tags }</code>（src-tauri/src/commands.rs:440），内部走 <code>lib.remove_tags(&amp;shas, &amp;tags)</code>。</li>
+        <li>chip 右边的 <code>N/M</code> 由前端算：遍历选中的 <code>a.tags</code> 数出现次数，<b>不发请求</b>；同时它有值就说明「至少有 1 张带它」，天然过滤掉无关标签。</li>
+        <li>提交后照现有习惯刷新 <code>tag_stats</code>，并本地回写 <code>a.tags</code>（参照 <code>applyTags</code> 添加分支 mobile.js:3767-3780）。</li>
+      </ul>
+      <h3>前端落点</h3>
+      <ul>
+        <li><code>openTagSheet(shas, {mode})</code> 增加 <code>remove</code>；<code>toggleTag</code> 分支；<code>applyTags</code> 走 <code>remove_tags</code>。</li>
+        <li><code>mobile.html</code> 的 <code>#tagsheet</code> 里加 <code>.modesw</code> 分段控件（标签管理入口 <code>#tag-manage</code> 保持不动）。</li>
+        <li><code>mobile.css</code> 加 <code>.modesw</code> / <code>.tg.rm</code> / <code>.tg.part</code> / <code>.selchip.rm</code> / <code>.apply.danger</code>。</li>
+      </ul>
+    </div>
+    <div>
+      <h3>文案口径</h3>
+      <ul>
+        <li>完成：<code>已为 5 张移除 2 个标签</code>（对应添加的 <code>已为 5 张添加 2 个标签</code>）。</li>
+        <li>说明行：<b>移除只是把标签从这几张图上去掉，标签本身和它的其它图片不受影响</b>——这是用户最容易误解的一点。</li>
+        <li>空态：<code>这 2 张还没有标签</code> + 一键切到「添加」。</li>
+      </ul>
+      <h3>实现顺序建议</h3>
+      <ol>
+        <li>先加分段控件 + 移除列表（只读），确认计数 5/5、3/5 对得上；</li>
+        <li>再接提交与本地回写，最后补空态与 toast。</li>
+      </ol>
+      <p class="foot">预览文件 docs/mock/mobile-ui-v26-untag.html · 按项目规矩只交 HTML，实现前请先拍板</p>
+    </div>
+  </div>
+</main>
+
+<script>
+// 预览交互：切模式、点 chip、提交 toast。
+// 注意这是 mock，刻意让面板提交后不收起，方便反复点；真实实现会 closeTagSheet()。
+document.querySelectorAll('.phone .sheet').forEach((sheet) => {
+  const scope = Number(sheet.dataset.scope || 0);
+  const sw = sheet.querySelector('.modesw');
+  const list = sheet.querySelector('.tagwrap:not([hidden])') || sheet.querySelector('.tagwrap');
+  const footer = sheet.querySelector('.apply');
+  const toast = sheet.closest('.phone').querySelector('.mtoast');
+  const theEmpty = sheet.querySelector('.tempty');
+
+  function modeNow() { return sheet.dataset.mode === 'remove' ? 'remove' : 'add'; }
+  function chipsNow() {
+    const box = sheet.querySelector('.selbox.' + (modeNow() === 'remove' ? 'only-rm' : 'only-add'));
+    return box ? box.querySelector('.selchips') : null;
+  }
+  function label(clr) {
+    const m = modeNow();
+    const n = sheet.querySelectorAll('.tg.' + (m === 'remove' ? 'rm' : 'on')).length;
+    const swBtn = sw && sw.querySelector('[data-mode="' + m + '"]');
+    if (swBtn) {
+      let badge = swBtn.querySelector('.n');
+      if (!badge) { badge = document.createElement('span'); badge.className = 'n'; swBtn.appendChild(badge); }
+      badge.textContent = n ? String(n) : '';
+      badge.hidden = !n;
+    }
+    if (footer) {
+      footer.disabled = n === 0;
+      footer.textContent = n === 0 ? (m === 'remove' ? '移除标签' : '添加标签')
+        : (m === 'remove' ? '移除 ' + n + ' 个标签' : '添加 ' + n + ' 个标签');
+    }
+    const seln = sheet.querySelector('.selbox.' + (m === 'remove' ? 'only-rm' : 'only-add') + ' .seln');
+    if (seln) seln.textContent = String(n);
+  }
+
+  // 点 chip：在添加/移除两种视觉之间切换
+  sheet.addEventListener('click', (e) => {
+    const modeBtn = e.target.closest('.modesw button, .go[data-mode]');
+    if (modeBtn) {
+      sheet.dataset.mode = modeBtn.dataset.mode;
+      sw && sw.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('on', b.dataset.mode === modeBtn.dataset.mode);
+        b.classList.toggle('rm', b.dataset.mode === 'remove' && b.classList.contains('on'));
+      });
+      if (theEmpty) theEmpty.hidden = modeNow() !== 'remove';
+      label();
+      return;
+    }
+    const tg = e.target.closest('.tg');
+    if (tg && list && !tg.disabled) {
+      if (modeNow() === 'remove') tg.classList.toggle('rm');
+      else tg.classList.toggle('on');
+      label();
+      return;
+    }
+    if (e.target === footer) {
+      const n = sheet.querySelectorAll('.tg.' + (modeNow() === 'remove' ? 'rm' : 'on')).length;
+      if (!n) return;
+      const word = modeNow() === 'remove' ? '移除' : '添加';
+      if (toast) {
+        toast.textContent = '已为 ' + scope + ' 张' + word + ' ' + n + ' 个标签';
+        toast.classList.add('show');
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => toast.classList.remove('show'), 2200);
+      }
+    }
+  });
+  // 让标签本身也能点（footer 是单独的 button，不在 list 里）
+  if (footer) footer.addEventListener('click', () => {});
+  label();
+});
+</script>
+</body>
+</html>
