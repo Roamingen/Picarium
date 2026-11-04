@@ -1919,6 +1919,7 @@ async function deleteEditing() {
 const TM_NEW = '\u0000new';
 let tagRows = []; // [{ name, count }]
 let tmQuery = '';
+let filterReopen = false;
 let tmEditing = null; // 行内正在改的标签名，新建时是 TM_NEW
 let tmMergeFrom = null;
 
@@ -1940,6 +1941,10 @@ async function openTagManage() {
 function closeTagManage() {
   $('tagmanage').hidden = true;
   tmEditing = null;
+  if (filterReopen) {
+    filterReopen = false;
+    openFilterPanel(); // 回来重画候选，顺便拿新建/删掉的标签
+  }
 }
 
 async function reloadTagRows() {
@@ -2213,6 +2218,13 @@ $('e-copy-file').addEventListener('click', async () => {
   } catch (e) {
     toast('复制失败：' + e);
   }
+});
+
+$('f-tags-manage').addEventListener('click', () => {
+  // 筛选面板 z 75 在标签管理之上，先收起它，关标签管理时再放回来
+  filterReopen = !$('filter-panel').hidden;
+  if (filterReopen) closeFilterPanel();
+  openTagManage();
 });
 
 $('e-save').addEventListener('click', saveEditor);
@@ -5171,6 +5183,17 @@ async function runAcceptSuite() {
     check('标签数回到初始', tagRows.length === tagsBefore, `${tagsBefore} -> ${tagRows.length}`);
     closeTagManage();
     check('标签管理可关闭', $('tagmanage').hidden);
+
+    // 筛选面板的「管理」入口：进去收面板，出来再放回来
+    openFilterPanel();
+    await sleep(120);
+    $('f-tags-manage').click();
+    await sleep(200);
+    check('筛选面板可进标签管理', !$('tagmanage').hidden && $('filter-panel').hidden);
+    closeTagManage();
+    await sleep(120);
+    check('关标签管理回到筛选面板', !$('filter-panel').hidden && $('tagmanage').hidden);
+    closeFilterPanel();
 
     await invoke('create_tag', { name: '合并A' });
     await invoke('create_tag', { name: '合并B' });

@@ -476,6 +476,19 @@ kbd {
   border-radius: 8px;
 }
 
+.fp-link {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.fp-link:hover { text-decoration: underline; }
+
 .modal-actions {
   display: flex;
   align-items: center;
