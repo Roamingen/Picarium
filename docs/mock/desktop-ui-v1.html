@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>桌面端重绘 v1 · 多选 / 加入分组·加标签 / 编辑</title>
+<style>
+  :root {
+    --bg: #14161a; --bg-2: #1b1e24; --surface: #0f1115; --surface-2: #232833; --surface-3: #1c212a;
+    --modal: #191d24; --line: #2a2f38; --line-2: #333a47; --hover: #2a3140; --active: #26354d;
+    --fg: #e8eaed; --dim: #8b93a1; --dim-2: #5d6573; --accent: #6ea8fe; --accent-fg: #dce7ff;
+    --danger: #ff9aa2; --danger-border: #5a2b31; --danger-bg: #e5484d; --on-danger: #fff;
+    --mask: rgba(0, 0, 0, .5); --shadow: rgba(0, 0, 0, .55);
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 28px 24px 60px;
+    background: #0b0c0f; color: var(--fg);
+    font: 13px/1.5 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  .page { max-width: 1260px; margin: 0 auto; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  .sub { color: var(--dim); font-size: 12px; margin: 0 0 22px; }
+  .frame-cap { display: flex; align-items: baseline; gap: 10px; margin: 26px 0 8px; }
+  .frame-cap b { font-size: 13px; }
+  .frame-cap span { font-size: 12px; color: var(--dim); }
+  .note { color: var(--dim); font-size: 12px; line-height: 1.75; }
+  .note code { color: #c9d4e5; background: #1a1f28; padding: 1px 5px; border-radius: 4px; }
+
+  /* ---------- 窗口壳 ---------- */
+  .win {
+    position: relative; width: 1200px; height: 680px; overflow: hidden;
+    border: 1px solid var(--line-2); border-radius: 12px; background: var(--bg);
+    box-shadow: 0 24px 70px var(--shadow);
+  }
+  .win header {
+    display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px;
+    border-bottom: 1px solid var(--line); background: var(--bg-2);
+  }
+  .brand { font-weight: 700; font-size: 14px; letter-spacing: .2px; }
+  .search {
+    width: 260px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface); color: var(--fg); font: inherit; font-size: 12px;
+  }
+  .spacer { flex: 1; }
+  .stats { color: var(--dim); font-size: 12px; }
+  .clip {
+    display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+    border: 1px solid var(--line); border-radius: 999px; font-size: 12px; color: var(--dim);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; }
+  .pinbtn {
+    width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--surface-2); color: var(--dim);
+  }
+  .win .toolbar {
+    display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px;
+    border-bottom: 1px solid var(--line); background: var(--bg-2);
+  }
+  .tbtn {
+    height: 28px; padding: 0 11px; display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2);
+    color: var(--fg); font: inherit; font-size: 12px;
+  }
+  .tbtn.on { border-color: var(--accent); background: var(--active); color: var(--accent-fg); }
+  .path {
+    flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--surface); color: var(--dim-2); font: inherit; font-size: 12px;
+  }
+  .body { display: flex; height: calc(100% - 90px); }
+  .side {
+    width: 176px; flex: none; padding: 10px 8px; border-right: 1px solid var(--line);
+    background: var(--bg-2); overflow: hidden;
+  }
+  .sitem {
+    display: flex; align-items: center; justify-content: space-between; height: 30px;
+    padding: 0 10px; border-radius: 8px; color: var(--fg); font-size: 13px;
+  }
+  .sitem.on { background: var(--active); color: var(--accent-fg); }
+  .sitem i { font-style: normal; color: var(--dim); font-size: 12px; }
+  .sitem.on i { color: var(--accent); }
+  .stitle {
+    display: flex; align-items: center; justify-content: space-between;
+    margin: 14px 10px 4px; font-size: 11px; color: var(--dim-2);
+  }
+  .grid {
+    flex: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
+    align-content: start; padding: 14px; overflow: hidden;
+  }
+  .card {
+    position: relative; aspect-ratio: 1 / 1; border-radius: 10px; overflow: hidden;
+    display: grid; place-items: center; font-size: 30px;
+    border: 1px solid rgba(255,255,255,.05);
+  }
+  .card.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .card.sel::after {
+    content: '✓'; position: absolute; top: 6px; left: 6px; width: 18px; height: 18px;
+    border-radius: 6px; background: var(--accent); color: #0d1420;
+    font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  }
+  .card.dim { filter: brightness(.45) saturate(.6); }
+
+  /* ---------- A：多选操作栏 ---------- */
+  .selbar {
+    position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 14px;
+    border: 1px solid var(--line-2); border-radius: 14px; background: rgba(25, 29, 36, .96);
+    box-shadow: 0 18px 46px rgba(0,0,0,.6); backdrop-filter: blur(8px);
+  }
+  .selcount { font-size: 12px; color: var(--dim); white-space: nowrap; padding-right: 6px; }
+  .selcount b { color: var(--fg); font-size: 13px; }
+  .selall {
+    flex: 0 0 auto; white-space: nowrap;
+    border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 12px;
+    padding: 6px 8px; border-radius: 7px;
+  }
+  .sep { width: 1px; height: 20px; background: var(--line-2); margin: 0 4px; }
+  .act {
+    flex: 0 0 auto; white-space: nowrap;
+    display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px;
+    border: 0; border-radius: 8px; background: transparent; color: var(--fg);
+    font: inherit; font-size: 12px;
+  }
+  .act svg { flex: none; }
+  .act:hover { background: var(--hover); }
+  .act.danger { color: var(--danger); }
+  .act.danger:hover { background: var(--danger-border); }
+  .act.ghost { color: var(--dim); }
+  .chip.on { border-color: var(--accent); background: var(--active); color: var(--accent-fg); }
+
+  /* ---------- B：加入分组 / 加标签 ---------- */
+  .mask {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    background: var(--mask); backdrop-filter: blur(2px);
+  }
+  .dlg {
+    width: 520px; padding: 18px; border: 1px solid var(--line-2); border-radius: 14px;
+    background: var(--modal); box-shadow: 0 24px 70px var(--shadow);
+  }
+  .dlg-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .dlg-title { font-size: 15px; font-weight: 600; }
+  .dlg-sub { font-size: 12px; color: var(--dim); }
+  .dlg-x {
+    margin-left: auto; width: 26px; height: 26px; display: grid; place-items: center;
+    border: 0; border-radius: 7px; background: transparent; color: var(--dim); font-size: 14px;
+  }
+  .dlg-x:hover { background: var(--hover); color: var(--fg); }
+  .dlg-q {
+    width: 100%; height: 34px; margin: 10px 0 10px; padding: 0 11px;
+    border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
+    color: var(--fg); font: inherit; font-size: 13px;
+  }
+  .rows {
+    max-height: 260px; overflow: auto; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface);
+  }
+  .row {
+    display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px;
+    border-bottom: 1px solid var(--line); font-size: 13px;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .cnt { font-size: 12px; color: var(--dim-2); }
+  .row.on { background: rgba(110,168,254,.08); box-shadow: inset 2px 0 0 var(--accent); }
+  .row.on .nm { color: var(--accent-fg); }
+  .row .st { font-size: 11px; color: var(--accent); display: flex; align-items: center; gap: 4px; }
+  .row .st.off { color: var(--dim-2); }
+  .newrow {
+    display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px;
+    color: var(--accent); font-size: 13px; border-top: 1px dashed var(--line-2);
+  }
+  .dlg-foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .hint { font-size: 11px; color: var(--dim-2); }
+  .btn {
+    height: 30px; padding: 0 13px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface-2); color: var(--fg); font: inherit; font-size: 12px;
+  }
+  .btn.primary { border-color: var(--accent); background: var(--active); color: var(--accent-fg); }
+  .btn.ghost { background: transparent; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px;
+    border: 1px solid var(--line-2); border-radius: 999px; background: var(--surface-2);
+    font-size: 12px; color: var(--fg);
+  }
+  .chip .x { color: var(--dim); font-size: 11px; }
+  .chip.add { border-style: dashed; color: var(--dim); }
+
+  /* ---------- C：编辑弹窗 ---------- */
+  .edit {
+    width: 660px; padding: 16px 18px 14px; border: 1px solid var(--line-2); border-radius: 14px;
+    background: var(--modal); box-shadow: 0 24px 70px var(--shadow);
+  }
+  .edit-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+  .edit-meta { font-size: 12px; color: var(--dim); }
+  .edit-body { display: flex; gap: 16px; }
+  .prev {
+    width: 220px; height: 300px; flex: none; display: grid; place-items: center;
+    border: 1px solid var(--line); border-radius: 10px; font-size: 56px;
+    background:
+      linear-gradient(45deg, #171b21 25%, transparent 25%, transparent 75%, #171b21 75%) 0 0/16px 16px,
+      linear-gradient(45deg, #171b21 25%, #11151a 25%, #11151a 75%, #171b21 75%) 8px 8px/16px 16px;
+  }
+  .fields { flex: 1; min-width: 0; }
+  .flabel {
+    display: flex; align-items: center; gap: 8px; margin: 0 0 6px;
+    font-size: 12px; color: var(--dim);
+  }
+  .flabel .link { margin-left: auto; color: var(--accent); font-size: 11px; }
+  .finput {
+    width: 100%; height: 32px; padding: 0 10px; margin-bottom: 14px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+    color: var(--fg); font: inherit; font-size: 13px;
+  }
+  .fbox {
+    min-height: 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    padding: 5px 8px; margin-bottom: 14px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--surface);
+  }
+  .fbox input {
+    flex: 1; min-width: 90px; height: 22px; border: 0; background: transparent;
+    color: var(--fg); font: inherit; font-size: 13px; outline: none;
+  }
+  .sugg {
+    margin: -8px 0 14px; padding: 5px; border: 1px solid var(--line-2); border-radius: 9px;
+    background: var(--surface-3); box-shadow: 0 14px 34px var(--shadow);
+  }
+  .sugg .row { height: 30px; border: 0; border-radius: 6px; padding: 0 8px; }
+  .sugg .row.on { background: var(--hover); box-shadow: none; }
+  .edit-foot { display: flex; align-items: center; gap: 8px; margin-top: 16px; }
+  .lock-hint { font-size: 11px; color: var(--dim-2); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>桌面端重绘 · v1</h1>
+  <p class="sub">
+    多选操作栏 / 加入分组·加标签 / 右键编辑，三块一起看。样式沿用 <code>src-tauri/ui/style.css</code> 现有 token，
+    只换结构与交互；手机端的做法（点一下立即生效、搜索兼新建、chip 已选态）搬过来，但保持桌面尺寸密度。
+  </p>
+
+  <!-- ================= A 多选 ================= -->
+  <div class="frame-cap"><b>① 多选状态</b><span>底部操作栏按「选择 · 主操作 · 危险 · 退出」分组，全部带图标</span></div>
+  <div class="win">
+    <header>
+      <div class="brand">StickerBox</div>
+      <input class="search" placeholder="筛选：名字 / 拼音 / 首字母…" />
+      <div class="spacer"></div>
+      <span class="stats">312 张 · 28.4 MB</span>
+      <span class="clip"><span class="dot"></span>剪贴板捕获</span>
+      <span class="pinbtn">⚙️</span>
+      <span class="pinbtn">📌</span>
+    </header>
+    <div class="toolbar">
+      <button class="tbtn">导入文件夹…</button>
+      <button class="tbtn">导入图片…</button>
+      <button class="tbtn on">退出多选</button>
+      <button class="tbtn">筛选</button>
+      <input class="path" placeholder="或粘贴路径后回车" />
+      <span class="stats">点击卡片勾选 · Shift 连选</span>
+    </div>
+    <div class="body">
+      <aside class="side">
+        <div class="sitem on">全部<i>312</i></div>
+        <div class="sitem">未分组<i>118</i></div>
+        <div class="sitem">收藏<i>26</i></div>
+        <div class="sitem">最近使用<i>40</i></div>
+        <div class="stitle">分组</div>
+        <div class="sitem">摸鱼<i>30</i></div>
+        <div class="sitem">猫猫<i>16</i></div>
+        <div class="sitem">梗图<i>95</i></div>
+        <div class="stitle">其他</div>
+        <div class="sitem">标签管理<i>6</i></div>
+        <div class="sitem">回收站<i>2</i></div>
+      </aside>
+      <div class="grid">
+        <div class="card sel" style="background:#26354d">🐟</div>
+        <div class="card" style="background:#2a2431">🐱</div>
+        <div class="card sel" style="background:#21323a">😹</div>
+        <div class="card sel" style="background:#332a24">🐶</div>
+        <div class="card" style="background:#2b2f3a">🌙</div>
+        <div class="card" style="background:#233026">🍃</div>
+        <div class="card" style="background:#312630">🎀</div>
+        <div class="card" style="background:#242a34">🫧</div>
+        <div class="card" style="background:#2f2a22">☕</div>
+        <div class="card" style="background:#22303a">🐳</div>
+        <div class="card" style="background:#2d2430">🍓</div>
+        <div class="card" style="background:#262d26">🌵</div>
+        <div class="card" style="background:#30282a">🔥</div>
+        <div class="card" style="background:#222c33">🌊</div>
+        <div class="card" style="background:#2e2b20">🌻</div>
+        <div class="card" style="background:#2a2430">🍡</div>
+        <div class="card" style="background:#203028">🐸</div>
+        <div class="card" style="background:#332630">🍒</div>
+      </div>
+    </div>
+    <div class="selbar">
+      <span class="selcount">已选 <b>3</b> 张</span>
+      <button class="selall">全选</button>
+      <div class="sep"></div>
+      <button class="act">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v6"/><path d="M9 14h6"/></svg>
+        加入分组
+      </button>
+      <button class="act">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.6 2.6a2 2 0 0 0-1.4-.6H4a2 2 0 0 0-2 2v7.2c0 .5.2 1 .6 1.4l8.2 8.2a2 2 0 0 0 2.8 0l7.2-7.2a2 2 0 0 0 0-2.8z"/><path d="M7 7h.01"/></svg>
+        加标签
+      </button>
+      <button class="act">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 3.2a1 1 0 0 1 1 0l2.3 1.3 2.6-.2a1 1 0 0 1 .9.6l1 2.4 2.1 1.5a1 1 0 0 1 .3 1l-1.3 2.3.2 2.6a1 1 0 0 1-.5 1l-2.4 1-1.5 2.1a1 1 0 0 1-1 .3l-2.3-1.3-2.6.2a1 1 0 0 1-1-.5l-1-2.4-2.1-1.5a1 1 0 0 1-.3-1l1.3-2.3-.2-2.6a1 1 0 0 1 .5-1z"/></svg>
+        收藏
+      </button>
+      <button class="act">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        复制文件
+      </button>
+      <div class="sep"></div>
+      <button class="act danger">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+        删除
+      </button>
+      <div class="sep"></div>
+      <button class="act ghost">Esc 取消</button>
+    </div>
+  </div>
+  <p class="note" style="margin-top:8px">
+    旧版是 8 个同等重量的灰按钮排一行、超宽就横向滚动，删除混在中间。改后：<code>已选 3 张</code> 靠左加粗，
+    操作分三段用竖线隔开，危险动作固定在右侧并染红，最后一颗换成 <code>Esc 取消</code>，不抢「删除」的位置。
+    勾选框从圆形对勾改成左上角圆角方块，和卡片圆角对齐；选中用 accent 描边，未选中的卡片不变暗（避免整屏发灰）。
+  </p>
+
+  <!-- ================= B 加入分组 ================= -->
+  <div class="frame-cap"><b>② 加入分组 / 加标签</b><span>不再贴着按钮弹小浮层，改成居中弹窗；点一下立即生效，可连续点</span></div>
+  <div class="win">
+    <header>
+      <div class="brand">StickerBox</div>
+      <input class="search" placeholder="筛选：名字 / 拼音 / 首字母…" />
+      <div class="spacer"></div>
+      <span class="stats">312 张 · 28.4 MB</span>
+      <span class="clip"><span class="dot"></span>剪贴板捕获</span>
+      <span class="pinbtn">⚙️</span>
+      <span class="pinbtn">📌</span>
+    </header>
+    <div class="toolbar">
+      <button class="tbtn">导入文件夹…</button>
+      <button class="tbtn">导入图片…</button>
+      <button class="tbtn on">退出多选</button>
+      <button class="tbtn">筛选</button>
+      <input class="path" placeholder="或粘贴路径后回车" />
+    </div>
+    <div class="body" style="filter:blur(1px)">
+      <aside class="side">
+        <div class="sitem on">全部<i>312</i></div>
+        <div class="sitem">未分组<i>118</i></div>
+        <div class="sitem">收藏<i>26</i></div>
+        <div class="stitle">分组</div>
+        <div class="sitem">摸鱼<i>30</i></div>
+        <div class="sitem">猫猫<i>16</i></div>
+        <div class="stitle">其他</div>
+        <div class="sitem">标签管理<i>6</i></div>
+        <div class="sitem">回收站<i>2</i></div>
+      </aside>
+      <div class="grid">
+        <div class="card sel" style="background:#26354d">🐟</div>
+        <div class="card" style="background:#2a2431">🐱</div>
+        <div class="card sel" style="background:#21323a">😹</div>
+        <div class="card sel" style="background:#332a24">🐶</div>
+        <div class="card" style="background:#2b2f3a">🌙</div>
+        <div class="card" style="background:#233026">🍃</div>
+      </div>
+    </div>
+    <div class="mask">
+      <div class="dlg">
+        <div class="dlg-head">
+          <span class="dlg-title">加入分组</span>
+          <span class="dlg-sub">已选 3 张</span>
+          <button class="dlg-x">✕</button>
+        </div>
+        <input class="dlg-q" placeholder="搜索分组，或输入新名字回车新建" />
+        <div class="rows">
+          <div class="row on"><span class="nm">摸鱼</span><span class="cnt">30 张</span><span class="st">✓ 已加入</span></div>
+          <div class="row"><span class="nm">猫猫</span><span class="cnt">16 张</span><span class="st off">加入</span></div>
+          <div class="row"><span class="nm">梗图</span><span class="cnt">95 张</span><span class="st off">加入</span></div>
+          <div class="row"><span class="nm">表情包</span><span class="cnt">41 张</span><span class="st off">加入</span></div>
+          <div class="row"><span class="nm">测试组</span><span class="cnt">3 张</span><span class="st off">加入</span></div>
+        </div>
+        <div class="dlg-foot">
+          <button class="btn primary">完成</button>
+          <span class="hint">点一下立即生效，再点一下移出；Esc 关闭</span>
+          <span class="spacer"></span>
+          <span class="hint">已改 1 处</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= B2 加标签 ================= -->
+  <div class="frame-cap"><b>②b 加标签</b><span>同一个弹窗，换成标签；底部多一行「新建标签」且与标签管理共用文案</span></div>
+  <div class="win" style="height:520px">
+    <header>
+      <div class="brand">StickerBox</div>
+      <input class="search" placeholder="筛选：名字 / 拼音 / 首字母…" />
+      <div class="spacer"></div>
+      <span class="stats">312 张 · 28.4 MB</span>
+      <span class="clip"><span class="dot"></span>剪贴板捕获</span>
+      <span class="pinbtn">⚙️</span>
+      <span class="pinbtn">📌</span>
+    </header>
+    <div class="toolbar">
+      <button class="tbtn">导入文件夹…</button>
+      <button class="tbtn">导入图片…</button>
+      <button class="tbtn on">退出多选</button>
+      <button class="tbtn">筛选</button>
+      <input class="path" placeholder="或粘贴路径后回车" />
+    </div>
+    <div class="body" style="filter:blur(1px)">
+      <aside class="side">
+        <div class="sitem on">全部<i>312</i></div>
+        <div class="sitem">未分组<i>118</i></div>
+        <div class="sitem">收藏<i>26</i></div>
+      </aside>
+      <div class="grid">
+        <div class="card sel" style="background:#26354d">🐟</div>
+        <div class="card" style="background:#2a2431">🐱</div>
+        <div class="card sel" style="background:#21323a">😹</div>
+        <div class="card sel" style="background:#332a24">🐶</div>
+      </div>
+    </div>
+    <div class="mask">
+      <div class="dlg">
+        <div class="dlg-head">
+          <span class="dlg-title">加标签</span>
+          <span class="dlg-sub">已选 3 张</span>
+          <button class="dlg-x">✕</button>
+        </div>
+        <input class="dlg-q" placeholder="搜索标签，或输入新名字回车新建" />
+        <div class="chips" style="margin-bottom:10px">
+          <span class="chip on">搞笑 <span class="x">×</span></span>
+          <span class="chip">猫猫 <span class="x">×</span></span>
+        </div>
+        <div class="rows">
+          <div class="row on"><span class="nm">搞笑</span><span class="cnt">全库 88 张</span><span class="st">✓ 已加</span></div>
+          <div class="row on"><span class="nm">猫猫</span><span class="cnt">全库 16 张</span><span class="st">✓ 已加</span></div>
+          <div class="row"><span class="nm">梗图</span><span class="cnt">全库 95 张</span><span class="st off">加入</span></div>
+          <div class="row"><span class="nm">表情包</span><span class="cnt">全库 41 张</span><span class="st off">加入</span></div>
+          <div class="row" style="border-top:1px dashed var(--line-2)"><span class="nm" style="color:var(--accent)">＋ 新建标签「摸鱼日常」</span><span class="st off">回车</span></div>
+        </div>
+        <div class="dlg-foot">
+          <button class="btn primary">完成</button>
+          <span class="hint">已加 2 个 · 点标签可取消</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note" style="margin-top:8px">
+    旧版是 320px 的浮层，贴着按钮向上展开，只一个输入框加下拉，看不到已选上下文、也不能连续点。
+    新版：居中弹窗，标题旁写「已选 3 张」；列表里每行右侧明示「加入 / ✓ 已加入」，点一下立刻写库、行变高亮，可继续点下一个；
+    搜索框即新建（回车）；标签版顶部复用 chip 展示本次已加的，底部「新建标签「xx」」行只在没有同名时出现。
+  </p>
+
+  <!-- ================= C 编辑弹窗 ================= -->
+  <div class="frame-cap"><b>③ 右键编辑</b><span>左图右信息，标签/分组改成输入框式 chip，管理入口直接挂到分组行</span></div>
+  <div class="win" style="height:600px">
+    <header>
+      <div class="brand">StickerBox</div>
+      <input class="search" placeholder="筛选：名字 / 拼音 / 首字母…" />
+      <div class="spacer"></div>
+      <span class="stats">312 张 · 28.4 MB</span>
+      <span class="clip"><span class="dot"></span>剪贴板捕获</span>
+      <span class="pinbtn">⚙️</span>
+      <span class="pinbtn">📌</span>
+    </header>
+    <div class="toolbar">
+      <button class="tbtn">导入文件夹…</button>
+      <button class="tbtn">导入图片…</button>
+      <button class="tbtn">多选</button>
+      <button class="tbtn">筛选</button>
+      <input class="path" placeholder="或粘贴路径后回车" />
+    </div>
+    <div class="body" style="filter:blur(1px)">
+      <aside class="side">
+        <div class="sitem on">全部<i>312</i></div>
+        <div class="sitem">未分组<i>118</i></div>
+        <div class="stitle">分组</div>
+        <div class="sitem">摸鱼<i>30</i></div>
+      </aside>
+      <div class="grid">
+        <div class="card" style="background:#26354d">🐟</div>
+        <div class="card" style="background:#2a2431">🐱</div>
+        <div class="card" style="background:#21323a">😹</div>
+      </div>
+    </div>
+    <div class="mask">
+      <div class="edit">
+        <div class="edit-head">
+          <span class="dlg-title">编辑表情</span>
+          <span class="edit-meta">y1 · 1080 × 2400 · 1.2 MB · 11-02 · 来自文件夹</span>
+        </div>
+        <div class="edit-body">
+          <div class="prev">🐟</div>
+          <div class="fields">
+            <div class="flabel">名称</div>
+            <input class="finput" value="y1" />
+            <div class="flabel">标签 <button class="btn ghost" style="margin-left:auto;height:22px;padding:0 8px;font-size:11px">管理</button></div>
+            <div class="fbox">
+              <span class="chip">搞笑 <span class="x">×</span></span>
+              <span class="chip">猫猫 <span class="x">×</span></span>
+              <input placeholder="输入标签，回车添加" />
+            </div>
+            <div class="sugg">
+              <div class="row on"><span class="nm">梗图</span><span class="cnt">95 张</span><span class="st off">⇥</span></div>
+              <div class="row"><span class="nm">表情包</span><span class="cnt">41 张</span><span class="st off"></span></div>
+              <div class="row"><span class="nm">摸鱼</span><span class="cnt">30 张</span><span class="st off"></span></div>
+            </div>
+            <div class="flabel">分组</div>
+            <div class="fbox">
+              <span class="chip">摸鱼 <span class="x">×</span></span>
+              <input placeholder="输入分组，回车添加" />
+            </div>
+          </div>
+        </div>
+        <div class="edit-foot">
+          <button class="btn">打开方式</button>
+          <button class="btn">复制文件</button>
+          <button class="btn" style="border-color:var(--danger-border);color:var(--danger)">删除</button>
+          <div class="spacer"></div>
+          <span class="lock-hint">Esc 关闭 · j/k 切字段 · ⌘Enter 保存</span>
+          <button class="btn ghost">取消</button>
+          <button class="btn primary">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note" style="margin-top:8px">
+    旧版：420px 宽、纯纵向字段、顶部一行逐字解释键盘操作，没有图片预览，标签/分组是「已选 chip + 候选下拉」两层。
+    新版：660px，左边预览（按比例 contain，棋盘底），右边字段；标签/分组都改成「框内 chip + 行内输入」，候选以浮层跟在输入下面；
+    标签行右侧挂「管理」直接开标签管理弹窗（复用刚做完的那套）；键盘提示压到 footer 行尾 11px，不再单独占一行。
+  </p>
+
+  <div class="frame-cap"><b>实现落点（预估）</b></div>
+  <p class="note">
+    <code>index.html</code>：#batchbar 重排（图标按钮 + 分隔线）、新增 #batchdlg（分组/标签共用）、#editor 结构与预览区；<br />
+    <code>app.js</code>：<code>openBatchCombo()</code> → <code>openBatchDialog(kind)</code>（写库逻辑沿用 <code>add_to_group / batch_ungroup / batch_tags / batch_untag</code>）、
+    <code>updateBatchBar()</code> 只改计数与文案、<code>openEditor()/renderPickers()</code> 跟着新结构走；自测断言里那几条选择器（<code>#batchbar [data-act]</code>、<code>#e-name</code>…）同步改名；<br />
+    <code>style.css</code>：<code>.batchbar</code> 改成三段式、新增 <code>.batch-dlg</code>、<code>.edit-*</code>，旧的 <code>.picker-pop / .batch-combo</code> 保留给筛选面板和设置里的来源选择。
+  </p>
+</div>
+</body>
+</html>
