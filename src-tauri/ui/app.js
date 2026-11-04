@@ -637,12 +637,25 @@ function renderPicker(id, options, set, placeholder, opts = {}) {
   renderPickerIn($(id), options, set, placeholder, opts);
 }
 
-let panelTagSet = new Set();
-
-function renderPickers() {
-  if ($('editor').hidden) return;
-  renderPicker('p-tags', allTags, editTags, '添加标签');
-  renderPicker('p-groups', allGroups, editGroups, '加入分组');
+function renderEditChips() {
+  const fill = (el, values, emptyText) => {
+    el.innerHTML = '';
+    if (!values.length) {
+      const s = document.createElement('span');
+      s.className = 'ed-empty';
+      s.textContent = emptyText;
+      el.appendChild(s);
+      return;
+    }
+    for (const v of values) {
+      const s = document.createElement('span');
+      s.className = 'chip';
+      s.textContent = v;
+      el.appendChild(s);
+    }
+  };
+  fill($('e-tags'), [...editTags], '还没有标签，点右上「编辑标签」');
+  fill($('e-groups'), [...editGroups], '不在任何分组，点右上「编辑分组」');
 }
 
 /* ---------- 列表 ---------- */
@@ -1619,7 +1632,7 @@ async function loadGroups() {
     (g.pinned ? pinnedList : list).appendChild(b);
   }
 
-  renderPickers();
+  if (editing) renderEditChips();
 }
 
 function cleanGroupDropMarks() {
@@ -1824,16 +1837,17 @@ async function openEditor(a) {
   $('e-name').value = a.name;
   editTags = new Set(a.tags || []);
   editGroups = new Set(a.groups || []);
-  $('e-meta').textContent = `${a.width} × ${a.height} · ${fmtSize(a.bytes)} · ${a.ext.toUpperCase()}`;
-
-  const inGroup = currentGroup !== '__all__' && currentGroup !== '__none__' && editGroups.has(currentGroup);
-  const ungroupBtn = $('e-ungroup');
-  ungroupBtn.hidden = !inGroup;
-  if (inGroup) ungroupBtn.textContent = `移出「${currentGroup}」`;
+  $('e-meta').textContent = `${a.width} × ${a.height} · ${fmtSize(a.bytes)}`;
+  const src = a.source === 'clipboard' ? '来自剪贴板' : '来自文件夹';
+  const when = (a.added_at || '').slice(0, 10);
+  $('e-sub').textContent = `${a.ext.toUpperCase()} · ${fmtSize(a.bytes)} · ${when} · ${src}`;
+  $('e-path').textContent = a.path || '';
+  $('e-path').title = a.path || '';
+  $('e-prev').src = convertFileSrc(a.path);
 
   $('editor').hidden = false;
   exitEditorNav();
-  renderPickers();
+  renderEditChips();
   $('e-name').focus();
   $('e-name').select();
 
@@ -1844,10 +1858,19 @@ async function openEditor(a) {
     editing = fresh;
     editTags = new Set(fresh.tags || []);
     editGroups = new Set(fresh.groups || []);
-    const inGroupNow = currentGroup !== '__all__' && currentGroup !== '__none__' && editGroups.has(currentGroup);
-    ungroupBtn.hidden = !inGroupNow;
-    if (inGroupNow) ungroupBtn.textContent = `移出「${currentGroup}」`;
-    renderPickers();
+    renderEditChips();
+  } catch (_) {}
+}
+
+async function reloadEditing() {
+  if (!editing) return;
+  try {
+    const fresh = await invoke('get_asset', { sha: editing.sha });
+    if (!editing || editing.sha !== fresh.sha) return;
+    editing = fresh;
+    editTags = new Set(fresh.tags || []);
+    editGroups = new Set(fresh.groups || []);
+    renderEditChips();
   } catch (_) {}
 }
 
@@ -1855,6 +1878,7 @@ $('editor').addEventListener('mousedown', () => exitEditorNav());
 
 function closeEditor() {
   closePop();
+  closeBatchPanel();
   exitEditorNav();
   $('editor').hidden = true;
   editing = null;
@@ -1863,11 +1887,10 @@ function closeEditor() {
 async function saveEditor() {
   if (!editing) return;
   try {
+    // 标签/分组在面板里点一下就写库了，这里只存名称，避免用旧快照把它们覆盖回去
     await invoke('update_asset', {
       sha: editing.sha,
       name: $('e-name').value.trim(),
-      tags: [...editTags],
-      groups: [...editGroups],
     });
     closeEditor();
     await Promise.all([refresh(), loadGroups(), showStats()]);
@@ -2195,9 +2218,20 @@ $('e-copy-file').addEventListener('click', async () => {
 $('e-save').addEventListener('click', saveEditor);
 $('e-cancel').addEventListener('click', closeEditor);
 $('e-del').addEventListener('click', deleteEditing);
-$('e-ungroup').addEventListener('click', async () => {
-  editGroups.delete(currentGroup);
-  await saveEditor();
+$('e-tags-btn').addEventListener('click', () => {
+  if (editing) openBatchPanel('tag', { sha: editing.sha, name: editing.name, onClose: reloadEditing });
+});
+$('e-groups-btn').addEventListener('click', () => {
+  if (editing) openBatchPanel('group', { sha: editing.sha, name: editing.name, onClose: reloadEditing });
+});
+$('e-copy-path').addEventListener('click', async () => {
+  if (!editing) return;
+  try {
+    await navigator.clipboard.writeText(editing.path);
+    toast('路径已复制');
+  } catch (_) {
+    toast('复制失败');
+  }
 });
 $('editor').addEventListener('click', (e) => {
   if (e.target === $('editor')) closeEditor();
@@ -3704,6 +3738,11 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (!$('editor') || $('editor').hidden) return;
+  if (batchPanel && e.key === 'Escape') {
+    e.preventDefault();
+    closeBatchPanel();
+    return;
+  }
   if (e.key === 'Escape') {
     e.preventDefault();
     if (isTypingTarget()) {
@@ -3755,16 +3794,20 @@ function currentCard() {
 
 let batchPanel = null;
 let batchPanelKind = null;
+let batchPanelOnClose = null;
 
 function closeBatchPanel() {
   if (!batchPanel) return;
   batchPanel.remove();
   batchPanel = null;
   batchPanelKind = null;
+  const cb = batchPanelOnClose;
+  batchPanelOnClose = null;
+  if (cb) cb();
 }
 
-function openBatchPanel(kind) {
-  const shas = getActionShas();
+function openBatchPanel(kind, opts = {}) {
+  const shas = opts.sha ? [opts.sha] : getActionShas();
   if (!shas.length) return;
   if (batchPanel && batchPanelKind === kind) {
     closeBatchPanel();
@@ -3774,6 +3817,8 @@ function openBatchPanel(kind) {
   const isGroup = kind === 'group';
   const label = isGroup ? '分组' : '标签';
   const m = shas.length;
+  const single = !!opts.sha;
+  const scopeText = single ? `${opts.name || '这张图'} · 1 张` : `已选 ${m} 张`;
   let changed = 0;
   let q = '';
 
@@ -3782,7 +3827,7 @@ function openBatchPanel(kind) {
   panel.innerHTML =
     '<div class="bp-head">' +
     `<span class="bp-title">编辑${label}</span>` +
-    `<span class="bp-scope">已选 ${m} 张</span>` +
+    `<span class="bp-scope">${escapeHtml(scopeText)}</span>` +
     `<button class="bp-x" title="关闭（Esc）">${icon('x', 14)}</button>` +
     '</div>' +
     `<div class="bp-search"><input class="bp-q" autocomplete="off" spellcheck="false" placeholder="搜索${label}，或输入新名字回车新建"></div>` +
@@ -3796,13 +3841,27 @@ function openBatchPanel(kind) {
   document.body.appendChild(panel);
   batchPanel = panel;
   batchPanelKind = kind;
+  batchPanelOnClose = opts.onClose || null;
 
   const listEl = panel.querySelector('.bp-list');
   const countEl = panel.querySelector('.bp-count');
   const input = panel.querySelector('.bp-q');
-  const has = (a, name) => (isGroup ? a.groups || [] : a.tags || []).includes(name);
-  const assets = () => shas.map((s) => shownItems.find((x) => x.sha === s)).filter(Boolean);
-  const cov = (name) => assets().filter((a) => has(a, name)).length;
+  // 面板内的状态自己维护：单图模式下 shownItems 可能不含这张（比如从回收站打开），
+  // 而且 refresh() 之后原对象就换掉了，所以不要回读列表。
+  const state = new Map();
+  for (const s of shas) {
+    const a = shownItems.find((x) => x.sha === s) || (editing && editing.sha === s ? editing : null);
+    state.set(s, {
+      tags: new Set((a && a.tags) || []),
+      groups: new Set((a && a.groups) || []),
+    });
+  }
+  const setOf = (s) => state.get(s);
+  const hasSet = (s, name) => {
+    const st = setOf(s);
+    return !!st && (isGroup ? st.groups : st.tags).has(name);
+  };
+  const cov = (name) => shas.filter((s) => hasSet(s, name)).length;
 
   function repaint() {
     const names = (isGroup ? allGroups : allTags)
@@ -3818,8 +3877,7 @@ function openBatchPanel(kind) {
       row.innerHTML =
         `<span class="bp-name">${escapeHtml(name)}</span>` +
         `<span class="bp-meta">${n}/${m} 张</span>` +
-        `<span class="bp-st"><span class="n">${st}</span><span class="h">✕ 移出</span></span>`;
-      row.onclick = () => toggle(name);
+        `<span class="bp-st"><span class="n">${st}</span><span class="h">✕ 移出</span></span>`;      row.onclick = () => toggle(name);
       listEl.appendChild(row);
     }
     const exact = names.some((n) => n.toLowerCase() === q.toLowerCase());
@@ -3851,14 +3909,19 @@ function openBatchPanel(kind) {
       if (n === m) {
         if (isGroup) await invoke('batch_ungroup', { shas, group: name });
         else await invoke('batch_untag', { shas, tags: [name] });
+        for (const s of shas) {
+          const st = setOf(s);
+          if (st) (isGroup ? st.groups : st.tags).delete(name);
+        }
       } else {
-        const miss = shas.filter((s) => {
-          const a = shownItems.find((x) => x.sha === s);
-          return a && !has(a, name);
-        });
+        const miss = shas.filter((s) => !hasSet(s, name));
         if (!miss.length) return;
         if (isGroup) await invoke('add_to_group', { shas: miss, group: name });
         else await invoke('batch_tags', { shas: miss, tags: [name] });
+        for (const s of shas) {
+          const st = setOf(s);
+          if (st) (isGroup ? st.groups : st.tags).add(name);
+        }
       }
       await afterChange();
     } catch (err) {
@@ -3872,6 +3935,10 @@ function openBatchPanel(kind) {
     try {
       if (isGroup) await invoke('add_to_group', { shas, group: nm });
       else await invoke('batch_tags', { shas, tags: [nm] });
+      for (const s of shas) {
+        const st = setOf(s);
+        if (st) (isGroup ? st.groups : st.tags).add(nm);
+      }
       q = '';
       input.value = '';
       await afterChange();
@@ -5057,6 +5124,29 @@ async function runAcceptSuite() {
       check('编辑标签面板跳过（卡片不足）', true, 'no items');
     }
 
+    // 单图面板（从编辑弹窗进）与只读 chip
+    if (shownItems.length) {
+      const one = shownItems[0];
+      openEditor(one);
+      await sleep(200);
+      const chipCount = document.querySelectorAll('#e-tags .chip').length;
+      check('编辑弹窗只读标签 chip', chipCount === (one.tags || []).length, `chips=${chipCount}`);
+      check('编辑弹窗有编辑标签按钮', !!$('e-tags-btn') && !$('e-tags-btn').hidden);
+      openBatchPanel('tag', { sha: one.sha, name: one.name });
+      await sleep(150);
+      const bp1 = document.querySelector('.bpanel');
+      const scope = bp1 ? bp1.querySelector('.bp-scope').textContent : '';
+      check('单图面板标出名与张数', scope.includes(one.name) && scope.includes('1 张'), scope);
+      const onRow = bp1 && [...bp1.querySelectorAll('.bp-row')].find((r) => r.classList.contains('on'));
+      check('单图面板已加的标签显示已加', !!(one.tags || []).length === !!onRow, onRow ? 'has row' : 'no row');
+      closeBatchPanel();
+      closeEditor();
+      await sleep(100);
+      check('编辑弹窗可关闭后再无面板', $('editor').hidden && !document.querySelector('.bpanel'));
+    } else {
+      check('单图面板跳过（无卡片）', true, 'no items');
+    }
+
     // 标签管理
     const tagsBefore = tagRows.length;
     await openTagManage();
@@ -5254,13 +5344,17 @@ window.addEventListener('unhandledrejection', (e) => {
   }
   if (ui === 'editor' && shownItems[0]) {
     openEditor(shownItems[0]);
-    await new Promise((r) => setTimeout(r, 200));
-    const tagInput = $('p-tags').querySelector('.picker-input');
-    if (tagInput) {
-      tagInput.focus();
-      tagInput.value = '浏';
-      tagInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
+  if (ui === 'editorpanel' && shownItems[0]) {
+    openEditor(shownItems[0]);
+    await new Promise((r) => setTimeout(r, 250));
+    openBatchPanel('tag', { sha: shownItems[0].sha, name: shownItems[0].name, onClose: reloadEditing });
+  }
+  if (ui === 'editorpanelgroup' && shownItems[0]) {
+    openEditor(shownItems[0]);
+    await new Promise((r) => setTimeout(r, 250));
+    openBatchPanel('group', { sha: shownItems[0].sha, name: shownItems[0].name, onClose: reloadEditing });
   }
 })();
 

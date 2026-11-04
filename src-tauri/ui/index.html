@@ -92,31 +92,48 @@
   <div id="tip" class="tip"></div>
 
   <div id="editor" class="modal-mask" hidden>
-    <div class="modal">
+    <div class="modal ed-modal">
       <div class="modal-head">
         <span class="modal-title">编辑表情</span>
         <span id="e-meta" class="dim"></span>
       </div>
-      <div class="editor-hint">Esc 离开输入框 → j/k 选字段 → Enter 进入；输入框内可用 Ctrl+J/K 换字段</div>
-      <label class="field">
-        <span>名称</span>
-        <input id="e-name" autocomplete="off" spellcheck="false" />
-      </label>
-      <div class="field">
-        <span>标签</span>
-        <div id="p-tags" class="picker"></div>
+      <div class="ed-body">
+        <div class="ed-left">
+          <div class="ed-prev"><img id="e-prev" alt="" /></div>
+          <div class="ed-quick">
+            <button id="e-open" class="btn small" title="用系统默认的图片查看器打开">打开方式</button>
+            <button id="e-copy-file" class="btn small" title="复制原文件，动图不会丢帧">复制文件</button>
+          </div>
+        </div>
+        <div class="ed-right">
+          <div class="field ed-name-field">
+            <input id="e-name" class="ed-name" autocomplete="off" spellcheck="false" />
+          </div>
+          <div class="ed-sub" id="e-sub"></div>
+          <div class="ed-sec field">
+            <div class="ed-sec-head">
+              <span>标签</span>
+              <button id="e-tags-btn" class="btn small">编辑标签</button>
+            </div>
+            <div id="e-tags" class="ed-chips"></div>
+          </div>
+          <div class="ed-sec field">
+            <div class="ed-sec-head">
+              <span>分组</span>
+              <button id="e-groups-btn" class="btn small">编辑分组</button>
+            </div>
+            <div id="e-groups" class="ed-chips"></div>
+          </div>
+          <div class="ed-path">
+            <span id="e-path"></span>
+            <button id="e-copy-path" class="btn small ghost">复制路径</button>
+          </div>
+        </div>
       </div>
-      <div class="field">
-        <span>分组</span>
-        <div id="p-groups" class="picker"></div>
-      </div>
-
       <div class="modal-actions">
-        <button id="e-open" class="btn" title="用系统默认的图片查看器打开">打开方式</button>
-        <button id="e-copy-file" class="btn" title="复制原文件，动图不会丢帧">复制文件</button>
-        <button id="e-del" class="btn danger">删除</button>
-        <button id="e-ungroup" class="btn" hidden>移出分组</button>
+        <button id="e-del" class="btn danger">移到回收站</button>
         <div class="spacer"></div>
+        <span class="ed-hint">Esc 关闭</span>
         <button id="e-cancel" class="btn">取消</button>
         <button id="e-save" class="btn primary">保存</button>
       </div>

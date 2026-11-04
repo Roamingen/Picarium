@@ -1541,7 +1541,7 @@ body.drag-active {
   border-radius: 14px;
   background: var(--surface-3);
   box-shadow: 0 26px 68px var(--shadow);
-  z-index: 46;
+  z-index: 62;
   overflow: hidden;
 }
 
@@ -1728,6 +1728,160 @@ body.drag-active {
   font-size: 11px;
   color: var(--dim);
   white-space: nowrap;
+}
+
+
+/* ---------- 编辑弹窗（只读 chip + 编辑按钮） ---------- */
+
+.ed-modal {
+  width: min(760px, calc(100vw - 64px));
+  padding: 16px 18px;
+}
+
+.ed-body {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  margin: 2px 0 12px;
+}
+
+.ed-left {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ed-prev {
+  height: 300px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: #191d24;
+  background-image:
+    linear-gradient(45deg, #20242c 25%, transparent 25%, transparent 75%, #20242c 75%),
+    linear-gradient(45deg, #20242c 25%, transparent 25%, transparent 75%, #20242c 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 8px 8px;
+}
+
+.ed-prev img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.ed-quick {
+  display: flex;
+  gap: 8px;
+}
+
+.ed-quick .btn {
+  flex: 1;
+}
+
+.ed-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ed-name-field {
+  margin: 0;
+}
+
+.ed-name {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.ed-name:focus {
+  border-color: var(--accent);
+}
+
+.ed-sub {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.ed-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+}
+
+.ed-sec-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.ed-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line-2);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.ed-chips .chip {
+  background: var(--chip);
+  border: 1px solid var(--line-2);
+  color: var(--fg);
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.ed-empty {
+  font-size: 11px;
+  color: var(--dim-2);
+}
+
+.ed-path {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 11px;
+  color: var(--dim-2);
+}
+
+.ed-path span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.ed-hint {
+  font-size: 11px;
+  color: var(--dim-2);
+  margin-right: 4px;
 }
 
 /* ---------- 虚影锚点选择（田字格） ---------- */
