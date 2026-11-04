@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>桌面端重绘 v4 · 右键菜单 / 标签管理 / 筛选面板</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --bg2: #12161c;
+    --surface: #171b22;
+    --surface2: #1b2028;
+    --surface3: #1f242d;
+    --line: #262c36;
+    --line2: #333a46;
+    --fg: #e8eaed;
+    --dim: #8b93a1;
+    --dim2: #606a79;
+    --accent: #6ea8fe;
+    --accent-soft: rgba(110, 168, 254, .14);
+    --on-accent: #0d1420;
+    --danger: #ff6b78;
+    --danger-soft: rgba(255, 107, 120, .12);
+    --warn: #d8a24a;
+    --ok: #63c48a;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 13px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    padding: 40px 0 80px;
+  }
+  .page { width: 1200px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 6px; }
+  .lede { color: var(--dim); font-size: 12.5px; margin: 0 0 26px; max-width: 900px; }
+  .lede b { color: var(--fg); font-weight: 600; }
+  .frame-cap { margin: 30px 0 10px; font-size: 12.5px; color: var(--dim); }
+  .frame-cap b { color: var(--fg); font-size: 13px; margin-right: 8px; }
+  .frame {
+    position: relative;
+    width: 1200px;
+    height: 680px;
+    border: 1px solid var(--line2);
+    border-radius: 14px;
+    background: var(--bg2);
+    overflow: hidden;
+  }
+  .win-head {
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: #3a4150; display: block; }
+  .win-title { font-size: 12px; color: var(--dim); }
+  .win-body { display: grid; grid-template-columns: 176px 1fr; height: 640px; }
+  .side { border-right: 1px solid var(--line); padding: 10px 8px; background: var(--bg2); }
+  .side-item {
+    display: flex; align-items: center; gap: 8px;
+    height: 30px; padding: 0 10px; border-radius: 7px;
+    font-size: 12.5px; color: var(--fg);
+  }
+  .side-item.on { background: var(--accent-soft); color: var(--accent); }
+  .side-item .n { margin-left: auto; font-size: 11px; color: var(--dim2); }
+  .side-sec { margin: 14px 10px 6px; font-size: 11px; color: var(--dim2); }
+  .main { position: relative; padding: 12px; overflow: hidden; }
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .card {
+    position: relative; aspect-ratio: 1 / 1; border-radius: 10px;
+    border: 1px solid var(--line);
+    display: grid; place-items: center;
+    font-size: 18px; color: rgba(255, 255, 255, .55);
+  }
+  .card.hot { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .c1 { background: linear-gradient(150deg, #2b3a55, #1d2432); }
+  .c2 { background: linear-gradient(150deg, #43324a, #241d28); }
+  .c3 { background: linear-gradient(150deg, #3d4a2f, #232b1d); }
+  .c4 { background: linear-gradient(150deg, #55402b, #2c2318); }
+  .c5 { background: linear-gradient(150deg, #2f3d42, #1c2528); }
+  .c6 { background: linear-gradient(150deg, #4a3240, #2a1c23); }
+
+  /* ---------- 右键菜单 ---------- */
+  .ctx {
+    position: absolute;
+    width: 238px;
+    padding: 6px;
+    border: 1px solid var(--line2);
+    border-radius: 11px;
+    background: rgba(24, 28, 35, .98);
+    box-shadow: 0 26px 64px rgba(0, 0, 0, .62);
+    backdrop-filter: blur(14px);
+  }
+  .ctx button {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; height: 34px; padding: 0 10px;
+    border: 0; border-radius: 7px; background: none;
+    color: var(--fg); font: inherit; font-size: 12.5px; text-align: left;
+  }
+  .ctx button:hover { background: rgba(255, 255, 255, .07); }
+  .ctx button svg { flex: none; color: var(--dim); }
+  .ctx button:hover svg { color: var(--fg); }
+  .ctx .k { margin-left: auto; font-size: 11px; color: var(--dim2); }
+  .ctx .sep { height: 1px; margin: 6px 8px; background: var(--line); }
+  .ctx .danger { color: var(--danger); }
+  .ctx .danger svg { color: var(--danger); }
+  .ctx .sub { margin-left: auto; color: var(--dim2); }
+  .ctx .head { padding: 6px 10px 8px; font-size: 11px; color: var(--dim2); }
+
+  /* ---------- 标签管理 ---------- */
+  .dlg {
+    position: absolute; left: 50%; top: 54px; transform: translateX(-50%);
+    width: 470px;
+    border: 1px solid var(--line2);
+    border-radius: 14px;
+    background: var(--surface);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
+    overflow: hidden;
+  }
+  .dlg-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+  .dlg-title { font-size: 14px; font-weight: 600; }
+  .dlg-sub { font-size: 11.5px; color: var(--dim2); }
+  .dlg-x { margin-left: auto; color: var(--dim); font-size: 14px; }
+  .tm-search { display: flex; gap: 8px; padding: 0 16px 10px; }
+  .tm-search input {
+    flex: 1; height: 32px; padding: 0 10px;
+    border: 1px solid var(--line2); border-radius: 8px;
+    background: var(--bg2); color: var(--fg); font: inherit; font-size: 12.5px; outline: none;
+  }
+  .tm-new {
+    height: 32px; padding: 0 12px; border: 1px solid var(--line2); border-radius: 8px;
+    background: var(--surface3); color: var(--fg); font: inherit; font-size: 12.5px;
+  }
+  .tm-list { max-height: 288px; overflow: hidden; padding: 0 8px 6px; }
+  .tm-row {
+    display: flex; align-items: center; gap: 10px;
+    height: 40px; padding: 0 10px; border-radius: 8px; font-size: 12.5px;
+  }
+  .tm-row + .tm-row { border-top: 1px solid var(--line); }
+  .tm-row:hover { background: rgba(255, 255, 255, .04); }
+  .tm-row .cnt { margin-left: auto; font-size: 11.5px; color: var(--dim2); }
+  .tm-row .cnt.hot { color: var(--warn); }
+  .tm-acts { display: flex; gap: 2px; margin-left: 10px; opacity: 0; transition: opacity .12s; }
+  .tm-row:hover .tm-acts, .tm-row.hover .tm-acts, .tm-row.edit .tm-acts { opacity: 1; }
+  .tm-row.hover { background: rgba(255, 255, 255, .04); }
+  .tm-act {
+    display: grid; place-items: center; width: 26px; height: 26px;
+    border: 0; border-radius: 6px; background: none; color: var(--dim);
+  }
+  .tm-act:hover { background: rgba(255, 255, 255, .08); color: var(--fg); }
+  .tm-act.rm:hover { background: var(--danger-soft); color: var(--danger); }
+  .tm-row.edit { background: var(--accent-soft); }
+  .tm-row.edit input {
+    flex: 1; height: 26px; padding: 0 8px;
+    border: 1px solid var(--accent); border-radius: 6px;
+    background: var(--bg2); color: var(--fg); font: inherit; font-size: 12.5px; outline: none;
+  }
+  .tm-empty { padding: 26px 0; text-align: center; font-size: 12px; color: var(--dim2); }
+  .dlg-foot {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-top: 1px solid var(--line);
+    font-size: 11.5px; color: var(--dim2);
+  }
+  .btn {
+    height: 30px; padding: 0 12px; border: 1px solid var(--line2); border-radius: 8px;
+    background: var(--surface3); color: var(--fg); font: inherit; font-size: 12.5px;
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+  .btn.mini { height: 26px; padding: 0 9px; font-size: 11.5px; }
+  .spacer { flex: 1; }
+
+  /* ---------- 筛选面板 ---------- */
+  .fp {
+    position: absolute; right: 16px; top: 12px;
+    width: 404px; max-height: 616px;
+    display: flex; flex-direction: column;
+    border: 1px solid var(--line2); border-radius: 14px;
+    background: rgba(23, 27, 34, .985);
+    box-shadow: 0 28px 70px rgba(0, 0, 0, .55);
+    backdrop-filter: blur(16px);
+    overflow: hidden;
+  }
+  .fp-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
+  .fp-title { font-size: 14px; font-weight: 600; }
+  .badge {
+    padding: 2px 8px; border-radius: 999px; font-size: 11px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .fp-head .x { margin-left: auto; color: var(--dim); }
+  .fp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 2px; }
+  .fp-sec { padding: 9px 0; border-top: 1px solid var(--line); }
+  .fp-sec:first-child { border-top: 0; padding-top: 4px; }
+  .fp-sec-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; font-size: 11px; color: var(--dim2); letter-spacing: .02em;
+  }
+  .fp-sec-head .mini { color: var(--dim2); font-size: 11px; }
+  .fp-range { display: flex; align-items: center; gap: 8px; }
+  .inp {
+    display: flex; align-items: center; gap: 6px;
+    height: 32px; padding: 0 10px; border: 1px solid var(--line2); border-radius: 8px;
+    background: var(--bg2); font-size: 12.5px; color: var(--dim);
+  }
+  .inp.wide { flex: 1; }
+  .inp input {
+    width: 58px; border: 0; background: none; color: var(--fg);
+    font: inherit; font-size: 12.5px; outline: none;
+  }
+  .inp.wide input { width: auto; flex: 1; min-width: 0; }
+  .inp .u { color: var(--dim2); font-size: 11px; }
+  .dash { color: var(--dim2); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    height: 28px; padding: 0 11px; border-radius: 999px;
+    border: 1px solid var(--line2); background: var(--surface);
+    color: var(--dim); font: inherit; font-size: 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .chip.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .chip .n { font-size: 10.5px; color: var(--dim2); }
+  .chip.on .n { color: var(--accent); opacity: .8; }
+  .seg { display: flex; gap: 4px; padding: 3px; background: var(--bg2); border: 1px solid var(--line); border-radius: 9px; }
+  .seg button {
+    flex: 1; height: 28px; border: 0; border-radius: 7px; background: none;
+    color: var(--dim); font: inherit; font-size: 12px;
+  }
+  .seg button.on { background: var(--surface3); color: var(--fg); }
+  .fp-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pre {
+    height: 28px; padding: 0 10px; border-radius: 8px;
+    border: 1px dashed var(--line2); background: none;
+    color: var(--dim); font: inherit; font-size: 11.5px;
+  }
+  .pre.on { border-style: solid; border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .fp-foot {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-top: 1px solid var(--line);
+  }
+  .fp-note { font-size: 11px; color: var(--dim2); }
+
+  .note {
+    margin-top: 16px; padding: 12px 16px;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--surface); font-size: 12px; color: var(--dim);
+    line-height: 1.7;
+  }
+  .note b { color: var(--fg); }
+  .note code { color: var(--accent); font-size: 11.5px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>桌面端重绘 · v4</h1>
+  <p class="lede">
+    三件事：<b>① 卡片交互改成「单击复制 · 双击编辑 · 右键菜单」</b>；<b>② 标签管理弹窗收窄到 470px 并重排</b>；<b>③ 筛选面板从「一行行输入框」重做成分组面板</b>。
+    样式仍取 <code>src-tauri/ui/style.css</code> 的现有 token，只改结构与交互密度。
+  </p>
+
+  <!-- ============ ① 右键菜单 ============ -->
+  <div class="frame-cap"><b>① 卡片右键菜单</b><span>单击复制保持不变；双击进编辑；右键出菜单（默认第一项就是编辑，习惯不需要重建）</span></div>
+  <div class="frame">
+    <div class="win-head">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <span class="win-title">StickerBox · 312 张</span>
+    </div>
+    <div class="win-body">
+      <div class="side">
+        <div class="side-item on">全部<span class="n">312</span></div>
+        <div class="side-item">未分组<span class="n">118</span></div>
+        <div class="side-item">收藏<span class="n">26</span></div>
+        <div class="side-item">最近使用<span class="n">40</span></div>
+        <div class="side-sec">分组</div>
+        <div class="side-item">摸鱼<span class="n">30</span></div>
+        <div class="side-item">猫猫<span class="n">16</span></div>
+        <div class="side-item">梗图<span class="n">95</span></div>
+        <div class="side-sec">其他</div>
+        <div class="side-item">标签管理<span class="n">6</span></div>
+        <div class="side-item">回收站<span class="n">2</span></div>
+      </div>
+      <div class="main">
+        <div class="grid">
+          <div class="card c1">🐟</div>
+          <div class="card c2">🦊</div>
+          <div class="card c3 hot">🦊</div>
+          <div class="card c4">🐶</div>
+          <div class="card c5">🌙</div>
+          <div class="card c6">🍃</div>
+          <div class="card c2">🐱</div>
+          <div class="card c1">🌰</div>
+          <div class="card c3">☕</div>
+          <div class="card c4">🍓</div>
+          <div class="card c5">🦋</div>
+          <div class="card c6">🌵</div>
+          <div class="card c3">🥑</div>
+          <div class="card c4">🌻</div>
+          <div class="card c5">🥕</div>
+          <div class="card c6">🍄</div>
+          <div class="card c1">🐸</div>
+          <div class="card c2">🍒</div>
+        </div>
+
+        <div class="ctx" style="left: 396px; top: 196px">
+          <button>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            编辑…
+            <span class="k">Enter</span>
+          </button>
+          <button>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            复制图片
+            <span class="k">单击</span>
+          </button>
+          <button>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z"/><path d="M14 3v5h5"/></svg>
+            复制文件
+          </button>
+          <button>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="m14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+            复制路径
+          </button>
+          <div class="sep"></div>
+          <button>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 3.2 14 8.4l5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8Z"/></svg>
+            收藏
+            <span class="k">S</span>
+          </button>
+          <div class="sep"></div>
+          <button>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8Z"/><circle cx="7" cy="7" r="1.4"/></svg>
+            加入标签…
+          </button>
+          <button>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M12 11v5"/><path d="M9.5 13.5h5"/></svg>
+            加入分组…
+          </button>
+          <div class="sep"></div>
+          <button class="danger">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>
+            移到回收站
+            <span class="k">dd</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note">
+    <b>为什么这样排：</b>菜单头三项是「拿到这张图」的三个动作（编辑 / 复制图片 / 复制文件），也是使用频率最高的一组；
+    中间是状态（收藏）；下半是归类（加入标签 / 加入分组，点开就是悬浮面板，所以不留 <code>›</code> 子菜单箭头）；
+    危险动作单独一段、红字沉底。不提供「在文件夹中显示」——那是内部 blob 路径，不给用户看见。<br>
+    <b>交互约定：</b>单击 = 复制（带 260ms 防抖）；<b>双击 = 编辑</b>（第二次 click 会取消待执行的复制，不会写剪贴板）；
+    <b>右键 = 菜单</b>，并把键位表里 <code>mouse3</code> 从「编辑」解绑，否则右键永远只会开编辑、菜单永远出不来。<br>
+    <b>多选时：</b>右键只弹「批量项」（复制文件 / 收藏 / 删除 / 加入标签 / 加入分组），不弹单图项。
+  </div>
+
+  <!-- ============ ② 标签管理 ============ -->
+  <div class="frame-cap"><b>② 标签管理（470px）</b><span>从 520 收窄；行内悬停出三颗图标；编辑态直接在行里改；底部说明与排序</span></div>
+  <div class="frame">
+    <div class="win-head">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <span class="win-title">StickerBox · 标签管理</span>
+    </div>
+    <div class="win-body">
+      <div class="side">
+        <div class="side-item">全部<span class="n">312</span></div>
+        <div class="side-item">未分组<span class="n">118</span></div>
+        <div class="side-item">收藏<span class="n">26</span></div>
+        <div class="side-sec">其他</div>
+        <div class="side-item on">标签管理<span class="n">6</span></div>
+        <div class="side-item">回收站<span class="n">2</span></div>
+      </div>
+      <div class="main" style="background: rgba(10, 12, 16, .35)">
+        <div class="grid">
+          <div class="card c1">🐟</div>
+          <div class="card c2">🦊</div>
+          <div class="card c3">🦊</div>
+          <div class="card c4">🐶</div>
+          <div class="card c5">🌙</div>
+          <div class="card c6">🍃</div>
+          <div class="card c2">🐱</div>
+          <div class="card c1">🌰</div>
+          <div class="card c3">☕</div>
+          <div class="card c4">🍓</div>
+          <div class="card c5">🦋</div>
+          <div class="card c6">🌵</div>
+        </div>
+
+        <div class="dlg">
+          <div class="dlg-head">
+            <span class="dlg-title">标签管理</span>
+            <span class="dlg-sub">6 个 · 共 243 次引用</span>
+            <span class="dlg-x">✕</span>
+          </div>
+          <div class="tm-search">
+            <input placeholder="搜索标签…" />
+            <button class="tm-new">＋ 新建标签</button>
+          </div>
+          <div class="tm-list">
+            <div class="tm-row">
+              <span>梗图</span>
+              <span class="cnt">95</span>
+              <span class="tm-acts">
+                <button class="tm-act" title="重命名"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                <button class="tm-act" title="合并到…"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="12" r="2.4"/><path d="M8.2 7.2 15.6 11"/><path d="M8.2 16.8 15.6 13"/></svg></button>
+                <button class="tm-act rm" title="删除"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
+              </span>
+            </div>
+            <div class="tm-row hover">
+              <span>搞笑</span>
+              <span class="cnt">88</span>
+              <span class="tm-acts">
+                <button class="tm-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                <button class="tm-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="12" r="2.4"/><path d="M8.2 7.2 15.6 11"/><path d="M8.2 16.8 15.6 13"/></svg></button>
+                <button class="tm-act rm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
+              </span>
+            </div>
+            <div class="tm-row">
+              <span>表情包</span>
+              <span class="cnt">41</span>
+              <span class="tm-acts">
+                <button class="tm-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                <button class="tm-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="12" r="2.4"/><path d="M8.2 7.2 15.6 11"/><path d="M8.2 16.8 15.6 13"/></svg></button>
+                <button class="tm-act rm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
+              </span>
+            </div>
+            <div class="tm-row">
+              <span>猫猫</span>
+              <span class="cnt">16</span>
+              <span class="tm-acts">
+                <button class="tm-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                <button class="tm-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="12" r="2.4"/><path d="M8.2 7.2 15.6 11"/><path d="M8.2 16.8 15.6 13"/></svg></button>
+                <button class="tm-act rm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
+              </span>
+            </div>
+            <div class="tm-row edit">
+              <input value="摸鱼日常" />
+              <span class="tm-acts" style="opacity: 1">
+                <button class="tm-act" style="color: var(--accent)" title="回车确认"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 12 5 5L20 6"/></svg></button>
+                <button class="tm-act" title="Esc 取消"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+              </span>
+            </div>
+            <div class="tm-row">
+              <span>zero</span>
+              <span class="cnt">0</span>
+              <span class="tm-acts">
+                <button class="tm-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                <button class="tm-act"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="12" r="2.4"/><path d="M8.2 7.2 15.6 11"/><path d="M8.2 16.8 15.6 13"/></svg></button>
+                <button class="tm-act rm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg></button>
+              </span>
+            </div>
+          </div>
+          <div class="dlg-foot">
+            <span>按引用数排序 · 0 引用的也保留</span>
+            <span class="spacer"></span>
+            <button class="btn mini">完成</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note">
+    <b>和旧的区别：</b>520 → 470px，行高 36 → 40px、左右留白对齐新面板；<b>悬停才出 ✎ ⑂ 🗑</b>，平时只看到「名字 + 引用数」，眼睛不用先穿过三颗按钮；
+    编辑态直接在行里改成输入框（回车确认 / Esc 取消），不再弹第二个小窗；合并仍走小弹窗（要选目标），删除仍二次确认。<br>
+    <b>底部那句说明</b>保留（0 引用的标签也留着），点「完成」只是关窗。
+  </div>
+
+  <!-- ============ ③ 筛选面板 ============ -->
+  <div class="frame-cap"><b>③ 筛选面板（404px）</b><span>从「一行行输入框」改成分组面板：格式/预设变 chip，来源变分段，顶部显示生效项</span></div>
+  <div class="frame">
+    <div class="win-head">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <span class="win-title">StickerBox · 筛选</span>
+    </div>
+    <div class="win-body">
+      <div class="side">
+        <div class="side-item on">全部<span class="n">312</span></div>
+        <div class="side-item">未分组<span class="n">118</span></div>
+        <div class="side-item">收藏<span class="n">26</span></div>
+        <div class="side-sec">分组</div>
+        <div class="side-item">摸鱼<span class="n">30</span></div>
+        <div class="side-item">猫猫<span class="n">16</span></div>
+        <div class="side-sec">其他</div>
+        <div class="side-item">标签管理<span class="n">6</span></div>
+        <div class="side-item">回收站<span class="n">2</span></div>
+      </div>
+      <div class="main">
+        <div class="grid">
+          <div class="card c1">🐟</div>
+          <div class="card c2">🦊</div>
+          <div class="card c3">🦊</div>
+          <div class="card c4">🐶</div>
+          <div class="card c5">🌙</div>
+          <div class="card c6">🍃</div>
+          <div class="card c2">🐱</div>
+          <div class="card c1">🌰</div>
+          <div class="card c3">☕</div>
+          <div class="card c4">🍓</div>
+          <div class="card c5">🦋</div>
+          <div class="card c6">🌵</div>
+          <div class="card c3">🥑</div>
+          <div class="card c4">🌻</div>
+          <div class="card c5">🥕</div>
+          <div class="card c6">🍄</div>
+        </div>
+
+        <div class="fp">
+          <div class="fp-head">
+            <span class="fp-title">筛选</span>
+            <span class="badge">3 项生效</span>
+            <span class="x">✕</span>
+          </div>
+          <div class="fp-body">
+            <div class="fp-sec">
+              <div class="fp-sec-head"><span>尺寸与体积</span><span class="mini">留空表示不限</span></div>
+              <div class="fp-range" style="margin-bottom: 8px">
+                <span class="inp wide"><input value="0.5" /><span class="u">MB</span></span>
+                <span class="dash">–</span>
+                <span class="inp wide"><input placeholder="不限" /><span class="u">MB</span></span>
+              </div>
+              <div class="fp-range">
+                <span class="inp"><input placeholder="宽" /><span class="u">px</span></span>
+                <span class="dash">×</span>
+                <span class="inp"><input placeholder="高" /><span class="u">px</span></span>
+                <span class="fp-note" style="margin-left: auto">最大边 ≤1000</span>
+              </div>
+            </div>
+
+            <div class="fp-sec">
+              <div class="fp-sec-head"><span>格式</span><span class="mini">不选 = 全部</span></div>
+              <div class="chips">
+                <button class="chip on">GIF<span class="n">88</span></button>
+                <button class="chip">PNG<span class="n">96</span></button>
+                <button class="chip on">JPG<span class="n">102</span></button>
+                <button class="chip">WebP<span class="n">24</span></button>
+                <button class="chip">BMP<span class="n">2</span></button>
+              </div>
+            </div>
+
+            <div class="fp-sec">
+              <div class="fp-sec-head"><span>标签</span><button class="btn mini">管理</button></div>
+              <div class="chips">
+                <button class="chip on">梗图<span class="n">95</span></button>
+                <button class="chip">搞笑<span class="n">88</span></button>
+                <button class="chip">猫猫<span class="n">16</span></button>
+                <button class="chip">表情包<span class="n">41</span></button>
+                <button class="chip">摸鱼日常<span class="n">3</span></button>
+              </div>
+            </div>
+
+            <div class="fp-sec">
+              <div class="fp-sec-head"><span>来源</span></div>
+              <div class="seg">
+                <button class="on">全部</button>
+                <button>本地导入</button>
+                <button>剪贴板</button>
+              </div>
+            </div>
+
+            <div class="fp-sec">
+              <div class="fp-sec-head"><span>日期</span></div>
+              <div class="fp-range">
+                <span class="inp wide"><input value="2026-11-01" /></span>
+                <span class="dash">–</span>
+                <span class="inp wide"><input placeholder="今天" /></span>
+              </div>
+            </div>
+
+            <div class="fp-sec">
+              <div class="fp-sec-head"><span>常用筛选</span><span class="mini">点一下叠加</span></div>
+              <div class="fp-presets">
+                <button class="pre on">微信动图 ≤1MB</button>
+                <button class="pre">微信可发 ≤10MB</button>
+                <button class="pre">宽 ≤1000px</button>
+              </div>
+            </div>
+          </div>
+          <div class="fp-foot">
+            <button class="btn mini">清空</button>
+            <span class="fp-note">筛选结果 132 张</span>
+            <span class="spacer"></span>
+            <button class="btn mini primary">应用</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note">
+    <b>旧面板的问题：</b>416px 高的一列输入框，五组之间只有 6px 间距，视觉上糊成一片；格式是五个复选框、来源是弹层、预设是复选框，三套控件三种手感；
+    顶部没有「现在到底筛了什么」的反馈，只能数格子。<br>
+    <b>改法：</b>分组卡片化（每组一条 1px 分隔 + 组标题，右侧一句「留空表示不限」这类说明）；
+    格式/标签统一成可点 chip（带全库计数，点了才知道会剩多少）；来源改分段控件；预设改成可叠加的虚线 chip；
+    顶部显示「3 项生效」，底部显示「筛选结果 132 张」，应用前就知道会剩下多少。
+  </div>
+
+  <div class="note" style="margin-top: 26px">
+    <b>实现落点（给下一批用）：</b><br>
+    · <b>卡片交互</b>：<code>src-tauri/ui/app.js</code> 卡片上新增 <code>dblclick</code> → <code>openEditor(a)</code>；<code>contextmenu</code> 里去掉 <code>keymap</code> 分流，改调新的 <code>openCardMenu(a, x, y)</code>；键位表 <code>edit</code> 的 <code>mouse3</code> 解绑。<br>
+    · <b>标签管理</b>：<code>#tagmanage</code> 的 <code>.tm-modal</code> 宽度改 470，行内按钮默认 <code>opacity: 0</code>、<code>.tm-row:hover</code> 时 1；行内编辑沿用现有 <code>tmEditing</code> 状态机，只换渲染。<br>
+    · <b>筛选面板</b>：<code>index.html</code> 的 <code>#filter-panel</code> 整块重写（仍是固定面板，不改弹出方式）；<code>app.js</code> 的 <code>fillFilterPanel/readFilterPanel</code> 跟着换控件类型；<code>style.css</code> 里 <code>.fp-*</code> 整段替换。
+  </div>
+</div>
+</body>
+</html>
