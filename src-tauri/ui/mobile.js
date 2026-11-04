@@ -1534,8 +1534,8 @@ function activeLayer() {
   if (shown("gmenu")) return { close: () => closeGmenu() };
   if (shown("filtermask")) return { close: () => { $("filtermask").hidden = true; syncGuard(); } };
   if (shown("pickmask")) return { close: exitPicker };
-  if (shown("tagmask")) return { close: () => closeTagSheet() };
   if (tagManage) return { close: () => closeTagManage() };
+  if (shown("tagmask")) return { close: () => closeTagSheet() };
   if (imgSelMode) return { close: () => setImgSelMode(false) };
   if (shown("viewer")) return { close: () => closeViewer() };
   if (trashSelMode) return { close: () => setTrashSelMode(false) };
@@ -1561,7 +1561,7 @@ window.__sbBack = sbBack;
 
 function openSheet(title, bodyHtml) {
   resetSheetHeight(document.querySelector("#sheetmask .sheet"));
-  if (!$("tagmask").hidden) $("sheetmask").classList.add("above");
+  if (!$("tagmask").hidden || !$("tagvmask").hidden) $("sheetmask").classList.add("above");
   $("sheet-title").textContent = title;
   $("sheet-body").innerHTML = bodyHtml;
   $("sheetmask").hidden = false;
@@ -2683,8 +2683,8 @@ function setTab(tab) {
   $("groupdetail").hidden = !isGroups || !S.gview;
   $("trashview").hidden = tab !== "trash";
   if (tab !== "me") tagManage = false;
-  $("meview").hidden = tab !== "me" || tagManage;
-  $("tagview").hidden = !(tab === "me" && tagManage);
+  $("meview").hidden = tab !== "me";
+  $("tagvmask").hidden = !tagManage;
 
   if (isGallery) renderPins();
   if (isGroups) {
@@ -3586,7 +3586,7 @@ function openMoveSheet(shas) {
 let tagShas = [];
 let tagSel = new Set();
 let tagNewNames = new Set();
-let tagMode = "add"; // add | edit
+let tagMode = "add"; // add | edit | remove
 let tagSaved = new Set(); // edit 模式的原始标签
 let tagManage = false;
 
@@ -3619,35 +3619,69 @@ function renderTagSheet() {
   const ql = q.toLowerCase();
   const assets = tagAssets();
   const selList = [...tagSel];
+  const n = tagShas.length;
   const edit = tagMode === "edit";
+  const remove = tagMode === "remove";
 
-  $("tag-title").textContent = edit ? "标签" : "加标签";
-  $("tag-scope").textContent = edit ? "这张图" : `已选 ${tagShas.length} 张`;
+  $("tag-modesw").hidden = edit;
+  $("tag-modesw").querySelector('[data-mode="add"]').classList.toggle("on", !remove);
+  $("tag-modesw").querySelector('[data-mode="remove"]').classList.toggle("on", remove);
+  $("tag-modesw").querySelector('[data-mode="remove"]').classList.toggle("rm", remove);
+  $("tagq").placeholder = remove ? "搜索这几张图上的标签" : "搜索或新建标签";
+  $("tag-n-add").hidden = remove || selList.length === 0;
+  $("tag-n-add").textContent = remove ? "" : String(selList.length);
+  $("tag-n-rm").hidden = !remove || selList.length === 0;
+  $("tag-n-rm").textContent = remove ? String(selList.length) : "";
+
+  $("tag-title").textContent = edit ? "标签" : remove ? "移除标签" : "加标签";
+  $("tag-scope").textContent = edit ? "这张图" : `已选 ${n} 张`;
   $("tag-selbox").hidden = selList.length === 0;
   $("tag-selhead").innerHTML = edit
     ? `这张图的标签 <b>${selList.length}</b><span class="fhint">点 × 移出这张图</span>`
-    : `将添加 <b>${selList.length}</b> 个标签<span class="fhint">点 × 取消</span>`;
+    : remove
+      ? `将移除 <b>${selList.length}</b> 个标签<span class="fhint">点 × 取消</span>`
+      : `将添加 <b>${selList.length}</b> 个标签<span class="fhint">点 × 取消</span>`;
   $("tag-sel").innerHTML = selList
     .map(
       (name) =>
-        `<button class="selchip${tagNewNames.has(name) ? " new" : ""}" data-untag="${escapeAttr(name)}">${escapeHtml(name)}` +
+        `<button class="selchip${tagNewNames.has(name) ? " new" : ""}${remove ? " rm" : ""}" data-untag="${escapeAttr(name)}">${escapeHtml(name)}` +
         `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>`
     )
     .join("");
 
   const all = S.tags || [];
-  const filtered = all.filter((t) => !ql || t.name.toLowerCase().includes(ql));
+  // 移除模式只列「至少一张选中图有」的标签；数字 N/M 中 N 为本地面板内统计，不发请求
+  const cov = (name) => assets.reduce((k, a) => k + ((a.tags || []).includes(name) ? 1 : 0), 0);
+  const base = remove ? all.filter((t) => cov(t.name) > 0) : all;
+  const filtered = base.filter((t) => !ql || t.name.toLowerCase().includes(ql));
   const exact = all.find((t) => t.name.toLowerCase() === ql);
-  const showCreate = !!q && !exact && !tagSel.has(q);
+  const showCreate = !remove && !!q && !exact && !tagSel.has(q);
   $("tag-create").hidden = !showCreate;
   if (showCreate) $("tag-cname").textContent = q;
-  $("tag-none").hidden = !(ql && filtered.length === 0 && !showCreate);
-  $("tag-empty").hidden = !(all.length === 0 && !q);
-  $("tag-empty-hint").textContent = `输入一个名字，给这 ${tagShas.length} 张图打上第一个标签`;
+
+  $("tag-listhead").textContent = remove ? `这 ${n} 张图上的标签` : "全部标签";
+  $("tag-listhint").textContent = remove ? "数字 = 其中几张有" : "数字为全库图片数";
+
+  const emptyAll = all.length === 0 && !q;
+  const emptySel = remove && all.length > 0 && base.length === 0 && !q;
+  $("tag-empty").hidden = !(emptyAll || emptySel);
+  $("tag-empty-title").textContent = emptySel ? `这 ${n} 张还没有标签` : "还没有标签";
+  $("tag-empty-hint").textContent = emptySel
+    ? "先给它们打上标签，才谈得上移除"
+    : `输入一个名字，给这 ${n} 张图打上第一个标签`;
+  $("tag-empty-act").hidden = !emptySel;
+  $("tag-none").hidden = !(ql && filtered.length === 0 && !showCreate && !emptyAll);
 
   $("tag-list").innerHTML = filtered
     .map((t) => {
       const on = tagSel.has(t.name);
+      if (remove) {
+        const c = cov(t.name);
+        return (
+          `<button class="tagchip${on ? " rm" : ""}" data-tag="${escapeAttr(t.name)}">` +
+          `${escapeHtml(t.name)} <em class="cov${c < n ? " partial" : ""}">${c}/${n}</em></button>`
+        );
+      }
       const done = !edit && !on && tagAllHave(t.name, assets);
       return (
         `<button class="tagchip${on ? " on" : ""}${done ? " done" : ""}" data-tag="${escapeAttr(t.name)}"${done ? " disabled" : ""}>` +
@@ -3656,18 +3690,35 @@ function renderTagSheet() {
     })
     .join("");
 
+  const btn = $("tag-ok");
+  btn.classList.toggle("danger", remove);
   if (edit) {
     const d = tagDiff();
     const changed = d.add + d.rem > 0;
     $("tag-diff").hidden = false;
     $("tag-diff").innerHTML = changed ? `添加 <b>${d.add}</b> · 移出 <b>${d.rem}</b>` : "未改动";
-    $("tag-ok").textContent = "保存更改";
-    $("tag-ok").disabled = !changed;
+    btn.textContent = "保存更改";
+    btn.disabled = !changed;
+  } else if (remove) {
+    $("tag-diff").hidden = true;
+    btn.textContent = selList.length ? `移除 ${selList.length} 个标签` : "移除标签";
+    btn.disabled = selList.length === 0;
   } else {
     $("tag-diff").hidden = true;
-    $("tag-ok").textContent = selList.length ? `添加 ${selList.length} 个标签` : "添加标签";
-    $("tag-ok").disabled = selList.length === 0;
+    btn.textContent = selList.length ? `添加 ${selList.length} 个标签` : "添加标签";
+    btn.disabled = selList.length === 0;
   }
+}
+
+// 添加 / 移除切换：两个方向的选择互相不通用，切过去就清空
+function setTagMode(mode) {
+  if (tagMode === mode || tagMode === "edit") return;
+  tagMode = mode;
+  tagSel.clear();
+  tagNewNames.clear();
+  $("tagq").value = "";
+  $("tagq-clear").hidden = true;
+  renderTagSheet();
 }
 
 function addTagFromQuery() {
@@ -3695,7 +3746,7 @@ function toggleTag(name) {
 }
 
 function openTagSheet(shas, opts = {}) {
-  tagMode = opts.mode === "edit" ? "edit" : "add";
+  tagMode = opts.mode === "edit" ? "edit" : opts.mode === "remove" ? "remove" : "add";
   tagShas = (shas || []).slice();
   const a = tagMode === "edit" ? viewerAsset() : null;
   tagSaved = new Set(tagMode === "edit" ? a.tags || [] : []);
@@ -3755,6 +3806,32 @@ async function applyTags() {
   if (!tags.length) return;
   const n = tagShas.length;
   const btn = $("tag-ok");
+  if (tagMode === "remove") {
+    btn.disabled = true;
+    btn.textContent = "移除中…";
+    try {
+      await invokeRetry("remove_tags", { shas: tagShas, tags });
+    } catch (e) {
+      toast("移除失败：" + String(e));
+      renderTagSheet();
+      return;
+    }
+    const keep = new Set(tagShas);
+    const strip = (a) => {
+      if (a && keep.has(a.sha)) a.tags = (a.tags || []).filter((t) => !tags.includes(t));
+    };
+    (S.items || []).forEach(strip);
+    (gdItems || []).forEach(strip);
+    if (vCache) vCache.forEach(strip);
+    closeTagSheet();
+    toast(`已为 ${n} 张移除 ${tags.length} 个标签`);
+    try {
+      S.tags = (await invokeRetry("tag_stats")) || [];
+    } catch (_) {
+      /* 统计刷新失败不影响已写入的标签 */
+    }
+    return;
+  }
   btn.disabled = true;
   btn.textContent = "添加中…";
   try {
@@ -3817,19 +3894,21 @@ function renderTagManage() {
 function openTagManage() {
   tagManage = true;
   if (!$("viewer").hidden) closeViewer();
-  setTab("me");
+  $("tagvmask").hidden = false;
   renderTagManage();
   syncGuard();
 }
 
 function closeTagManage() {
   tagManage = false;
-  setTab("me");
+  $("tagvmask").hidden = true;
+  // 底下可能还压着标签面板：重命名/合并/删除后列表要跟着变
+  if (!$("tagmask").hidden) renderTagSheet();
+  syncGuard();
 }
 
 async function goTagManage() {
   if (tagMode === "edit" && tagDirty() && !(await confirmSheet("放弃未保存的修改？", "管理标签"))) return;
-  closeTagSheet();
   openTagManage();
 }
 
@@ -3975,6 +4054,11 @@ function openTagActions(name, count) {
 }
 
 $("tag-close").addEventListener("click", closeTagSheet);
+$("tag-modesw").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-mode]");
+  if (b) setTagMode(b.dataset.mode);
+});
+$("tag-empty-act").addEventListener("click", () => setTagMode("add"));
 $("tagmask").addEventListener("click", (e) => {
   if (e.target === $("tagmask")) closeTagSheet();
 });
@@ -4009,6 +4093,9 @@ $("tag-sel").addEventListener("click", (e) => {
 });
 $("tag-ok").addEventListener("click", applyTags);
 $("tag-manage").addEventListener("click", goTagManage);
+$("tagvmask").addEventListener("click", (e) => {
+  if (e.target === $("tagvmask")) closeTagManage();
+});
 $("me-tags").addEventListener("click", openTagManage);
 $("tagv-back").addEventListener("click", closeTagManage);
 $("tagv-new").addEventListener("click", newTagFlow);

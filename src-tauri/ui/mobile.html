@@ -429,8 +429,10 @@
       </div>
     </section>
 
-    <!-- 标签管理：重命名 / 合并 / 删除 / 新建 -->
-    <section class="gview" id="tagview" hidden>
+    <!-- 标签管理：重命名 / 合并 / 删除 / 新建。
+         叠加层（不是页面跳转）：从标签面板点「管理」时盖在上面，关闭后多选和已选图都还在 -->
+    <div class="sheetmask" id="tagvmask" hidden>
+      <section class="gview tagv-sheet" id="tagview">
       <header class="ghead">
         <button class="iconbtn back" id="tagv-back" title="返回">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg>
@@ -449,7 +451,8 @@
       </div>
       <div class="mcard" id="tagv-list"></div>
       <div class="gempty" id="tagv-empty" hidden>还没有标签</div>
-    </section>
+      </section>
+    </div>
 
     <!-- 加入分组：复用分组页的双列封面卡，80% 叠加层 -->
     <div class="sheetmask" id="pickmask" hidden>
@@ -500,12 +503,16 @@
             </button>
           </div>
         </div>
+        <div class="modesw" id="tag-modesw">
+          <button class="on" data-mode="add">添加<span class="n" id="tag-n-add" hidden></span></button>
+          <button data-mode="remove">移除<span class="n" id="tag-n-rm" hidden></span></button>
+        </div>
         <div class="fbody" id="tag-body">
           <div id="tag-selbox" hidden>
             <div class="fsect" id="tag-selhead"></div>
             <div class="tagsel" id="tag-sel"></div>
           </div>
-          <div class="fsect">全部标签<span class="fhint">数字为全库图片数</span></div>
+          <div class="fsect"><span id="tag-listhead">全部标签</span><span class="fhint" id="tag-listhint">数字为全库图片数</span></div>
           <button class="createrow" id="tag-create" hidden>
             <span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
             <span>新建标签「<b id="tag-cname"></b>」</span>
@@ -515,8 +522,9 @@
           <div class="tagwrap" id="tag-list"></div>
           <div class="tempty" id="tag-empty" hidden>
             <span class="te-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></span>
-            <b>还没有标签</b>
+            <b id="tag-empty-title">还没有标签</b>
             <span id="tag-empty-hint">输入一个名字，给这 5 张图打上第一个标签</span>
+            <button class="tempty-act" id="tag-empty-act" hidden>去「添加」打标签</button>
           </div>
         </div>
         <div class="tagdiff" id="tag-diff" hidden></div>

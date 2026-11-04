@@ -1705,6 +1705,21 @@ body.cross-dragging {
 .tagsearch { flex: 0 0 auto; padding-bottom: 10px; }
 .tagsearch .search { margin: 0; }
 
+/* 添加 / 移除 两个方向共用一个面板：分段切换，默认添加 */
+.modesw {
+  flex: 0 0 auto; display: flex; gap: 4px;
+  padding: 3px; margin-bottom: 10px; border-radius: 12px;
+  background: var(--surface3); border: 1px solid var(--line);
+}
+.modesw button {
+  flex: 1; height: 34px; border: 0; border-radius: 9px;
+  background: none; color: var(--dim);
+  font-family: inherit; font-size: 13px;
+}
+.modesw button.on { background: var(--surface2); color: var(--fg); font-weight: 600; }
+.modesw button.on.rm { background: rgba(255, 93, 108, .16); color: #ffbcc3; }
+.modesw .n { margin-left: 5px; font-size: 11px; opacity: .85; }
+
 .fhint { margin-left: auto; font-size: 11px; color: var(--dim2); font-weight: 400; }
 .fsect .fhint { flex: 0 0 auto; }
 
@@ -1722,6 +1737,7 @@ body.cross-dragging {
   border-style: dashed; border-color: rgba(110, 168, 254, .6);
   color: var(--accent); background: rgba(110, 168, 254, .08);
 }
+.selchip.rm { border-color: rgba(255, 93, 108, .45); background: rgba(255, 93, 108, .13); color: #ffbcc3; }
 
 .tagwrap { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 0 6px; }
 .tagchip {
@@ -1738,6 +1754,10 @@ body.cross-dragging {
 .tagchip.done { color: var(--dim2); background: transparent; border-color: var(--line); }
 .tagchip.done em { color: var(--dim2); }
 .tagchip:disabled { opacity: 1; }
+/* 移除模式：选中即「将从这几张图上去掉」，红底；数字 N/M 里 N<M 用黄字提示只覆盖部分 */
+.tagchip.rm { border-color: rgba(255, 93, 108, .5); background: rgba(255, 93, 108, .14); color: #ffbcc3; }
+.tagchip.rm em { color: rgba(255, 188, 195, .75); }
+.tagchip em.cov.partial { color: #e8b45a; }
 
 .createrow {
   display: flex; align-items: center; gap: 9px;
@@ -1772,6 +1792,11 @@ body.cross-dragging {
 .te-ic svg { width: 24px; height: 24px; }
 .tempty b { font-size: 14px; color: var(--fg); font-weight: 600; }
 .tempty span { font-size: 12px; line-height: 1.7; max-width: 240px; }
+.tempty-act {
+  margin-top: 6px; height: 36px; padding: 0 14px; border-radius: 10px;
+  border: 1px solid var(--line2); background: var(--surface2); color: var(--fg);
+  font-family: inherit; font-size: 13px;
+}
 
 /* 键盘弹起时底栏照常留在面板底部（覆盖全局「整条收起」） */
 body.kbd .tagsheet .ffoot { display: flex; }
@@ -1785,6 +1810,17 @@ body.kbd .tagsheet .ffoot { display: flex; }
 .tagsheet .fright { margin-left: auto; display: flex; align-items: center; gap: 4px; }
 .tagsheet .fhead .iconbtn { margin-left: 0; }
 .sheetmask.above { z-index: 60; }
+
+/* 标签管理改成叠加层：盖在标签面板（z 50）之上、提示弹层（60）之下；
+   做成顶部圆角的整宽面板，关掉直接回到原标签面板，多选状态不动 */
+#tagvmask { z-index: 55; }
+#tagview.tagv-sheet {
+  width: 100%; max-height: 88dvh; overflow-y: auto;
+  background: var(--sheet-bg, #191d24);
+  border-radius: 22px 22px 0 0;
+  padding-bottom: calc(12px + var(--safe-bottom));
+}
+#tagview.tagv-sheet .ghead { padding-top: 12px; }
 .tagdiff {
   flex: 0 0 auto; text-align: center; font-size: 11.5px; color: var(--dim);
   padding: 2px 0 6px;
