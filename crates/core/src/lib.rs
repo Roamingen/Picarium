@@ -569,7 +569,16 @@ impl Library {
             }
         }
         if let Some(t) = tags {
-            asset.tags = clean_list(t);
+            let t = clean_list(t);
+            // 桌面编辑弹窗走这里：新打的标签必须立刻进登记表，
+            // 否则本轮 tag_stats / 筛选面板看不到，要等重开库归一。
+            for name in &t {
+                if !self.known_tags.iter().any(|x| x == name) {
+                    self.known_tags.push(name.clone());
+                }
+            }
+            self.known_tags = clean_list(std::mem::take(&mut self.known_tags));
+            asset.tags = t;
         }
         if let Some(g) = groups {
             asset.groups = clean_list(g);
@@ -1938,6 +1947,35 @@ mod tests {
             .iter()
             .any(|(n, c)| n == "空标签" && *c == 0));
         assert!(!lib.tag_stats().iter().any(|(n, _)| n == "丙"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn update_registers_new_tags() {
+        let base = std::env::temp_dir().join(format!("sb-update-tags-{}", std::process::id()));
+        let src = base.join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([7, 8, 9, 255]))
+            .save(src.join("u.png"))
+            .unwrap();
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        lib.scan_folder(&src).unwrap();
+        let sha = lib.assets()[0].sha.clone();
+
+        // 桌面编辑弹窗保存走 update()：新标签要立刻进登记表，不能等重开库
+        lib.update(&sha, None, Some(vec!["编辑新建".into()]), None)
+            .unwrap();
+        assert!(lib
+            .tag_stats()
+            .iter()
+            .any(|(n, c)| n == "编辑新建" && *c == 1));
+
+        // 从图里移出后仍留在登记表（0 引用），与 add_tags 语义一致
+        lib.update(&sha, None, Some(vec![]), None).unwrap();
+        assert!(lib
+            .tag_stats()
+            .iter()
+            .any(|(n, c)| n == "编辑新建" && *c == 0));
         let _ = std::fs::remove_dir_all(&base);
     }
 

@@ -49,6 +49,7 @@
       <div class="side-title">分组<button id="group-add" class="side-add" title="新建分组">＋</button></div>
       <div id="group-list"></div>
       <div class="side-title">其他</div>
+      <button class="side-item" id="tag-manage-open">标签管理<span id="c-tags">0</span></button>
       <button class="side-item" data-group="__trash__">回收站<span id="c-trash">0</span></button>
     </aside>
 
@@ -161,6 +162,37 @@
         <div class="spacer"></div>
         <button id="prompt-cancel" class="btn">取消</button>
         <button id="prompt-ok" class="btn primary">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tagmanage" class="modal-mask" hidden>
+    <div class="modal tm-modal">
+      <div class="modal-head">
+        <span class="modal-title">标签管理</span>
+        <span id="tm-count" class="dim tm-headcount"></span>
+        <div class="spacer"></div>
+        <button id="tm-close" class="btn small">完成</button>
+      </div>
+      <input id="tm-q" class="tm-q" placeholder="搜索标签…" autocomplete="off" spellcheck="false" />
+      <div id="tm-list" class="tm-list"></div>
+      <div id="tm-empty" class="tm-empty" hidden>还没有标签</div>
+      <div class="tm-hint">按引用数排序；0 引用的标签也保留，重复使用前不会丢</div>
+      <div class="modal-actions">
+        <button id="tm-new" class="btn">＋ 新建标签</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tagmerge" class="modal-mask" hidden>
+    <div class="modal small">
+      <div class="modal-head"><span class="modal-title" id="tg-merge-title">合并到…</span></div>
+      <div id="tg-merge-note" class="tm-hint tm-mergenote"></div>
+      <div id="tg-merge-list" class="tm-merge-list"></div>
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button id="tg-merge-cancel" class="btn">取消</button>
+        <button id="tg-merge-ok" class="btn primary" disabled>合并</button>
       </div>
     </div>
   </div>

@@ -72,6 +72,8 @@ const ICONS = {
   x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  merge: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
 };
 
 function icon(name, size) {
@@ -1534,6 +1536,7 @@ async function loadGroups() {
   groupMeta = meta.groups;
   allGroups = meta.groups.map((g) => g.name);
   allTags = tags.map((t) => t.name);
+  $('c-tags').textContent = String(allTags.length);
 
   $('c-all').textContent = data.total;
   $('c-star').textContent = data.starred;
@@ -1888,6 +1891,167 @@ async function deleteEditing() {
   }
 }
 
+/* ---------- 标签管理（桌面） ---------- */
+
+const TM_NEW = '\u0000new';
+let tagRows = []; // [{ name, count }]
+let tmQuery = '';
+let tmEditing = null; // 行内正在改的标签名，新建时是 TM_NEW
+let tmMergeFrom = null;
+
+async function openTagManage() {
+  try {
+    await reloadTagRows();
+  } catch (e) {
+    toast('读标签失败：' + e);
+    return;
+  }
+  tmQuery = '';
+  tmEditing = null;
+  $('tm-q').value = '';
+  $('tagmanage').hidden = false;
+  renderTagManage();
+  $('tm-q').focus();
+}
+
+function closeTagManage() {
+  $('tagmanage').hidden = true;
+  tmEditing = null;
+}
+
+async function reloadTagRows() {
+  tagRows = (await invoke('tag_stats')) || [];
+  allTags = tagRows.map((t) => t.name);
+  $('c-tags').textContent = String(allTags.length);
+}
+
+async function tmAfterChange(msg) {
+  const ok = await Promise.all([reloadTagRows(), loadGroups()]).then(() => true).catch(() => false);
+  renderTagManage();
+  if (!ok) toast('标签列表刷新失败，请重开窗口');
+  else if (msg) toast(msg);
+}
+
+function renderTagManage() {
+  const q = tmQuery.trim().toLowerCase();
+  const rows = tagRows.filter((t) => !q || t.name.toLowerCase().includes(q));
+  $('tm-count').textContent = `${tagRows.length} 个标签`;
+  const showEmpty = rows.length === 0 && tmEditing !== TM_NEW;
+  $('tm-empty').hidden = !showEmpty;
+  $('tm-empty').textContent = tagRows.length ? '没有匹配的标签' : '还没有标签，点下面「新建标签」';
+
+  let html = '';
+  if (tmEditing === TM_NEW) {
+    html += `<div class="tm-row editing">
+      <input class="tm-in" id="tm-new-input" placeholder="新标签名，回车确认" autocomplete="off" spellcheck="false" />
+      <button class="btn small" data-act="tm-cancel">取消</button>
+    </div>`;
+  }
+  html += rows
+    .map((t) => {
+      if (tmEditing === t.name) {
+        return `<div class="tm-row editing" data-tag="${escapeHtml(t.name)}">
+          <input class="tm-in" data-edit="${escapeHtml(t.name)}" value="${escapeHtml(t.name)}" autocomplete="off" spellcheck="false" />
+          <button class="btn small" data-act="tm-cancel">取消</button>
+        </div>`;
+      }
+      return `<div class="tm-row" data-tag="${escapeHtml(t.name)}">
+        <span class="tm-name">${escapeHtml(t.name)}</span>
+        <span class="tm-n${t.count ? '' : ' zero'}">${t.count}</span>
+        <span class="tm-acts">
+          <button class="tm-act" data-act="tm-rename" title="重命名">${icon('pencil')}</button>
+          <button class="tm-act" data-act="tm-merge" title="合并到…">${icon('merge')}</button>
+          <button class="tm-act danger" data-act="tm-delete" title="删除">${icon('trash')}</button>
+        </span>
+      </div>`;
+    })
+    .join('');
+  $('tm-list').innerHTML = html;
+  const focus = tmEditing === TM_NEW ? $('tm-new-input') : document.querySelector('.tm-in[data-edit]');
+  if (focus) {
+    focus.focus();
+    focus.select();
+  }
+}
+
+async function tmCreate(rawName) {
+  const name = String(rawName || '').trim();
+  tmEditing = null;
+  if (!name) return renderTagManage();
+  try {
+    const added = await invoke('create_tag', { name });
+    await tmAfterChange(added ? `已新建「${name}」` : `「${name}」已存在`);
+  } catch (e) {
+    renderTagManage();
+    toast('新建失败：' + e);
+  }
+}
+
+async function tmRename(oldName, rawName) {
+  const name = String(rawName || '').trim();
+  tmEditing = null;
+  if (!name || name === oldName) return renderTagManage();
+  try {
+    const exists = tagRows.some((t) => t.name.toLowerCase() === name.toLowerCase());
+    const n = await invoke('rename_tag', { old: oldName, new: name });
+    await tmAfterChange(exists ? `已合并到「${name}」，${n} 张受影响` : `已重命名为「${name}」`);
+  } catch (e) {
+    renderTagManage();
+    toast('重命名失败：' + e);
+  }
+}
+
+async function tmDelete(name) {
+  const row = tagRows.find((t) => t.name === name);
+  const ok = await confirmDialog(
+    `删除标签「${name}」？会从 ${row ? row.count : 0} 张图片上移除这个标签，图片本身不删。`
+  );
+  if (!ok) return;
+  try {
+    const n = await invoke('delete_tag', { name });
+    await tmAfterChange(`已删除「${name}」，${n} 张受影响`);
+  } catch (e) {
+    toast('删除失败：' + e);
+  }
+}
+
+function openTagMerge(name) {
+  const from = tagRows.find((t) => t.name === name);
+  const targets = tagRows.filter((t) => t.name !== name);
+  tmMergeFrom = name;
+  $('tg-merge-title').textContent = `把「${name}」合并到…`;
+  $('tg-merge-note').textContent = `合并后「${name}」会被删除，${from ? from.count : 0} 张图的这个标签会换成目标标签，不可撤销`;
+  $('tg-merge-list').innerHTML = targets.length
+    ? targets
+        .map(
+          (t) =>
+            `<label class="tm-radio"><input type="radio" name="tm-merge" value="${escapeHtml(t.name)}" /><span class="tm-radio-name">${escapeHtml(t.name)}</span><span class="tm-n">${t.count}</span></label>`
+        )
+        .join('')
+    : '<div class="tm-empty">没有其他标签可合并</div>';
+  $('tg-merge-ok').disabled = true;
+  $('tagmerge').hidden = false;
+}
+
+function closeTagMerge() {
+  $('tagmerge').hidden = true;
+  tmMergeFrom = null;
+}
+
+async function doTagMerge() {
+  const sel = document.querySelector('input[name="tm-merge"]:checked');
+  if (!sel || !tmMergeFrom) return;
+  const from = tmMergeFrom;
+  const to = sel.value;
+  closeTagMerge();
+  try {
+    const n = await invoke('merge_tags', { from, to });
+    await tmAfterChange(`已把「${from}」并入「${to}」，${n} 张受影响`);
+  } catch (e) {
+    toast('合并失败：' + e);
+  }
+}
+
 /* ---------- 导入 ---------- */
 
 async function pickFolder() {
@@ -1978,6 +2142,7 @@ $('pick').addEventListener('click', pickFolder);
 $('pick-files').addEventListener('click', pickFiles);
 
 document.querySelectorAll('.side-item').forEach((el) => {
+  if (!el.dataset.group) return; // 「标签管理」这类按钮不是分组
   el.addEventListener('click', () => selectGroup(el.dataset.group));
   el.addEventListener('dragover', (e) => {
     if (el.dataset.group === '__all__') return;
@@ -2048,6 +2213,66 @@ $('prompt-input').addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closePrompt(null);
 });
 
+$('tag-manage-open').addEventListener('click', openTagManage);
+$('tm-close').addEventListener('click', closeTagManage);
+$('tagmanage').addEventListener('click', (e) => {
+  if (e.target === $('tagmanage')) closeTagManage();
+});
+$('tm-q').addEventListener('input', () => {
+  tmQuery = $('tm-q').value;
+  renderTagManage();
+});
+$('tm-new').addEventListener('click', () => {
+  tmEditing = TM_NEW;
+  renderTagManage();
+});
+$('tm-list').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  const row = btn.closest('.tm-row');
+  const name = row && row.dataset.tag;
+  switch (btn.dataset.act) {
+    case 'tm-rename':
+      tmEditing = name;
+      renderTagManage();
+      break;
+    case 'tm-cancel':
+      tmEditing = null;
+      renderTagManage();
+      break;
+    case 'tm-merge':
+      openTagMerge(name);
+      break;
+    case 'tm-delete':
+      await tmDelete(name);
+      break;
+  }
+});
+$('tm-list').addEventListener('keydown', (e) => {
+  const inp = e.target.closest && e.target.closest('.tm-in');
+  if (!inp) return;
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    e.stopPropagation();
+    if (inp.id === 'tm-new-input') tmCreate(inp.value);
+    else tmRename(inp.dataset.edit, inp.value);
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    tmEditing = null;
+    renderTagManage();
+  }
+});
+$('tg-merge-list').addEventListener('change', (e) => {
+  if (e.target.name === 'tm-merge') $('tg-merge-ok').disabled = false;
+});
+$('tg-merge-cancel').addEventListener('click', closeTagMerge);
+$('tg-merge-ok').addEventListener('click', doTagMerge);
+$('tagmerge').addEventListener('click', (e) => {
+  if (e.target === $('tagmerge')) closeTagMerge();
+});
+
 $('gmenu').addEventListener('click', (e) => {
   const act = e.target.dataset && e.target.dataset.act;
   if (act) groupAction(act);
@@ -2060,6 +2285,17 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('keydown', (e) => {
   if ($('settings') && !$('settings').hidden) return;
+  if (!$('tagmanage').hidden || !$('tagmerge').hidden) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (!$('tagmerge').hidden) closeTagMerge();
+      else if (tmEditing) {
+        tmEditing = null;
+        renderTagManage();
+      } else closeTagManage();
+    }
+    return;
+  }
   if (filterPanelOpen()) return;
   const typing = e.target && e.target.tagName === 'INPUT';
   if (!typing && (e.key === 's' || e.key === 'S') && selected.size > 0) {
@@ -3719,7 +3955,7 @@ async function runAction(action, e) {
     }
     case 'groupNext':
     case 'groupPrev': {
-      const items = [...document.querySelectorAll('.side-item')].filter((x) => !x.hidden);
+      const items = [...document.querySelectorAll('.side-item')].filter((x) => !x.hidden && x.dataset.group);
       const idx = items.findIndex((x) => x.dataset.group === currentGroup);
       if (idx < 0) break;
       const step = action === 'groupNext' ? 1 : -1;
@@ -4690,6 +4926,58 @@ async function runAcceptSuite() {
     }
 
     check('清空选择后批量栏隐藏', $('batchbar').hidden === true);
+
+    // 标签管理
+    const tagsBefore = tagRows.length;
+    await openTagManage();
+    await sleep(150);
+    check('标签管理可打开', !$('tagmanage').hidden, `rows=${tagRows.length}`);
+    await tmCreate('验收标签');
+    await sleep(200);
+    check('新建标签入库', tagRows.some((t) => t.name === '验收标签'), `n=${tagRows.length}`);
+    await tmRename('验收标签', '验收标签2');
+    await sleep(200);
+    check(
+      '重命名标签生效',
+      tagRows.some((t) => t.name === '验收标签2') && !tagRows.some((t) => t.name === '验收标签'),
+      tagRows.map((t) => t.name).join(',')
+    );
+    const delPromise = tmDelete('验收标签2');
+    await sleep(200);
+    $('confirm-ok').click();
+    await delPromise;
+    await sleep(250);
+    check('删除标签生效', !tagRows.some((t) => t.name === '验收标签2'), `n=${tagRows.length}`);
+    check('标签数回到初始', tagRows.length === tagsBefore, `${tagsBefore} -> ${tagRows.length}`);
+    closeTagManage();
+    check('标签管理可关闭', $('tagmanage').hidden);
+
+    await invoke('create_tag', { name: '合并A' });
+    await invoke('create_tag', { name: '合并B' });
+    await reloadTagRows();
+    await openTagManage();
+    await sleep(120);
+    const rowA = [...document.querySelectorAll('#tm-list .tm-row')].find((r) => r.dataset.tag === '合并A');
+    if (rowA) rowA.querySelector('[data-act="tm-merge"]').click();
+    await sleep(150);
+    check('合并弹窗打开', !$('tagmerge').hidden);
+    const radio = [...document.querySelectorAll('#tg-merge-list input')].find((i) => i.value === '合并B');
+    if (radio) {
+      radio.checked = true;
+      radio.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    await sleep(80);
+    check('选中目标后可合并', !$('tg-merge-ok').disabled);
+    $('tg-merge-ok').click();
+    await sleep(350);
+    check(
+      '合并后源标签消失',
+      !tagRows.some((t) => t.name === '合并A') && tagRows.some((t) => t.name === '合并B'),
+      tagRows.map((t) => t.name).join(',')
+    );
+    await invoke('delete_tag', { name: '合并B' });
+    await reloadTagRows();
+    closeTagManage();
   } catch (err) {
     check('自测执行异常', false, err && err.stack ? err.stack : String(err));
   }
@@ -4749,6 +5037,13 @@ window.addEventListener('unhandledrejection', (e) => {
     showWhichKey('g');
   }
   if (ui === 'help') openHelp();
+  if (ui === 'tagmanage' || ui === 'tagmanage:actions') {
+    await openTagManage();
+    if (ui.endsWith(':actions')) {
+      document.querySelectorAll('#tagmanage .tm-acts').forEach((el) => (el.style.opacity = '1'));
+    }
+    await new Promise((r) => setTimeout(r, 300));
+  }
   if (ui.startsWith('theme:')) {
     await loadThemes();
     theme = ui.split(':')[1];

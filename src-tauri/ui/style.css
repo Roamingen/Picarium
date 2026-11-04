@@ -496,6 +496,148 @@ kbd {
 
 .btn.danger:hover { border-color: var(--danger-strong); }
 
+/* ---------- 标签管理 ---------- */
+
+/* 确认/输入层要压在标签管理、合并这些弹窗之上（同为 .modal-mask，z 默认 60） */
+#confirm,
+#prompt { z-index: 70; }
+
+#tagmerge { z-index: 65; }
+
+.tm-modal { width: 520px; }
+
+.tm-headcount { font-size: 12px; margin-left: 8px; }
+
+.tm-q {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.tm-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.tm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tm-row:last-child { border-bottom: 0; }
+
+.tm-row:hover { background: var(--surface-2); }
+
+.tm-row.editing { background: var(--surface-2); }
+
+.tm-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-n {
+  flex: none;
+  min-width: 18px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.tm-n.zero { color: var(--dim-2); }
+
+.tm-acts {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.tm-row:hover .tm-acts,
+.tm-row:focus-within .tm-acts { opacity: 1; }
+
+.tm-act {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.tm-act:hover { background: var(--hover); color: var(--fg); }
+
+.tm-act.danger:hover { background: var(--danger-border); color: var(--danger); }
+
+.tm-in {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.tm-empty {
+  padding: 18px 10px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--dim);
+}
+
+.tm-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--dim);
+  line-height: 1.6;
+}
+
+.tm-mergenote { margin-bottom: 10px; }
+
+.tm-merge-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.tm-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tm-radio:last-child { border-bottom: 0; }
+
+.tm-radio:hover { background: var(--surface-2); }
+
+.tm-radio input { accent-color: var(--accent); }
+
+.tm-radio-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- 主窗口骨架：侧栏 + 网格 ---------- */
 
 .workspace {
