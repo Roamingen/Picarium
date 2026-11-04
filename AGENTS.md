@@ -71,6 +71,16 @@ pwsh -NoProfile -File scripts/accept.ps1
 pwsh -NoProfile -File scripts/install-release.ps1
 ```
 
+**起桌面端看效果时别用 pwsh / Start-Process**（会闪终端窗口，用户明确嫌烦）。和安卓模拟器一样，用 `ops_bash` 后台直跑 exe：
+
+```bash
+# 用临时库，别碰用户的真实库
+export STICKERBOX_HOME="$TEMP/stickerbox-verify/lib"
+"$LOCALAPPDATA/StickerBoxBuild/target/debug/stickerbox.exe" > .demo/app.out.log 2>&1 &
+```
+
+要看某个状态就传 `STICKERBOX_UI_STATE`（如 `tagmanage`、`filters`、`settings:keys`）；截图跑 `.tools/shot_main.ps1 <输出路径>`（纯截图，不弹窗），图存 `.demo/`。
+
 安卓（仅在用户明确要做 M2 时）：
 
 ```bash

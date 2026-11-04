@@ -2311,6 +2311,10 @@ document.addEventListener('keydown', (e) => {
     });
     return;
   }
+  if (batchPanel && e.key === 'Escape') {
+    closeBatchPanel();
+    return;
+  }
   if (!typing && e.key === 'Escape' && (selected.size > 0 || selectionMode)) {
     clearSelection();
     exitSelectionMode();
@@ -2392,12 +2396,12 @@ $('batchbar').addEventListener('click', async (e) => {
   }
 
   if (act === 'group') {
-    openBatchCombo('group', e.target);
+    openBatchPanel('group');
     return;
   }
 
   if (act === 'tag') {
-    openBatchCombo('tag', e.target);
+    openBatchPanel('tag');
     return;
   }
 
@@ -3747,73 +3751,168 @@ function currentCard() {
   return shownItems[cursor] || null;
 }
 
-let batchCombo = null;
+/* ---------- 批量编辑面板（编辑标签 / 编辑分组） ---------- */
 
-function closeBatchCombo() {
-  if (batchCombo) {
-    batchCombo.remove();
-    batchCombo = null;
-  }
+let batchPanel = null;
+let batchPanelKind = null;
+
+function closeBatchPanel() {
+  if (!batchPanel) return;
+  batchPanel.remove();
+  batchPanel = null;
+  batchPanelKind = null;
 }
 
-function openBatchCombo(kind, anchor) {
-  closeBatchCombo();
+function openBatchPanel(kind) {
   const shas = getActionShas();
   if (!shas.length) return;
+  if (batchPanel && batchPanelKind === kind) {
+    closeBatchPanel();
+    return;
+  }
+  closeBatchPanel();
   const isGroup = kind === 'group';
-  const options = isGroup ? allGroups : allTags;
-  const common = new Set(
-    options.filter((o) =>
-      shas.every((sha) => {
-        const a = shownItems.find((x) => x.sha === sha);
-        return a && (isGroup ? a.groups : a.tags || []).includes(o);
-      })
-    )
-  );
+  const label = isGroup ? '分组' : '标签';
+  const m = shas.length;
+  let changed = 0;
+  let q = '';
 
   const panel = document.createElement('div');
-  panel.className = 'batch-combo';
-  const body = document.createElement('div');
-  body.className = 'bc-body';
-  panel.appendChild(body);
+  panel.className = 'bpanel';
+  panel.innerHTML =
+    '<div class="bp-head">' +
+    `<span class="bp-title">编辑${label}</span>` +
+    `<span class="bp-scope">已选 ${m} 张</span>` +
+    `<button class="bp-x" title="关闭（Esc）">${icon('x', 14)}</button>` +
+    '</div>' +
+    `<div class="bp-search"><input class="bp-q" autocomplete="off" spellcheck="false" placeholder="搜索${label}，或输入新名字回车新建"></div>` +
+    '<div class="bp-list"></div>' +
+    '<div class="bp-foot">' +
+    '<button class="btn small bp-done">完成</button>' +
+    (isGroup ? '' : '<button class="bp-link">管理全部标签</button>') +
+    '<span class="bp-hint">点一下加入，再点一下移出；Esc 关闭</span>' +
+    '<span class="bp-count"></span>' +
+    '</div>';
   document.body.appendChild(panel);
+  batchPanel = panel;
+  batchPanelKind = kind;
 
-  const r = anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : $('batchbar').getBoundingClientRect();
-  panel.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - 330))}px`;
-  panel.style.bottom = `${Math.max(12, window.innerHeight - r.top + 8)}px`;
-  batchCombo = panel;
+  const listEl = panel.querySelector('.bp-list');
+  const countEl = panel.querySelector('.bp-count');
+  const input = panel.querySelector('.bp-q');
+  const has = (a, name) => (isGroup ? a.groups || [] : a.tags || []).includes(name);
+  const assets = () => shas.map((s) => shownItems.find((x) => x.sha === s)).filter(Boolean);
+  const cov = (name) => assets().filter((a) => has(a, name)).length;
 
-  setTimeout(() => {
-    const inp = body.querySelector('.picker-input');
-    if (inp) {
-      inp.focus();
-      inp.dispatchEvent(new Event('input', { bubbles: true }));
+  function repaint() {
+    const names = (isGroup ? allGroups : allTags)
+      .filter((n) => !q || n.toLowerCase().includes(q.toLowerCase()))
+      .sort((a, b) => cov(b) - cov(a) || a.localeCompare(b, 'zh'));
+    listEl.innerHTML = '';
+    for (const name of names) {
+      const n = cov(name);
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'bp-row' + (n === m ? ' on' : n ? ' part' : '');
+      const st = n === m ? '✓ 已加' : n ? `缺 ${m - n} 张` : '加入';
+      row.innerHTML =
+        `<span class="bp-name">${escapeHtml(name)}</span>` +
+        `<span class="bp-meta">${n}/${m} 张</span>` +
+        `<span class="bp-st"><span class="n">${st}</span><span class="h">✕ 移出</span></span>`;
+      row.onclick = () => toggle(name);
+      listEl.appendChild(row);
     }
-  }, 30);
+    const exact = names.some((n) => n.toLowerCase() === q.toLowerCase());
+    if (q && !exact) {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'bp-row bp-new';
+      row.innerHTML =
+        `<span class="bp-name"><span class="bp-plus">＋</span> 新建${label}「${escapeHtml(q)}」</span>` +
+        '<span class="bp-meta"></span><span class="bp-st">回车</span>';
+      row.onclick = () => createAndAdd(q);
+      listEl.appendChild(row);
+    }
+    if (!names.length && !q) {
+      listEl.innerHTML = `<div class="bp-empty">还没有${label}，在上面的输入框里新建一个</div>`;
+    }
+    countEl.textContent = changed ? `已改 ${changed} 处` : '';
+  }
 
-  renderPickerIn(body, options, common, isGroup ? '搜索或新建分组' : '搜索或新建标签', {
-    allowNew: true,
-    heading: isGroup ? '加入分组' : '加标签',
-    onChange: async (name, added) => {
-      try {
-        if (isGroup) {
-          if (added) await invoke('add_to_group', { shas, group: name });
-          else await invoke('batch_ungroup', { shas, group: name });
-        } else if (added) {
-          await invoke('batch_tags', { shas, tags: [name] });
-        } else {
-          await invoke('batch_untag', { shas, tags: [name] });
-        }
-        await Promise.all([refresh(), loadGroups()]);
-      } catch (err) {
-        toast('操作失败：' + err);
+  async function afterChange() {
+    changed++;
+    await Promise.all([refresh(), loadGroups()]);
+    repaint();
+  }
+
+  async function toggle(name) {
+    const n = cov(name);
+    try {
+      if (n === m) {
+        if (isGroup) await invoke('batch_ungroup', { shas, group: name });
+        else await invoke('batch_untag', { shas, tags: [name] });
+      } else {
+        const miss = shas.filter((s) => {
+          const a = shownItems.find((x) => x.sha === s);
+          return a && !has(a, name);
+        });
+        if (!miss.length) return;
+        if (isGroup) await invoke('add_to_group', { shas: miss, group: name });
+        else await invoke('batch_tags', { shas: miss, tags: [name] });
       }
-    },
+      await afterChange();
+    } catch (err) {
+      toast('操作失败：' + err);
+    }
+  }
+
+  async function createAndAdd(name) {
+    const nm = String(name || '').trim();
+    if (!nm) return;
+    try {
+      if (isGroup) await invoke('add_to_group', { shas, group: nm });
+      else await invoke('batch_tags', { shas, tags: [nm] });
+      q = '';
+      input.value = '';
+      await afterChange();
+    } catch (err) {
+      toast('操作失败：' + err);
+    }
+  }
+
+  input.addEventListener('input', () => {
+    q = input.value.trim();
+    repaint();
   });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      closeBatchPanel();
+      return;
+    }
+    if (e.key !== 'Enter') return;
+    const pool = isGroup ? allGroups : allTags;
+    const exact = pool.find((n) => n.toLowerCase() === q.toLowerCase());
+    if (exact) toggle(exact);
+    else if (q) createAndAdd(q);
+  });
+  panel.querySelector('.bp-x').onclick = () => closeBatchPanel();
+  panel.querySelector('.bp-done').onclick = () => {
+    closeBatchPanel();
+    if (changed) toast(`已更新 ${changed} 处${label}`);
+  };
+  const link = panel.querySelector('.bp-link');
+  if (link)
+    link.onclick = () => {
+      closeBatchPanel();
+      openTagManage();
+    };
+  repaint();
+  setTimeout(() => input.focus(), 0);
 }
 
 document.addEventListener('mousedown', (e) => {
-  if (batchCombo && !batchCombo.contains(e.target)) closeBatchCombo();
+  if (batchPanel && !batchPanel.contains(e.target)) closeBatchPanel();
 });
 
 function getActionShas() {
@@ -4033,7 +4132,7 @@ async function runAction(action, e) {
     case 'groupAdd': {
       const shas = getActionShas();
       if (!shas.length) break;
-      openBatchCombo('group', grid.querySelector(`.card[data-index="${cursor}"]`) || $('batchbar'));
+      openBatchPanel('group');
       break;
     }
     case 'groupRemove': {
@@ -4052,12 +4151,7 @@ async function runAction(action, e) {
     case 'tagAdd': {
       const shas = getActionShas();
       if (!shas.length) break;
-      const t = await promptDialog('添加标签', '');
-      const v = (t || '').trim();
-      if (!v) break;
-      await invoke('batch_tags', { shas, tags: [v] });
-      logAction(`已给 ${shas.length} 张加标签：${v}`);
-      await Promise.all([refresh(), loadGroups()]);
+      openBatchPanel('tag');
       break;
     }
     case 'star': {
@@ -4927,6 +5021,42 @@ async function runAcceptSuite() {
 
     check('清空选择后批量栏隐藏', $('batchbar').hidden === true);
 
+    // 批量编辑面板（编辑标签）
+    if (shownItems.length >= 2) {
+      selected = new Set(shownItems.slice(0, 2).map((a) => a.sha));
+      paintSelection();
+      openBatchPanel('tag');
+      await sleep(150);
+      const bp = document.querySelector('.bpanel');
+      check('编辑标签面板可打开', !!bp && bp.querySelector('.bp-title').textContent === '编辑标签');
+      const bpRow = bp && [...bp.querySelectorAll('.bp-row')].find((r) => !r.classList.contains('bp-new'));
+      const bpName = bpRow ? bpRow.querySelector('.bp-name').textContent : '';
+      const countOf = async (name) => {
+        const rows = (await invoke('tag_stats')) || [];
+        const hit = rows.find((t) => t.name === name);
+        return hit ? hit.count : 0;
+      };
+      const before = bpName ? await countOf(bpName) : 0;
+      if (bpRow) bpRow.click();
+      await sleep(500);
+      const after = bpName ? await countOf(bpName) : 0;
+      check('点一行加入标签', !!bpName && after === before + 2, `${bpName}: ${before} -> ${after}`);
+      const bpRow2 = [...document.querySelectorAll('.bpanel .bp-row')].find(
+        (r) => r.querySelector('.bp-name').textContent === bpName
+      );
+      check('行状态变成已加', !!bpRow2 && bpRow2.classList.contains('on'), bpRow2 ? bpRow2.className : 'none');
+      if (bpRow2) bpRow2.click();
+      await sleep(500);
+      const back = bpName ? await countOf(bpName) : 0;
+      check('再点一行移出标签', back === before, `${bpName}: ${after} -> ${back}`);
+      closeBatchPanel();
+      check('编辑面板可关闭', !document.querySelector('.bpanel'));
+      clearSelection();
+      paintSelection();
+    } else {
+      check('编辑标签面板跳过（卡片不足）', true, 'no items');
+    }
+
     // 标签管理
     const tagsBefore = tagRows.length;
     await openTagManage();
@@ -5112,7 +5242,14 @@ window.addEventListener('unhandledrejection', (e) => {
     if (shownItems.length) {
       selected = new Set(shownItems.slice(0, 2).map((a) => a.sha));
       paintSelection();
-      openBatchCombo('group', $('batchbar'));
+      openBatchPanel('tag');
+    }
+  }
+  if (ui === 'batchgroup') {
+    if (shownItems.length) {
+      selected = new Set(shownItems.slice(0, 2).map((a) => a.sha));
+      paintSelection();
+      openBatchPanel('group');
     }
   }
   if (ui === 'editor' && shownItems[0]) {

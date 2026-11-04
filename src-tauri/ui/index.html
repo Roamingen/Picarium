@@ -73,14 +73,16 @@
   </div>
   <div id="batchbar" class="batchbar" hidden>
     <span id="batch-count" class="batch-count">已选 0 张</span>
-    <button class="btn small" data-act="all">全选</button>
-    <button class="btn small" data-act="group">加入分组</button>
-    <button class="btn small" data-act="leave" id="batch-leave" hidden>移出</button>
-    <button class="btn small" data-act="tag">加标签</button>
+    <button class="btn small ghost" data-act="all">全选</button>
+    <span class="batch-sep"></span>
+    <button class="btn small" data-act="group">编辑分组</button>
+    <button class="btn small" data-act="tag">编辑标签</button>
     <button class="btn small" data-act="copyfiles">复制文件</button>
     <button class="btn small" data-act="star">收藏</button>
+    <button class="btn small" data-act="leave" id="batch-leave" hidden>移出</button>
+    <span class="batch-sep"></span>
     <button class="btn small danger" data-act="delete">删除</button>
-    <button class="btn small" data-act="clear">取消</button>
+    <button class="btn small ghost" data-act="clear">Esc 取消</button>
   </div>
 
   <footer>
