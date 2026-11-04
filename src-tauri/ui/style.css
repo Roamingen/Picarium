@@ -517,15 +517,47 @@ kbd {
 
 #tagmerge { z-index: 65; }
 
-.tm-modal { width: 520px; }
+.tm-modal { width: 470px; }
 
 .tm-headcount { font-size: 12px; margin-left: 8px; }
 
-.tm-q {
-  display: block;
-  width: 100%;
+.tm-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 10px;
 }
+
+.tm-q {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.tm-x {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tm-x:hover { background: var(--hover); color: var(--fg); }
+
+.tm-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.tm-foot .tm-hint { margin: 0; }
 
 .tm-list {
   max-height: 46vh;
@@ -539,7 +571,8 @@ kbd {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px;
+  min-height: 40px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -577,7 +610,8 @@ kbd {
 }
 
 .tm-row:hover .tm-acts,
-.tm-row:focus-within .tm-acts { opacity: 1; }
+.tm-row:focus-within .tm-acts,
+.tm-acts.on { opacity: 1; }
 
 .tm-act {
   display: grid;
@@ -593,6 +627,9 @@ kbd {
 }
 
 .tm-act:hover { background: var(--hover); color: var(--fg); }
+
+.tm-act.ok { color: var(--accent); }
+.tm-act.ok:hover { background: var(--hover); color: var(--accent); }
 
 .tm-act.danger:hover { background: var(--danger-border); color: var(--danger); }
 

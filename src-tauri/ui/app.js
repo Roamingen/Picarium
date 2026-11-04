@@ -73,6 +73,7 @@ const ICONS = {
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
   copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
   file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v6h6"/>',
   link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
@@ -2131,7 +2132,8 @@ async function tmAfterChange(msg) {
 function renderTagManage() {
   const q = tmQuery.trim().toLowerCase();
   const rows = tagRows.filter((t) => !q || t.name.toLowerCase().includes(q));
-  $('tm-count').textContent = `${tagRows.length} 个标签`;
+  const refs = tagRows.reduce((n, t) => n + (t.count || 0), 0);
+  $('tm-count').textContent = `${tagRows.length} 个 · 共 ${refs} 次引用`;
   const showEmpty = rows.length === 0 && tmEditing !== TM_NEW;
   $('tm-empty').hidden = !showEmpty;
   $('tm-empty').textContent = tagRows.length ? '没有匹配的标签' : '还没有标签，点下面「新建标签」';
@@ -2140,7 +2142,10 @@ function renderTagManage() {
   if (tmEditing === TM_NEW) {
     html += `<div class="tm-row editing">
       <input class="tm-in" id="tm-new-input" placeholder="新标签名，回车确认" autocomplete="off" spellcheck="false" />
-      <button class="btn small" data-act="tm-cancel">取消</button>
+      <span class="tm-acts on">
+        <button class="tm-act ok" data-act="tm-save" title="保存">${icon('check', 15)}</button>
+        <button class="tm-act" data-act="tm-cancel" title="取消">${icon('x', 15)}</button>
+      </span>
     </div>`;
   }
   html += rows
@@ -2148,7 +2153,10 @@ function renderTagManage() {
       if (tmEditing === t.name) {
         return `<div class="tm-row editing" data-tag="${escapeHtml(t.name)}">
           <input class="tm-in" data-edit="${escapeHtml(t.name)}" value="${escapeHtml(t.name)}" autocomplete="off" spellcheck="false" />
-          <button class="btn small" data-act="tm-cancel">取消</button>
+          <span class="tm-acts on">
+            <button class="tm-act ok" data-act="tm-save" title="保存">${icon('check', 15)}</button>
+            <button class="tm-act" data-act="tm-cancel" title="取消">${icon('x', 15)}</button>
+          </span>
         </div>`;
       }
       return `<div class="tm-row" data-tag="${escapeHtml(t.name)}">
@@ -2429,6 +2437,7 @@ $('prompt-input').addEventListener('keydown', (e) => {
 
 $('tag-manage-open').addEventListener('click', openTagManage);
 $('tm-close').addEventListener('click', closeTagManage);
+$('tm-done').addEventListener('click', closeTagManage);
 $('tagmanage').addEventListener('click', (e) => {
   if (e.target === $('tagmanage')) closeTagManage();
 });
@@ -2450,6 +2459,13 @@ $('tm-list').addEventListener('click', async (e) => {
       tmEditing = name;
       renderTagManage();
       break;
+    case 'tm-save': {
+      const inp = row && row.querySelector('.tm-in');
+      if (!inp) break;
+      if (tmEditing === TM_NEW) tmCreate(inp.value);
+      else tmRename(name, inp.value);
+      break;
+    }
     case 'tm-cancel':
       tmEditing = null;
       renderTagManage();
@@ -5343,8 +5359,19 @@ async function runAcceptSuite() {
     await tmCreate('验收标签');
     await sleep(200);
     check('新建标签入库', tagRows.some((t) => t.name === '验收标签'), `n=${tagRows.length}`);
-    await tmRename('验收标签', '验收标签2');
-    await sleep(200);
+    // 行内编辑：点 ✎ → 出现 ✓ 保存按钮 → 改完点 ✓ 生效
+    const row0 = [...document.querySelectorAll('#tm-list .tm-row')].find((r) => r.dataset.tag === '验收标签');
+    if (row0) row0.querySelector('[data-act="tm-rename"]').click();
+    await sleep(80);
+    const editRow = document.querySelector('#tm-list .tm-row.editing');
+    const saveBtn = editRow && editRow.querySelector('[data-act="tm-save"]');
+    check('行内编辑有保存按钮', !!saveBtn);
+    if (editRow && saveBtn) {
+      const inp = editRow.querySelector('.tm-in');
+      inp.value = '验收标签2';
+      saveBtn.click();
+      await sleep(220);
+    }
     check(
       '重命名标签生效',
       tagRows.some((t) => t.name === '验收标签2') && !tagRows.some((t) => t.name === '验收标签'),
@@ -5500,10 +5527,14 @@ window.addEventListener('unhandledrejection', (e) => {
     showWhichKey('g');
   }
   if (ui === 'help') openHelp();
-  if (ui === 'tagmanage' || ui === 'tagmanage:actions') {
+  if (ui === 'tagmanage' || ui === 'tagmanage:actions' || ui === 'tagmanage:edit') {
     await openTagManage();
     if (ui.endsWith(':actions')) {
       document.querySelectorAll('#tagmanage .tm-acts').forEach((el) => (el.style.opacity = '1'));
+    }
+    if (ui.endsWith(':edit') && tagRows[0]) {
+      tmEditing = tagRows[0].name;
+      renderTagManage();
     }
     await new Promise((r) => setTimeout(r, 300));
   }

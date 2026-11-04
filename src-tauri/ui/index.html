@@ -193,14 +193,18 @@
         <span class="modal-title">标签管理</span>
         <span id="tm-count" class="dim tm-headcount"></span>
         <div class="spacer"></div>
-        <button id="tm-close" class="btn small">完成</button>
+        <button id="tm-close" class="tm-x" title="关闭">✕</button>
       </div>
-      <input id="tm-q" class="tm-q" placeholder="搜索标签…" autocomplete="off" spellcheck="false" />
+      <div class="tm-top">
+        <input id="tm-q" class="tm-q" placeholder="搜索标签…" autocomplete="off" spellcheck="false" />
+        <button id="tm-new" class="btn small">＋ 新建</button>
+      </div>
       <div id="tm-list" class="tm-list"></div>
       <div id="tm-empty" class="tm-empty" hidden>还没有标签</div>
-      <div class="tm-hint">按引用数排序；0 引用的标签也保留，重复使用前不会丢</div>
-      <div class="modal-actions">
-        <button id="tm-new" class="btn">＋ 新建标签</button>
+      <div class="tm-foot">
+        <span class="tm-hint">按引用数排序 · 0 引用的也保留</span>
+        <div class="spacer"></div>
+        <button id="tm-done" class="btn small primary">完成</button>
       </div>
     </div>
   </div>
