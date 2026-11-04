@@ -73,6 +73,12 @@ const ICONS = {
   plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
   search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   pencil: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v6h6"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  star: '<path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  tag: '<path d="M20.59 13.41 13.4 20.6a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><circle cx="7" cy="7" r="1.2"/>',
   merge: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
 };
 
@@ -758,6 +764,24 @@ function buildCard(a, idx, m) {
     cursor = idx;
     paintCursor();
     const combo = mouseCombo(e, 0);
+    // 单纯的左键单击：走防抖复制；双击时 e.detail 变成 2，直接取消待执行的那次复制
+    if (combo === 'mouse1' && (keymap['mouse1'] || []).includes('click')) {
+      if (e.detail > 1) {
+        clearTimeout(clickCopyTimer);
+        return;
+      }
+      if (currentGroup === '__trash__') {
+        executeAction('click', 1, e);
+        return;
+      }
+      if (selectionMode || selected.size > 0) {
+        toggleSelect(a.sha, idx);
+        return;
+      }
+      clearTimeout(clickCopyTimer);
+      clickCopyTimer = setTimeout(() => copy(a), 260);
+      return;
+    }
     const acts = keymap[combo];
     if (acts && acts.length) {
       e.preventDefault();
@@ -766,22 +790,24 @@ function buildCard(a, idx, m) {
     }
     if (selectionMode || selected.size > 0) {
       toggleSelect(a.sha, idx);
-    } else {
-      copy(a);
+      return;
     }
+    clearTimeout(clickCopyTimer);
+    clickCopyTimer = setTimeout(() => copy(a), 260);
   });
   el.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    // 右键先把自己变成光标，否则绑定在 mouse3 上的动作会作用到旧光标那张
+    clearTimeout(clickCopyTimer);
+    // 右键先把自己变成光标，菜单里的动作才作用到这张
     cursor = idx;
     paintCursor();
     hideTip();
-    const combo = mouseCombo(e, 2);
-    const acts = keymap[combo];
-    if (acts && acts.length) {
-      executeAction(acts[0], 1, e);
-      return;
-    }
+    openCardMenu(a, e.clientX, e.clientY);
+  });
+  el.addEventListener('dblclick', (e) => {
+    // 双击 = 编辑（单击的复制已按下去的时间清掉）
+    e.preventDefault();
+    clearTimeout(clickCopyTimer);
     openEditor(a);
   });
 
@@ -1198,6 +1224,8 @@ function hideCaret() {
   if (caretEl) caretEl.style.display = 'none';
 }
 let suppressClick = false;
+let clickCopyTimer = null;
+let copyHits = 0; // 自测用：复制实际发生的次数
 
 function beginPointerDrag(e, a) {
   const shas = selected.has(a.sha) && selected.size > 1 ? [...selected] : [a.sha];
@@ -1459,6 +1487,7 @@ function setLastAction(text) {
 }
 
 async function copy(a) {
+  copyHits += 1;
   // 动图（GIF / APNG / 动画 WebP）走「复制文件」：位图剪贴板会把动画压成一帧
   const animated = !!a.animated;
   const asFile = copyDefault === 'file' || animated;
@@ -1710,6 +1739,145 @@ function openGroupMenu(name, x, y) {
 function closeGroupMenu() {
   $('gmenu').hidden = true;
   menuGroup = null;
+}
+
+/* ---------- 卡片右键菜单 ---------- */
+
+const CARD_MENU_ITEMS = [
+  { act: 'edit', label: '编辑…', icon: 'pencil', key: 'Enter' },
+  { act: 'copyimg', label: '复制图片', icon: 'copy', key: '单击' },
+  { act: 'copyfile', label: '复制文件', icon: 'file' },
+  { act: 'copypath', label: '复制路径', icon: 'link' },
+  { sep: true },
+  { act: 'star', label: '收藏', icon: 'star', key: 'S' },
+  { sep: true },
+  { act: 'addtag', label: '加入标签…', icon: 'tag' },
+  { act: 'addgroup', label: '加入分组…', icon: 'folder-plus' },
+  { sep: true },
+  { act: 'trash', label: '移到回收站', icon: 'trash', key: 'dd', danger: true },
+];
+// 多选时只留批量项（单图专属的藏起来）
+const CARD_MENU_BATCH_HIDE = new Set(['edit', 'copyimg', 'copypath']);
+
+let cardMenuSha = null;
+let cardMenuBatch = false;
+
+function buildCardMenu() {
+  const box = $('cardmenu');
+  if (!box || box.dataset.built) return;
+  box.dataset.built = '1';
+  for (const it of CARD_MENU_ITEMS) {
+    if (it.sep) {
+      const sep = document.createElement('div');
+      sep.className = 'cm-sep';
+      box.appendChild(sep);
+      continue;
+    }
+    const b = document.createElement('button');
+    b.dataset.cm = it.act;
+    b.className = 'cm-item' + (it.danger ? ' danger' : '');
+    b.innerHTML =
+      icon(it.icon, 15) +
+      `<span class="cm-label">${it.label}</span>` +
+      (it.key ? `<span class="cm-key">${it.key}</span>` : '');
+    box.appendChild(b);
+  }
+}
+
+function openCardMenu(a, x, y) {
+  buildCardMenu();
+  cardMenuSha = a.sha;
+  cardMenuBatch = !!(selectionMode || selected.size > 0);
+  const m = $('cardmenu');
+  const inTrash = currentGroup === '__trash__';
+  for (const b of m.querySelectorAll('[data-cm]')) {
+    b.hidden = (cardMenuBatch && CARD_MENU_BATCH_HIDE.has(b.dataset.cm)) || (inTrash && b.dataset.cm === 'trash');
+  }
+  m.hidden = false;
+  // 藏掉被隐藏项旁边的分隔线，别让菜单开头/结尾、或中间出现两条线
+  const kids = [...m.children];
+  for (let i = 0; i < kids.length; i++) {
+    const el = kids[i];
+    if (!el.classList.contains('cm-sep')) continue;
+    let prev = null;
+    for (let j = i - 1; j >= 0; j--) {
+      if (!kids[j].hidden) { prev = kids[j]; break; }
+    }
+    let next = null;
+    for (let j = i + 1; j < kids.length; j++) {
+      if (!kids[j].hidden) { next = kids[j]; break; }
+    }
+    const dead = !prev || !next || prev.classList.contains('cm-sep') || next.classList.contains('cm-sep');
+    el.hidden = dead;
+  }
+  const w = m.offsetWidth || 220;
+  const h = m.offsetHeight || 340;
+  m.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + 'px';
+  m.style.top = Math.max(8, Math.min(y, window.innerHeight - h - 8)) + 'px';
+}
+
+function closeCardMenu() {
+  const m = $('cardmenu');
+  if (m && !m.hidden) m.hidden = true;
+  cardMenuSha = null;
+}
+
+async function cardMenuAction(act) {
+  const sha = cardMenuSha;
+  closeCardMenu();
+  if (!sha) return;
+  const item = (shownItems || []).find((x) => x.sha === sha) || { sha };
+  const shas = cardMenuBatch && selected.size ? [...selected] : [sha];
+  try {
+    if (act === 'edit') {
+      openEditor(item);
+      return;
+    }
+    if (act === 'copyimg') {
+      await copy(item);
+      return;
+    }
+    if (act === 'copyfile') {
+      if (shas.length > 1) {
+        await invoke('copy_assets_files', { shas });
+        toast(`已复制 ${shas.length} 个原文件`);
+        logAction(`已复制 ${shas.length} 个原文件`);
+      } else {
+        await invoke('copy_asset_file', { sha });
+        toast(`已复制原文件「${item.name || ''}」`);
+        logAction(`已复制原文件「${item.name || ''}」`);
+      }
+      return;
+    }
+    if (act === 'copypath') {
+      await navigator.clipboard.writeText(item.path || '');
+      toast('路径已复制');
+      return;
+    }
+    if (act === 'star') {
+      await invoke('batch_star', { shas, on: true });
+      logAction(`已收藏 ${shas.length} 张`);
+      await Promise.all([refresh(), loadGroups(), showStats()]);
+      return;
+    }
+    if (act === 'addtag' || act === 'addgroup') {
+      const kind = act === 'addtag' ? 'tag' : 'group';
+      openBatchPanel(kind, cardMenuBatch ? {} : { sha });
+      return;
+    }
+    if (act === 'trash') {
+      const ok = await confirmDialog(
+        shas.length > 1 ? `删除选中的 ${shas.length} 张到回收站？` : `删除「${item.name || ''}」到回收站？`
+      );
+      if (!ok) return;
+      await invoke('batch_delete', { shas });
+      logAction(`已把 ${shas.length} 张移入回收站`);
+      clearSelection();
+      await Promise.all([refresh(), loadGroups(), showStats()]);
+    }
+  } catch (e) {
+    toast('操作失败：' + e);
+  }
 }
 
 async function groupAction(act) {
@@ -2324,9 +2492,15 @@ $('gmenu').addEventListener('click', (e) => {
   if (act) groupAction(act);
 });
 
+$('cardmenu').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-cm]');
+  if (btn) cardMenuAction(btn.dataset.cm);
+});
+
 document.addEventListener('click', (e) => {
   if (popEl && !popEl.contains(e.target)) closePop();
   if (!$('gmenu').hidden && !$('gmenu').contains(e.target)) closeGroupMenu();
+  if (!$('cardmenu').hidden && !$('cardmenu').contains(e.target)) closeCardMenu();
 });
 
 document.addEventListener('keydown', (e) => {
@@ -2367,6 +2541,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 'Escape' && popEl) return closePop();
+  if (!$('cardmenu').hidden && e.key === 'Escape') return closeCardMenu();
   if (!$('gmenu').hidden && e.key === 'Escape') return closeGroupMenu();
   if (!$('prompt').hidden) {
     if (e.key === 'Escape') closePrompt(null);
@@ -3123,7 +3298,7 @@ const DEFAULT_KEYMAP = {
   selectAll: ['ctrl+a'],
   escape: ['escape'],
   copy: ['enter', 'ctrl+c'],
-  edit: ['c', 'mouse3'],
+  edit: ['c'],
   del: ['dd'],
   info: ['K'],
   filter: ['/', 'ctrl+f'],
@@ -4742,10 +4917,11 @@ async function runAcceptSuite() {
     ctxCard.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 120, clientY: 120 }));
     await sleep(250);
     check(
-      '右键打开的是鼠标下那张',
-      !!editing && editing.sha === shownItems[ctxIdx].sha,
-      editing ? editing.name : 'no editor'
+      '右键菜单作用在鼠标下那张',
+      !$('cardmenu').hidden && cardMenuSha === shownItems[ctxIdx].sha,
+      cardMenuSha ? `menu for ${cardMenuSha.slice(0, 6)}` : 'no menu'
     );
+    closeCardMenu();
     const hoverIdx = 4;
     const hoverCard = grid.querySelector(`.card[data-index="${hoverIdx}"]`);
     hoverCard.dispatchEvent(new MouseEvent('mouseenter', { clientX: 200, clientY: 200 }));
@@ -5195,6 +5371,50 @@ async function runAcceptSuite() {
     check('关标签管理回到筛选面板', !$('filter-panel').hidden && $('tagmanage').hidden);
     closeFilterPanel();
 
+    // 卡片右键菜单：右键出菜单、多选只留批量项、双击开编辑、mouse3 不再绑编辑
+    const card0 = grid.querySelector('.card[data-index="0"]');
+    if (card0) {
+      card0.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 300, clientY: 200 }));
+      await sleep(80);
+      check('右键弹出卡片菜单', !$('cardmenu').hidden);
+      const vis = [...document.querySelectorAll('#cardmenu [data-cm]')].filter((b) => !b.hidden);
+      check('菜单默认含编辑与单图项', vis.some((b) => b.dataset.cm === 'edit') && vis.length >= 8, `n=${vis.length}`);
+      closeCardMenu();
+      await sleep(60);
+      check('菜单可关闭', $('cardmenu').hidden);
+
+      card0.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+      await sleep(200);
+      check('双击打开编辑弹窗', !$('editor').hidden);
+      closeEditor();
+      await sleep(120);
+
+      // 单击防抖：双击（第二次 click detail=2）不该写剪贴板；单点要等 260ms 才复制
+      const hits0 = copyHits;
+      card0.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      await sleep(80);
+      card0.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
+      await sleep(320);
+      check('双击不触发复制', copyHits === hits0, `delta=${copyHits - hits0}`);
+      card0.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+      await sleep(420);
+      check('单击延迟后复制一次', copyHits === hits0 + 1, `delta=${copyHits - hits0}`);
+
+      const before = [...document.querySelectorAll('#cardmenu [data-cm][hidden]')].length;
+      selected = new Set(shownItems.slice(0, 2).map((x) => x.sha));
+      paintSelection();
+      openCardMenu(shownItems[0], 300, 200);
+      await sleep(60);
+      const editBtn = document.querySelector('#cardmenu [data-cm="edit"]');
+      const copyBtn = document.querySelector('#cardmenu [data-cm="copyfile"]');
+      check('多选时藏掉单图项', editBtn.hidden && !copyBtn.hidden, `hidden_before=${before}`);
+      closeCardMenu();
+      clearSelection();
+      check('mouse3 不再绑编辑', !(mergedKeymap().edit || []).includes('mouse3'));
+    } else {
+      check('右键菜单跳过（无卡片）', true, 'no items');
+    }
+
     await invoke('create_tag', { name: '合并A' });
     await invoke('create_tag', { name: '合并B' });
     await reloadTagRows();
@@ -5378,6 +5598,18 @@ window.addEventListener('unhandledrejection', (e) => {
     openEditor(shownItems[0]);
     await new Promise((r) => setTimeout(r, 250));
     openBatchPanel('group', { sha: shownItems[0].sha, name: shownItems[0].name, onClose: reloadEditing });
+  }
+  if (ui === 'cardmenu' && shownItems[0]) {
+    const el = grid.querySelector('.card[data-index="0"]');
+    const r = el ? el.getBoundingClientRect() : { left: 320, top: 200 };
+    openCardMenu(shownItems[0], r.left + 60, r.top + 40);
+  }
+  if (ui === 'cardmenubatch' && shownItems.length) {
+    selected = new Set(shownItems.slice(0, 3).map((a) => a.sha));
+    paintSelection();
+    const el = grid.querySelector('.card[data-index="1"]');
+    const r = el ? el.getBoundingClientRect() : { left: 620, top: 200 };
+    openCardMenu(shownItems[1], r.left + 60, r.top + 40);
   }
 })();
 
