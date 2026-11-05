@@ -69,7 +69,8 @@
     <div class="row"><span class="label">下</span><button class="keybtn" data-dir="down"><kbd>↓</kbd><span>ArrowDown</span></button><span class="desc">下一行 / 下一张</span></div>
     <div class="row"><span class="label">左</span><button class="keybtn" data-dir="left"><kbd>←</kbd><span>ArrowLeft</span></button><span class="desc">向左一格，到头停住</span></div>
     <div class="row"><span class="label">右</span><button class="keybtn" data-dir="right"><kbd>→</kbd><span>ArrowRight</span></button><span class="desc">向右一格，到头停住</span></div>
-    <p class="warn" id="warn">两个方向绑到了同一个键，面板会分不清前后。</p>
+    <div class="row"><span class="label">查看信息</span><button class="keybtn" data-dir="info"><kbd>Ctrl+Shift+K</kbd><span>Ctrl+Shift+K</span></button><span class="desc">等效于鼠标停在该卡片上，再按收起</span></div>
+    <p class="warn" id="warn">两个功能绑到了同一个键，面板会分不清。</p>
     <div class="row">
       <span class="label">Ctrl+HJKL</span>
       <span class="desc">额外的 vim 风格导航，默认开；底栏不显示它，只是能用</span>
@@ -89,7 +90,7 @@
 
 <script>
 const KEY_LABEL = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', ' ': 'Space' };
-const state = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', vim: true };
+const state = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', info: 'Ctrl+Shift+K', vim: true };
 let capturing = null;
 
 const btns = [...document.querySelectorAll('.keybtn')];
@@ -109,7 +110,7 @@ function paint() {
       ? '<span>按下新的键…</span>'
       : `${kbd(k)}<span style="color:var(--dim)">${k}</span>`;
   }
-  const vals = ['up', 'down', 'left', 'right'].map((d) => state[d]);
+  const vals = ['up', 'down', 'left', 'right', 'info'].map((d) => state[d]);
   const dup = vals.length !== new Set(vals).size;
   warn.classList.toggle('show', dup);
   btns.forEach((b) => b.classList.toggle('dup', dup));
@@ -127,7 +128,7 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault();
   if (e.key === 'Escape') { capturing = null; paint(); return; }
   if (e.key === 'Tab' || e.key === 'Enter') return;
-  const combo = (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+  const combo = (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
   state[capturing] = combo;
   capturing = null;
   paint();
