@@ -21,7 +21,7 @@
   <div id="tip" class="tip"></div>
 
     <div class="panel-foot">
-      <span><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> 选择</span>
+      <span id="navhint"></span>
       <span><kbd>Enter</kbd> 复制</span>
       <span><kbd>Esc</kbd> 关闭</span>
     </div>
@@ -36,12 +36,56 @@
     const hint = $('hint');
     const tipEl = $('tip');
     const count = $('count');
-    const COLS = 6;
+    const navhint = $('navhint');
     let items = [];
     let cursor = 0;
     let panelSort = 'recent';
     let recentLimit = 60;
     let hoverDelay = 350;
+    let panelNav = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+    let panelVim = true;
+
+    const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+    const VIM = { h: 'left', l: 'right', k: 'up', j: 'down' };
+    const KEY_SYM = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Space' };
+
+    function keySym(k) {
+      if (KEY_SYM[k]) return KEY_SYM[k];
+      return String(k).length === 1 ? String(k).toUpperCase() : String(k);
+    }
+
+    function navLabel(combo) {
+      return String(combo).split('+').map(keySym).join('+');
+    }
+
+    function paintFooter() {
+      const keys = ['up', 'down', 'left', 'right']
+        .map((d) => `<kbd>${keySym(panelNav[d])}</kbd>`)
+        .join(' ');
+      navhint.innerHTML = `${keys} 选择`;
+    }
+
+    function comboOf(e) {
+      return (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '')
+        + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+    }
+
+    function dirFor(e) {
+      const combo = comboOf(e);
+      for (const d of ['up', 'down', 'left', 'right']) {
+        if (panelNav[d] === combo) return d;
+      }
+      if (panelVim && e.ctrlKey && !e.altKey && e.key.length === 1) {
+        return VIM[e.key.toLowerCase()] || null;
+      }
+      return null;
+    }
+
+    function columns() {
+      const cols = getComputedStyle(grid).gridTemplateColumns;
+      const n = cols.split(' ').filter(Boolean).length;
+      return Math.max(1, n);
+    }
 
     function thumbUrl(sha) {
       try { return convertFileSrc(sha, 'thumb'); } catch (_) { return `http://thumb.localhost/${sha}`; }
@@ -127,7 +171,7 @@
 
     function move(dx, dy) {
       if (!items.length) return;
-      let next = cursor + dx + dy * COLS;
+      let next = cursor + dx + dy * columns();
       if (next < 0) next = 0;
       if (next >= items.length) next = items.length - 1;
       cursor = next;
@@ -163,13 +207,13 @@
     });
 
     input.addEventListener('keydown', (e) => {
-      switch (e.key) {
-        case 'Enter': e.preventDefault(); copy(); break;
-        case 'Escape': e.preventDefault(); invoke('hide_panel'); break;
-        case 'ArrowRight': e.preventDefault(); move(1, 0); break;
-        case 'ArrowLeft': e.preventDefault(); move(-1, 0); break;
-        case 'ArrowDown': e.preventDefault(); move(0, 1); break;
-        case 'ArrowUp': e.preventDefault(); move(0, -1); break;
+      if (e.key === 'Enter') { e.preventDefault(); copy(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); invoke('hide_panel'); return; }
+      const dir = dirFor(e);
+      if (dir) {
+        e.preventDefault();
+        const [dx, dy] = DIRS[dir];
+        move(dx, dy);
       }
     });
 
@@ -177,21 +221,33 @@
       if (e.key === 'Escape') invoke('hide_panel');
     });
 
+    async function applySettings() {
+      try {
+        const st = await invoke('get_settings');
+        if (st.panelSort) panelSort = st.panelSort;
+        if (typeof st.recentLimit === 'number') recentLimit = st.recentLimit;
+        if (typeof st.hoverDelay === 'number') hoverDelay = st.hoverDelay;
+        if (st.panelNav && typeof st.panelNav === 'object') {
+          for (const d of ['up', 'down', 'left', 'right']) {
+            if (typeof st.panelNav[d] === 'string') panelNav[d] = st.panelNav[d];
+          }
+        }
+        if (typeof st.panelVim === 'boolean') panelVim = st.panelVim;
+        if (st.theme) document.documentElement.dataset.theme = st.theme;
+      } catch (_) {}
+      paintFooter();
+    }
+
     window.__TAURI__.event.listen('panel-open', async () => {
       input.value = '';
+      await applySettings();
       await search('');
       input.focus();
       input.select();
     });
 
     (async () => {
-      try {
-        const st = await invoke('get_settings');
-        if (st.panelSort) panelSort = st.panelSort;
-        if (typeof st.recentLimit === 'number') recentLimit = st.recentLimit;
-        if (typeof st.hoverDelay === 'number') hoverDelay = st.hoverDelay;
-        if (st.theme) document.documentElement.dataset.theme = st.theme;
-      } catch (_) {}
+      await applySettings();
       input.focus();
       search('');
     })();

@@ -401,6 +401,26 @@
       </div>
       <div class="set-row column">
         <div class="set-text">
+          <div class="set-label">面板导航键</div>
+          <div class="dim set-value">点按钮再按新键；单字符会和搜索输入冲突，请用方向键或加 Ctrl/Alt</div>
+        </div>
+        <div id="panel-nav-keys" class="nav-keys">
+          <button class="nav-key" data-dir="up" type="button"></button>
+          <button class="nav-key" data-dir="down" type="button"></button>
+          <button class="nav-key" data-dir="left" type="button"></button>
+          <button class="nav-key" data-dir="right" type="button"></button>
+        </div>
+        <div id="panel-nav-warn" class="nav-warn"></div>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">Ctrl+HJKL 导航</div>
+          <div class="dim set-value">面板里额外支持 Ctrl+H/J/K/L；底栏不显示，免得挤</div>
+        </div>
+        <label class="switch"><input type="checkbox" id="set-panel-vim" /><span></span></label>
+      </div>
+      <div class="set-row column">
+        <div class="set-text">
           <div class="set-label">剪贴板黑名单</div>
           <div class="dim set-value">这些程序复制图片时不会被捕获；默认已屏蔽 Snipaste，带不带 .exe 都行</div>
         </div>

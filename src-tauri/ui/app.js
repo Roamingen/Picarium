@@ -46,6 +46,8 @@ let panelX = 0;
 let panelY = 0;
 let panelSort = 'recent';
 let recentLimit = 60;
+let panelNav = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
+let panelVim = true;
 let virtualize = true;
 let clipboardBlacklist = [];
 let virtStart = -1;
@@ -275,6 +277,92 @@ function saveSettings(patch) {
   invoke('patch_settings', { patch }).catch(() => {});
 }
 
+// ---- 快贴面板导航键 ----
+const NAV_DIRS = ['up', 'down', 'left', 'right'];
+const KEY_SYM = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Space' };
+
+function keySym(k) {
+  if (KEY_SYM[k]) return KEY_SYM[k];
+  return String(k).length === 1 ? String(k).toUpperCase() : String(k);
+}
+
+function navLabel(combo) {
+  return String(combo).split('+').map(keySym).join('+');
+}
+
+function refreshNavConflicts() {
+  const btns = [...document.querySelectorAll('#panel-nav-keys .nav-key')];
+  const used = new Map();
+  for (const dir of NAV_DIRS) used.set(panelNav[dir], (used.get(panelNav[dir]) || 0) + 1);
+  let dup = false;
+  for (const b of btns) {
+    const bad = used.get(panelNav[b.dataset.dir]) > 1;
+    b.classList.toggle('dup', bad);
+    if (bad) dup = true;
+  }
+  const warn = $('panel-nav-warn');
+  warn.textContent = dup ? '两个方向绑到了同一个键，面板会分不清前后' : '';
+  warn.classList.toggle('show', dup);
+  return !dup;
+}
+
+function fillPanelNav() {
+  for (const b of document.querySelectorAll('#panel-nav-keys .nav-key')) {
+    const dir = b.dataset.dir;
+    b.classList.remove('capturing', 'dup');
+    b.innerHTML = `<kbd>${navLabel(panelNav[dir])}</kbd><span class="k">${panelNav[dir]}</span>`;
+  }
+  refreshNavConflicts();
+}
+
+function panelNavCombo(e) {
+  return (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '')
+    + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+}
+
+let navCapture = null;
+
+document.querySelectorAll('#panel-nav-keys .nav-key').forEach((b) => {
+  b.addEventListener('click', () => {
+    navCapture = b.dataset.dir;
+    for (const other of document.querySelectorAll('#panel-nav-keys .nav-key')) {
+      other.classList.remove('capturing');
+    }
+    b.classList.add('capturing');
+    b.innerHTML = '<span>按下新的键…</span>';
+  });
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!navCapture) return;
+  if (e.key === 'Escape') { navCapture = null; fillPanelNav(); return; }
+  if (e.key === 'Tab') return;
+  e.preventDefault();
+  if (e.key.length === 1 && !e.ctrlKey && !e.altKey) {
+    toast('单字符会和搜索输入冲突，请用方向键或加 Ctrl/Alt');
+    navCapture = null;
+    fillPanelNav();
+    return;
+  }
+  const combo = panelNavCombo(e);
+  const clash = NAV_DIRS.find((d) => d !== navCapture && panelNav[d] === combo);
+  if (clash) {
+    toast(`这个键已经绑给「${navLabel(combo)}」了`);
+    navCapture = null;
+    fillPanelNav();
+    return;
+  }
+  panelNav[navCapture] = combo;
+  navCapture = null;
+  fillPanelNav();
+  saveSettings({ panelNav: { ...panelNav } });
+}, true);
+
+$('set-panel-vim').addEventListener('change', (e) => {
+  panelVim = e.target.checked;
+  saveSettings({ panelVim });
+});
+
 /// 启动时从库里的 settings.json 读取；老用户的数据从 localStorage 迁移过去
 async function syncSettings() {
   let s = {};
@@ -304,6 +392,12 @@ async function syncSettings() {
   if (typeof s.panelX === 'number') panelX = s.panelX;
   if (typeof s.panelY === 'number') panelY = s.panelY;
   if (s.panelSort) panelSort = s.panelSort;
+  if (s.panelNav && typeof s.panelNav === 'object') {
+    for (const dir of ['up', 'down', 'left', 'right']) {
+      if (typeof s.panelNav[dir] === 'string') panelNav[dir] = s.panelNav[dir];
+    }
+  }
+  if (typeof s.panelVim === 'boolean') panelVim = s.panelVim;
   if (typeof s.recentLimit === 'number') recentLimit = s.recentLimit;
   if (typeof s.virtualize === 'boolean') virtualize = s.virtualize;
   if (Array.isArray(s.clipboardBlacklist)) clipboardBlacklist = s.clipboardBlacklist.slice();
@@ -2862,6 +2956,8 @@ async function openSettings() {
   $('panel-pos-y').value = panelY;
   $('set-panel-sort').value = panelSort;
   $('set-recent-limit').value = recentLimit;
+  fillPanelNav();
+  $('set-panel-vim').checked = panelVim;
 
   const isCustomView = startView.startsWith('group:');
   $('set-start-view').value = isCustomView ? 'custom' : startView;
@@ -2964,7 +3060,7 @@ $('set-recent-limit').addEventListener('change', (e) => {
   recentLimit = Math.max(10, Math.min(1000, Number(e.target.value) || 60));
   e.target.value = recentLimit;
   saveSettings({ recentLimit });
-  toast('最近使用上限已更新，重启面板生效');
+  toast('最近使用上限已更新');
 });
 
 $('set-panel-sort').addEventListener('change', (e) => {
@@ -5376,6 +5472,38 @@ async function runAcceptSuite() {
       [...document.querySelectorAll('#tab-general .set-row')].some((r) => r.hidden),
       'hidden rows'
     );
+    const navBtns = [...document.querySelectorAll('#panel-nav-keys .nav-key')];
+    check(
+      '面板导航键四条默认方向键',
+      navBtns.length === 4 && navBtns.map((b) => b.dataset.dir).join(',') === 'up,down,left,right'
+        && navBtns.every((b) => /Arrow(Up|Down|Left|Right)/.test(b.textContent)),
+      navBtns.map((b) => b.textContent.trim()).join('|')
+    );
+    check('Ctrl+HJKL 默认开', $('set-panel-vim').checked === true);
+    const upBtn = navBtns.find((b) => b.dataset.dir === 'up');
+    upBtn.click();
+    await sleep(40);
+    send('k');
+    await sleep(60);
+    check(
+      '面板导航键拒绝单字符绑定',
+      upBtn.textContent.includes('ArrowUp') && !upBtn.classList.contains('capturing'),
+      upBtn.textContent.trim()
+    );
+    upBtn.click();
+    await sleep(40);
+    send('ArrowUp', { ctrlKey: true });
+    await sleep(60);
+    check(
+      '面板导航键绑定 Ctrl+方向键',
+      upBtn.textContent.includes('Ctrl+ArrowUp') && upBtn.textContent.includes('↑'),
+      upBtn.textContent.trim()
+    );
+    await invoke('patch_settings', { patch: { panelNav: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } } });
+    const navSt = await invoke('get_settings');
+    check('面板导航键写进设置', navSt.panelNav && navSt.panelNav.up === 'ArrowUp', JSON.stringify(navSt.panelNav));
+    fillPanelNav();
+    await sleep(40);
     applySettingsTab('general');
     $('settings').hidden = true;
 
@@ -5743,6 +5871,13 @@ window.addEventListener('unhandledrejection', (e) => {
     if (row) row.scrollIntoView({ block: 'center' });
     const b = row && row.querySelector('.sel-btn');
     if (b) b.click();
+  }
+  if (ui === 'settings:panelkeys') {
+    await openSettings();
+    applySettingsTab('general');
+    await new Promise((r) => setTimeout(r, 300));
+    const nav = $('panel-nav-keys');
+    if (nav) nav.scrollIntoView({ block: 'center' });
   }
   if (ui === 'settings:blacklist') {
     await openSettings();
