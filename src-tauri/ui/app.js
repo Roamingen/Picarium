@@ -46,9 +46,20 @@ let panelX = 0;
 let panelY = 0;
 let panelSort = 'recent';
 let recentLimit = 60;
-let panelNav = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
-let panelVim = true;
-let panelInfoKey = 'Ctrl+Shift+K';
+const PANEL_SLOT_DEFAULTS = {
+  up: ['ArrowUp', 'Ctrl+K'],
+  down: ['ArrowDown', 'Ctrl+J'],
+  left: ['ArrowLeft', 'Ctrl+H'],
+  right: ['ArrowRight', 'Ctrl+L'],
+  info: ['Ctrl+Shift+K'],
+};
+let panelKeys = {
+  up: ['ArrowUp', 'Ctrl+K'],
+  down: ['ArrowDown', 'Ctrl+J'],
+  left: ['ArrowLeft', 'Ctrl+H'],
+  right: ['ArrowRight', 'Ctrl+L'],
+  info: ['Ctrl+Shift+K'],
+};
 let virtualize = true;
 let clipboardBlacklist = [];
 let virtStart = -1;
@@ -278,9 +289,10 @@ function saveSettings(patch) {
   invoke('patch_settings', { patch }).catch(() => {});
 }
 
-// ---- 快贴面板导航键 ----
-const NAV_DIRS = ['up', 'down', 'left', 'right'];
-const NAV_SLOTS = [...NAV_DIRS, 'info'];
+// ---- 快贴面板按键 ----
+const PANEL_SLOTS = ['up', 'down', 'left', 'right', 'info'];
+const PANEL_SLOT_NAME = { up: '向上', down: '向下', left: '向左', right: '向右', info: '查看信息' };
+const VIM_KEY = { up: 'Ctrl+K', down: 'Ctrl+J', left: 'Ctrl+H', right: 'Ctrl+L' };
 const KEY_SYM = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Space' };
 
 function keySym(k) {
@@ -292,95 +304,119 @@ function navLabel(combo) {
   return String(combo).split('+').map(keySym).join('+');
 }
 
-function slotValue(slot) {
-  return slot === 'info' ? panelInfoKey : panelNav[slot];
+function slotCombos(slot) {
+  return Array.isArray(panelKeys[slot]) ? panelKeys[slot] : [];
 }
 
-function navButtons() {
-  return [...document.querySelectorAll('#panel-nav-keys .nav-key, #panel-info-key')];
+function chipText(combo) {
+  const label = navLabel(combo);
+  return label === combo ? `<kbd>${label}</kbd>` : `<kbd>${label}</kbd><span class="k">${combo}</span>`;
 }
 
-function slotOf(b) {
-  return b.dataset.dir || 'info';
-}
-
-function refreshNavConflicts() {
+function refreshPanelKeyWarn() {
   const used = new Map();
-  for (const slot of NAV_SLOTS) {
-    const v = slotValue(slot);
-    used.set(v, (used.get(v) || 0) + 1);
-  }
+  for (const slot of PANEL_SLOTS) for (const c of slotCombos(slot)) used.set(c, (used.get(c) || 0) + 1);
   let dup = false;
-  for (const b of navButtons()) {
-    const bad = used.get(slotValue(slotOf(b))) > 1;
-    b.classList.toggle('dup', bad);
+  for (const el of document.querySelectorAll('#panel-keys-list .pk-chip')) {
+    const bad = used.get(el.dataset.combo) > 1;
+    el.classList.toggle('dup', bad);
     if (bad) dup = true;
   }
-  const warn = $('panel-nav-warn');
-  warn.textContent = dup ? '两个功能绑到了同一个键，面板会分不清' : '';
-  warn.classList.toggle('show', dup);
-  return !dup;
+  const empty = PANEL_SLOTS.filter((s) => !slotCombos(s).length);
+  const parts = [];
+  if (dup) parts.push('两个功能绑到了同一个键，面板会分不清');
+  if (empty.length) parts.push(`${empty.map((s) => `「${PANEL_SLOT_NAME[s]}」`).join('、')}还没有绑定`);
+  const warn = $('panel-keys-warn');
+  warn.textContent = parts.join('；');
+  warn.classList.toggle('show', parts.length > 0);
 }
 
-function fillPanelNav() {
-  for (const b of navButtons()) {
-    const combo = slotValue(slotOf(b));
-    b.classList.remove('capturing', 'dup');
-    const label = navLabel(combo);
-    // 箭头这类键显示「符号 + 原名」，Ctrl+Shift+K 这种没符号可换的就不重复一遍
-    b.innerHTML = label === combo ? `<kbd>${label}</kbd>` : `<kbd>${label}</kbd><span class="k">${combo}</span>`;
-  }
-  refreshNavConflicts();
+function fillPanelKeys() {
+  const list = $('panel-keys-list');
+  if (!list) return;
+  list.innerHTML = PANEL_SLOTS.map((slot) => {
+    const chips = slotCombos(slot)
+      .map(
+        (combo, i) =>
+          `<span class="pk-chip" data-slot="${slot}" data-combo="${combo}" data-idx="${i}" title="点一下换成新键">${chipText(combo)}<span class="pk-del" data-slot="${slot}" data-idx="${i}" title="移除">✕</span></span>`
+      )
+      .join('');
+    return `<div class="pk-row" data-slot="${slot}"><span class="pk-name">${PANEL_SLOT_NAME[slot]}</span><span class="pk-keys">${chips}<button class="pk-add" data-add="${slot}" type="button">+ 添加</button></span></div>`;
+  }).join('');
+  refreshPanelKeyWarn();
 }
 
-function panelNavCombo(e) {
+function panelKeyCombo(e) {
   return (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '')
     + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
 }
 
-let navCapture = null;
+// pkCapture: { slot, idx }，idx 为 null 表示追加新键
+let pkCapture = null;
 
-for (const b of navButtons()) {
-  b.addEventListener('click', () => {
-    navCapture = slotOf(b);
-    for (const other of navButtons()) other.classList.remove('capturing');
-    b.classList.add('capturing');
-    b.innerHTML = '<span>按下新的键…</span>';
-  });
+function startPanelKeyCapture(slot, idx) {
+  pkCapture = { slot, idx };
+  const add = document.querySelector(`#panel-keys-list .pk-add[data-add="${slot}"]`);
+  if (add) add.classList.add('capturing');
+  const chip = idx == null ? null : document.querySelector(`#panel-keys-list .pk-chip[data-slot="${slot}"][data-idx="${idx}"]`);
+  if (chip) chip.classList.add('capturing');
+  toast('按下新的键，Esc 取消');
 }
 
+function stopPanelKeyCapture() {
+  pkCapture = null;
+  fillPanelKeys();
+}
+
+$('panel-keys-list').addEventListener('click', (e) => {
+  const del = e.target.closest('.pk-del');
+  if (del) {
+    e.stopPropagation();
+    const { slot, idx } = del.dataset;
+    if (slotCombos(slot).length <= 1) {
+      toast('每个方向至少留一个键');
+      return;
+    }
+    panelKeys[slot].splice(Number(idx), 1);
+    fillPanelKeys();
+    saveSettings({ panelKeys: { ...panelKeys } });
+    return;
+  }
+  const add = e.target.closest('.pk-add');
+  if (add) {
+    startPanelKeyCapture(add.dataset.add, null);
+    return;
+  }
+  const chip = e.target.closest('.pk-chip');
+  if (chip) startPanelKeyCapture(chip.dataset.slot, Number(chip.dataset.idx));
+});
+
 document.addEventListener('keydown', (e) => {
-  if (!navCapture) return;
-  if (e.key === 'Escape') { navCapture = null; fillPanelNav(); return; }
+  if (!pkCapture) return;
+  if (e.key === 'Escape') { stopPanelKeyCapture(); return; }
   if (e.key === 'Tab') return;
   if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
   e.preventDefault();
   if (e.key.length === 1 && !e.ctrlKey && !e.altKey) {
     toast('单字符会和搜索输入冲突，请用方向键或加 Ctrl/Alt');
-    navCapture = null;
-    fillPanelNav();
+    stopPanelKeyCapture();
     return;
   }
-  const combo = panelNavCombo(e);
-  const clash = NAV_SLOTS.find((s) => s !== navCapture && slotValue(s) === combo);
+  const combo = panelKeyCombo(e);
+  const { slot, idx } = pkCapture;
+  const clash = PANEL_SLOTS.some((s) =>
+    slotCombos(s).some((c, i) => c === combo && !(s === slot && i === idx))
+  );
   if (clash) {
     toast(`这个键已经绑给「${navLabel(combo)}」了`);
-    navCapture = null;
-    fillPanelNav();
+    stopPanelKeyCapture();
     return;
   }
-  const slot = navCapture;
-  if (slot === 'info') panelInfoKey = combo;
-  else panelNav[slot] = combo;
-  navCapture = null;
-  fillPanelNav();
-  saveSettings({ panelNav: { ...panelNav }, panelInfoKey });
+  if (idx == null) panelKeys[slot].push(combo);
+  else panelKeys[slot][idx] = combo;
+  stopPanelKeyCapture();
+  saveSettings({ panelKeys: { ...panelKeys } });
 }, true);
-
-$('set-panel-vim').addEventListener('change', (e) => {
-  panelVim = e.target.checked;
-  saveSettings({ panelVim });
-});
 
 /// 启动时从库里的 settings.json 读取；老用户的数据从 localStorage 迁移过去
 async function syncSettings() {
@@ -411,13 +447,22 @@ async function syncSettings() {
   if (typeof s.panelX === 'number') panelX = s.panelX;
   if (typeof s.panelY === 'number') panelY = s.panelY;
   if (s.panelSort) panelSort = s.panelSort;
-  if (s.panelNav && typeof s.panelNav === 'object') {
-    for (const dir of ['up', 'down', 'left', 'right']) {
-      if (typeof s.panelNav[dir] === 'string') panelNav[dir] = s.panelNav[dir];
+  if (s.panelKeys && typeof s.panelKeys === 'object') {
+    for (const slot of PANEL_SLOTS) {
+      if (!Array.isArray(s.panelKeys[slot])) continue;
+      const keys = s.panelKeys[slot].filter((k) => typeof k === 'string' && k);
+      if (keys.length) panelKeys[slot] = keys;
     }
+  } else if (s.panelNav && typeof s.panelNav === 'object') {
+    // 老设置：每方向一个键 + panelVim 开关，迁移成「多个键」的数组
+    const vimOk = s.panelVim !== false;
+    for (const slot of PANEL_SLOTS.slice(0, 4)) {
+      const legacy = typeof s.panelNav[slot] === 'string' ? s.panelNav[slot] : PANEL_SLOT_DEFAULTS[slot][0];
+      const alt = vimOk ? VIM_KEY[slot] : '';
+      panelKeys[slot] = alt && alt !== legacy ? [legacy, alt] : [legacy];
+    }
+    if (typeof s.panelInfoKey === 'string' && s.panelInfoKey) panelKeys.info = [s.panelInfoKey];
   }
-  if (typeof s.panelVim === 'boolean') panelVim = s.panelVim;
-  if (typeof s.panelInfoKey === 'string' && s.panelInfoKey) panelInfoKey = s.panelInfoKey;
   if (typeof s.recentLimit === 'number') recentLimit = s.recentLimit;
   if (typeof s.virtualize === 'boolean') virtualize = s.virtualize;
   if (Array.isArray(s.clipboardBlacklist)) clipboardBlacklist = s.clipboardBlacklist.slice();
@@ -2976,8 +3021,7 @@ async function openSettings() {
   $('panel-pos-y').value = panelY;
   $('set-panel-sort').value = panelSort;
   $('set-recent-limit').value = recentLimit;
-  fillPanelNav();
-  $('set-panel-vim').checked = panelVim;
+  fillPanelKeys();
 
   const isCustomView = startView.startsWith('group:');
   $('set-start-view').value = isCustomView ? 'custom' : startView;
@@ -5517,51 +5561,67 @@ async function runAcceptSuite() {
       [...document.querySelectorAll('#tab-general .set-row')].some((r) => r.hidden),
       'hidden rows'
     );
-    const navBtns = [...document.querySelectorAll('#panel-nav-keys .nav-key')];
+    applySettingsTab('keys');
+    await sleep(60);
+    const chips = [...document.querySelectorAll('#panel-keys-list .pk-chip')];
     check(
-      '面板导航键四条默认方向键',
-      navBtns.length === 4 && navBtns.map((b) => b.dataset.dir).join(',') === 'up,down,left,right'
-        && navBtns.every((b) => /Arrow(Up|Down|Left|Right)/.test(b.textContent)),
-      navBtns.map((b) => b.textContent.trim()).join('|')
+      '面板按键默认四方向 + Ctrl HJKL + 信息键',
+      chips.length === 9
+        && panelKeys.up.join(',') === 'ArrowUp,Ctrl+K'
+        && panelKeys.info.join(',') === 'Ctrl+Shift+K',
+      chips.map((c) => `${c.dataset.slot}:${c.dataset.combo}`).join('|')
     );
-    check('Ctrl+HJKL 默认开', $('set-panel-vim').checked === true);
-    const upBtn = navBtns.find((b) => b.dataset.dir === 'up');
-    upBtn.click();
+    const addUp = () => document.querySelector('#panel-keys-list .pk-add[data-add="up"]');
+    addUp().click();
     await sleep(40);
     send('k');
     await sleep(60);
     check(
-      '面板导航键拒绝单字符绑定',
-      upBtn.textContent.includes('ArrowUp') && !upBtn.classList.contains('capturing'),
-      upBtn.textContent.trim()
+      '面板按键拒绝单字符绑定',
+      panelKeys.up.join(',') === 'ArrowUp,Ctrl+K' && !document.querySelector('.pk-add.capturing'),
+      panelKeys.up.join(',')
     );
-    upBtn.click();
+    addUp().click();
     await sleep(40);
-    send('ArrowUp', { ctrlKey: true });
+    send('w', { ctrlKey: true, altKey: true });
     await sleep(60);
     check(
-      '面板导航键绑定 Ctrl+方向键',
-      upBtn.textContent.includes('Ctrl+ArrowUp') && upBtn.textContent.includes('↑'),
-      upBtn.textContent.trim()
+      '面板按键能给一个方向追加第二个键',
+      panelKeys.up.includes('Ctrl+Alt+W') && panelKeys.up.length === 3,
+      panelKeys.up.join(',')
     );
-    const infoBtn = $('panel-info-key');
-    check(
-      '查看信息键默认 Ctrl+Shift+K',
-      infoBtn.textContent.includes('Ctrl+Shift+K') && infoBtn.textContent.includes('K'),
-      infoBtn.textContent.trim()
-    );
-    infoBtn.click();
+    document.querySelector('#panel-keys-list .pk-chip[data-slot="info"]').click();
     await sleep(40);
     send('i', { ctrlKey: true, shiftKey: true });
     await sleep(60);
-    check('查看信息键能绑 Ctrl+Shift+字母', infoBtn.textContent.includes('Ctrl+Shift+I'), infoBtn.textContent.trim());
-    await invoke('patch_settings', { patch: { panelInfoKey: 'Ctrl+Shift+K' } });
-    panelInfoKey = 'Ctrl+Shift+K';
-    fillPanelNav();
-    await invoke('patch_settings', { patch: { panelNav: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' } } });
+    check('查看信息键能改绑 Ctrl+Shift+字母', panelKeys.info.join(',') === 'Ctrl+Shift+I', panelKeys.info.join(','));
+    document.querySelector('#panel-keys-list .pk-chip[data-slot="info"]').click();
+    await sleep(40);
+    send('k', { ctrlKey: true });
+    await sleep(60);
+    check('面板按键拒绝重复绑定', panelKeys.info.join(',') === 'Ctrl+Shift+I', panelKeys.info.join(','));
+    document.querySelector('#panel-keys-list .pk-chip[data-slot="up"][data-combo="Ctrl+Alt+W"] .pk-del').click();
+    await sleep(60);
+    check(
+      '面板按键能移除多余的键',
+      !panelKeys.up.includes('Ctrl+Alt+W') && panelKeys.up.length === 2,
+      panelKeys.up.join(',')
+    );
     const navSt = await invoke('get_settings');
-    check('面板导航键写进设置', navSt.panelNav && navSt.panelNav.up === 'ArrowUp', JSON.stringify(navSt.panelNav));
-    fillPanelNav();
+    check(
+      '面板按键写进设置',
+      Array.isArray(navSt.panelKeys?.up) && navSt.panelKeys.up.join(',') === 'ArrowUp,Ctrl+K',
+      JSON.stringify(navSt.panelKeys)
+    );
+    panelKeys = {
+      up: ['ArrowUp', 'Ctrl+K'],
+      down: ['ArrowDown', 'Ctrl+J'],
+      left: ['ArrowLeft', 'Ctrl+H'],
+      right: ['ArrowRight', 'Ctrl+L'],
+      info: ['Ctrl+Shift+K'],
+    };
+    fillPanelKeys();
+    await saveSettings({ panelKeys: { ...panelKeys } });
     await sleep(40);
     applySettingsTab('general');
     $('settings').hidden = true;
@@ -5933,9 +5993,9 @@ window.addEventListener('unhandledrejection', (e) => {
   }
   if (ui === 'settings:panelkeys') {
     await openSettings();
-    applySettingsTab('general');
+    applySettingsTab('keys');
     await new Promise((r) => setTimeout(r, 300));
-    const nav = $('panel-nav-keys');
+    const nav = $('panel-keys-list');
     if (nav) nav.scrollIntoView({ block: 'center' });
   }
   if (ui === 'settings:blacklist') {

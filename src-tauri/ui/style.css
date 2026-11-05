@@ -3059,3 +3059,30 @@ input[type="checkbox"]:checked {
 .nav-key .k { color: var(--dim); font-size: 11px; }
 .nav-warn { display: none; margin-top: 8px; color: var(--danger); font-size: 12px; }
 .nav-warn.show { display: block; }
+
+/* 快贴面板按键：每个方向一行，可挂多个键 */
+.pk-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.pk-row { display: flex; align-items: center; gap: 10px; }
+.pk-name { flex: 0 0 64px; font-size: 12.5px; color: var(--dim); }
+.pk-keys { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pk-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 6px 5px 9px; border-radius: 8px; font-size: 12px;
+  background: var(--surface-2); border: 1px solid var(--line-3); cursor: pointer;
+}
+.pk-chip:hover { background: var(--hover); }
+.pk-chip .k { color: var(--dim); font-size: 11px; }
+.pk-chip.dup { border-color: var(--danger); }
+.pk-chip.capturing { border-color: var(--accent); background: var(--active); color: var(--accent-fg); }
+.pk-del {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 4px; color: var(--dim);
+  font-size: 10px; line-height: 1;
+}
+.pk-del:hover { background: var(--danger); color: #fff; }
+.pk-add {
+  padding: 5px 9px; border-radius: 8px; font: inherit; font-size: 12px; cursor: pointer;
+  background: transparent; border: 1px dashed var(--line-3); color: var(--dim);
+}
+.pk-add:hover { color: var(--fg); border-color: var(--dim); }
+.pk-add.capturing { border-style: solid; border-color: var(--accent); color: var(--accent-fg); }

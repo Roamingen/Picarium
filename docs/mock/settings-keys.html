@@ -1,56 +1,38 @@
 <!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<title>StickerBox 设置 · 快贴面板按键</title>
+<title>快贴面板按键设置（预览）</title>
 <style>
   :root{
-    --bg:#14161a; --bg-2:#1b1e24; --surface:#0f1115; --surface-2:#232833;
-    --line:#2a2f38; --line-2:#333a47; --hover:#2a3140; --active:#26354d;
-    --fg:#e8eaed; --dim:#8b93a1; --dim-2:#5d6573; --accent:#6ea8fe; --accent-fg:#dce7ff;
-    --danger:#e06c75; --kbd-bg:#222833; --kbd-border:#333b48; --kbd-fg:#c8ced8;
-    --hairline:rgba(255,255,255,.04); --radius:8px;
+    --bg:#17191f; --surface:#1c1f26; --surface-2:#22262f; --hover:#262b35; --active:#2b3140;
+    --fg:#e6e8ee; --dim:#9aa3b2; --dim-2:#6d7789; --line:#2a2f3a; --line-2:#333a47; --line-3:#3c4453;
+    --accent:#4c9aff; --accent-fg:#0f1522; --danger:#ff6b6b; --kbd-bg:#242a35; --kbd-border:#3a4252; --kbd-fg:#cfd6e4;
   }
   *{box-sizing:border-box}
-  html,body{margin:0;min-height:100%}
-  body{
-    background:#0b0d10; color:var(--fg); font:13px/1.5 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-    padding:32px 20px 48px; display:flex; flex-direction:column; align-items:center; gap:16px;
-  }
-  .head{width:660px; color:var(--dim); font-size:12px}
-  .head b{color:var(--fg); font-size:14px; display:block; margin-bottom:3px}
-  .card{width:660px; background:var(--bg); border:1px solid var(--line-2); border-radius:12px; overflow:hidden}
-  .card > h3{
-    margin:0; padding:14px 18px 12px; font-size:13px; font-weight:600; color:var(--fg);
-    border-bottom:1px solid var(--hairline); letter-spacing:.2px;
-  }
-  .card > h3 span{font-weight:400; color:var(--dim); font-size:11.5px; margin-left:8px}
-  .row{display:flex; align-items:center; gap:14px; padding:11px 18px; border-bottom:1px solid var(--hairline)}
-  .row:last-child{border-bottom:0}
-  .row .label{width:96px; flex:none; color:var(--fg)}
-  .row .desc{flex:1; min-width:0; color:var(--dim); font-size:11.5px}
-  .keybtn{
-    flex:none; min-width:118px; display:inline-flex; align-items:center; justify-content:center; gap:8px;
-    padding:6px 12px; background:var(--surface-2); border:1px solid var(--line-2); border-radius:var(--radius);
-    color:var(--fg); font:12px/1.4 inherit; cursor:pointer; transition:border-color .12s, background .12s;
-  }
-  .keybtn:hover{background:var(--hover)}
-  .keybtn.capture{border-color:var(--accent); color:var(--accent-fg); background:var(--active)}
-  .keybtn.dup{border-color:var(--danger)}
-  .keybtn kbd{font-size:12px}
-  .warn{padding:0 18px 12px; margin:-4px 0 0; color:var(--danger); font-size:11.5px; display:none}
-  .warn.show{display:block}
+  body{margin:0; padding:28px 24px 48px; background:var(--bg); color:var(--fg); font:13px/1.65 "Segoe UI", "Microsoft YaHei UI", sans-serif; display:flex; flex-direction:column; align-items:center; gap:18px}
+  .head{width:660px; color:var(--dim); font-size:12.5px}
+  .head b{display:block; color:var(--fg); font-size:15px; font-weight:600; margin-bottom:6px}
+  .card{width:660px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:6px 18px 14px}
+  .sec{display:flex; align-items:center; gap:8px; padding:14px 0 6px; color:var(--dim); font-size:11.5px; letter-spacing:.02em}
+  .sec::after{content:""; flex:1; height:1px; background:var(--line)}
+  .row{display:flex; align-items:center; gap:10px; padding:7px 0}
+  .label{flex:0 0 74px; color:var(--dim); font-size:12.5px}
+  .chips{display:flex; align-items:center; gap:6px; flex-wrap:wrap; flex:1}
+  .chip{display:inline-flex; align-items:center; gap:6px; padding:4px 5px 4px 8px; border-radius:8px; background:var(--surface-2); border:1px solid var(--line-3); font-size:12px; cursor:pointer}
+  .chip:hover{background:var(--hover)}
+  .chip .k{color:var(--dim); font-size:11px}
+  .chip .x{display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:4px; color:var(--dim-2); font-size:10px}
+  .chip .x:hover{background:var(--danger); color:#fff}
+  .chip.dup{border-color:var(--danger)}
+  .chip.capturing,.add.capturing{border-color:var(--accent); background:var(--active); color:var(--accent-fg)}
+  .add{padding:4px 9px; border-radius:8px; font:inherit; font-size:12px; cursor:pointer; background:transparent; border:1px dashed var(--line-3); color:var(--dim)}
+  .add:hover{color:var(--fg); border-color:var(--dim)}
   kbd{display:inline-block; padding:1px 6px; border:1px solid var(--kbd-border); border-bottom-width:2px; border-radius:4px; background:var(--kbd-bg); color:var(--kbd-fg); font:11px/1.6 inherit}
-  .switch{position:relative; width:36px; height:20px; flex:none}
-  .switch input{position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; z-index:2}
-  .switch i{position:absolute; inset:0; border-radius:999px; background:#2b313c; transition:background .15s}
-  .switch i::after{content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#8b93a1; transition:transform .15s, background .15s}
-  .switch input:checked + i{background:var(--active)}
-  .switch input:checked + i::after{transform:translateX(16px); background:var(--accent)}
-  .preview{
-    width:660px; background:var(--surface); border:1px dashed var(--line-2); border-radius:12px; padding:12px 16px;
-    display:flex; align-items:center; gap:14px; color:var(--dim); font-size:11.5px;
-  }
+  .hintline{padding:10px 0 0; color:var(--dim-2); font-size:11.5px}
+  .warn{color:var(--danger); font-size:11.5px; padding-top:6px; display:none}
+  .warn.show{display:block}
+  .preview{width:660px; background:var(--surface); border:1px dashed var(--line-2); border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:14px; color:var(--dim); font-size:11.5px}
   .preview b{color:var(--fg); font-size:12px; font-weight:500}
   .preview .sp{flex:1}
   .note{width:660px; color:var(--dim-2); font-size:11.5px; margin-top:-4px}
@@ -59,23 +41,15 @@
 </head>
 <body>
   <div class="head">
-    <b>设置 › 快贴面板 › 导航键（预览）</b>
-    四个方向各绑一个键，默认就是方向键；Ctrl+HJKL 是额外的一组，默认开启。面板底栏提示只说当前真正生效的键。
+    <b>设置 › 按键 › 快贴面板按键设置（预览）</b>
+    四个方向各是一行，每行可以挂多个键；第一个键会显示在面板底栏。Ctrl+HJKL 只是默认的第二条绑定，删掉就没有了。
   </div>
 
   <div class="card">
-    <h3>导航键 <span>点一下按钮，然后按下新键（Esc 取消）</span></h3>
-    <div class="row"><span class="label">上</span><button class="keybtn" data-dir="up"><kbd>↑</kbd><span>ArrowUp</span></button><span class="desc">上一行 / 上一张</span></div>
-    <div class="row"><span class="label">下</span><button class="keybtn" data-dir="down"><kbd>↓</kbd><span>ArrowDown</span></button><span class="desc">下一行 / 下一张</span></div>
-    <div class="row"><span class="label">左</span><button class="keybtn" data-dir="left"><kbd>←</kbd><span>ArrowLeft</span></button><span class="desc">向左一格，到头停住</span></div>
-    <div class="row"><span class="label">右</span><button class="keybtn" data-dir="right"><kbd>→</kbd><span>ArrowRight</span></button><span class="desc">向右一格，到头停住</span></div>
-    <div class="row"><span class="label">查看信息</span><button class="keybtn" data-dir="info"><kbd>Ctrl+Shift+K</kbd><span>Ctrl+Shift+K</span></button><span class="desc">等效于鼠标停在该卡片上，再按收起</span></div>
-    <p class="warn" id="warn">两个功能绑到了同一个键，面板会分不清。</p>
-    <div class="row">
-      <span class="label">Ctrl+HJKL</span>
-      <span class="desc">额外的 vim 风格导航，默认开；底栏不显示它，只是能用</span>
-      <label class="switch"><input type="checkbox" id="vim" checked><i></i></label>
-    </div>
+    <div class="sec">快贴面板按键设置</div>
+    <div id="rows"></div>
+    <div class="hintline">点「+ 添加」再按新键会把键加到这一行；点键上的 ✕ 移除。单字符（比如 <kbd>k</kbd>）会和搜索输入冲突，请用方向键或加 Ctrl/Alt。</div>
+    <div class="warn" id="warn"></div>
   </div>
 
   <div class="preview">
@@ -85,56 +59,89 @@
   </div>
 
   <div class="note">
-    冲突在保存时才拦（<code>up == down</code> 之类），编辑过程中只标红不弹窗；按键支持 <code>Ctrl</code>/<code>Alt</code> 组合，单字符也收。
+    不同配列可以各配各的：<code>向上 = ↑ / Ctrl+W / Ctrl+Alt+U</code>，或者把方向键整个换掉只留 <code>Ctrl+HJKL</code>；同一行里先匹配到的键生效。
   </div>
 
 <script>
-const KEY_LABEL = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', ' ': 'Space' };
-const state = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', info: 'Ctrl+Shift+K', vim: true };
-let capturing = null;
+const SLOTS = [
+  ['up', '向上', ['ArrowUp', 'Ctrl+K']],
+  ['down', '向下', ['ArrowDown', 'Ctrl+J']],
+  ['left', '向左', ['ArrowLeft', 'Ctrl+H']],
+  ['right', '向右', ['ArrowRight', 'Ctrl+L']],
+  ['info', '查看信息', ['Ctrl+Shift+K']],
+];
+const SYM = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Space' };
+const label = (c) => c.split('+').map((k) => SYM[k] || (k.length === 1 ? k.toUpperCase() : k)).join('+');
+const state = Object.fromEntries(SLOTS.map(([slot, , keys]) => [slot, keys.slice()]));
 
-const btns = [...document.querySelectorAll('.keybtn')];
+let capturing = null; // {slot, idx|null}
+const rows = document.getElementById('rows');
 const warn = document.getElementById('warn');
 const hint = document.getElementById('hint');
-const vimBox = document.getElementById('vim');
 
-const short = (k) => KEY_LABEL[k] || (k.length === 1 ? k.toUpperCase() : k);
-const kbd = (k) => `<kbd>${short(k)}</kbd>`;
-
-function paint() {
-  for (const b of btns) {
-    const dir = b.dataset.dir;
-    const k = state[dir];
-    b.classList.toggle('capture', capturing === dir);
-    b.innerHTML = capturing === dir
-      ? '<span>按下新的键…</span>'
-      : `${kbd(k)}<span style="color:var(--dim)">${k}</span>`;
+function render() {
+  rows.innerHTML = SLOTS.map(([slot, name]) => `
+    <div class="row" data-slot="${slot}">
+      <span class="label">${name}</span>
+      <span class="chips">
+        ${state[slot].map((c, i) => `
+          <span class="chip" data-slot="${slot}" data-idx="${i}" title="点一下换成新键">
+            <kbd>${label(c)}</kbd>${label(c) === c ? '' : `<span class="k">${c}</span>`}
+            <span class="x" data-del="${slot}:${i}">✕</span>
+          </span>`).join('')}
+        <button class="add" data-add="${slot}" type="button">+ 添加</button>
+      </span>
+    </div>`).join('');
+  const used = {};
+  for (const [slot] of SLOTS) for (const c of state[slot]) used[c] = (used[c] || 0) + 1;
+  const dup = Object.values(used).some((n) => n > 1);
+  const empty = SLOTS.filter(([s]) => !state[s].length).map(([, n]) => n);
+  for (const el of rows.querySelectorAll('.chip')) if (used[state[el.dataset.slot][el.dataset.idx]] > 1) el.classList.add('dup');
+  const msgs = [];
+  if (dup) msgs.push('两个功能绑到了同一个键，面板会分不清');
+  if (empty.length) msgs.push(`${empty.map((n) => '「' + n + '」').join('、')}还没有绑定`);
+  warn.textContent = msgs.join('；');
+  warn.classList.toggle('show', msgs.length > 0);
+  hint.innerHTML = ['up', 'down', 'left', 'right'].map((s) => `<kbd>${label(state[s][0] || '—')}</kbd>`).join(' ') + ' 选择 <kbd>Enter</kbd> 复制 <kbd>Esc</kbd> 关闭';
+  if (capturing) {
+    const el = rows.querySelector(`.chip[data-slot="${capturing.slot}"][data-idx="${capturing.idx}"]`)
+      || rows.querySelector(`.add[data-add="${capturing.slot}"]`);
+    if (el) { el.classList.add('capturing'); if (el.classList.contains('chip')) el.querySelector('kbd').textContent = '按下新键…'; else el.textContent = '按下新键…'; }
   }
-  const vals = ['up', 'down', 'left', 'right', 'info'].map((d) => state[d]);
-  const dup = vals.length !== new Set(vals).size;
-  warn.classList.toggle('show', dup);
-  btns.forEach((b) => b.classList.toggle('dup', dup));
-
-  const parts = [`${kbd(state.up)}${kbd(state.down)}${kbd(state.left)}${kbd(state.right)} 选择`];
-  parts.push('<kbd>Enter</kbd> 复制', '<kbd>Esc</kbd> 关闭');
-  hint.innerHTML = parts.join(' &nbsp; ');
 }
 
-btns.forEach((b) => b.addEventListener('click', () => { capturing = b.dataset.dir; paint(); }));
-vimBox.addEventListener('change', () => { state.vim = vimBox.checked; paint(); });
-
-window.addEventListener('keydown', (e) => {
-  if (!capturing) return;
-  e.preventDefault();
-  if (e.key === 'Escape') { capturing = null; paint(); return; }
-  if (e.key === 'Tab' || e.key === 'Enter') return;
-  const combo = (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
-  state[capturing] = combo;
-  capturing = null;
-  paint();
+rows.addEventListener('click', (e) => {
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    const [slot, i] = del.dataset.del.split(':');
+    if (state[slot].length <= 1) { warn.textContent = '每个方向至少留一个键'; warn.classList.add('show'); return; }
+    state[slot].splice(Number(i), 1);
+    capturing = null;
+    render();
+    return;
+  }
+  const add = e.target.closest('[data-add]');
+  if (add) { capturing = { slot: add.dataset.add, idx: null }; render(); return; }
+  const chip = e.target.closest('.chip');
+  if (chip) { capturing = { slot: chip.dataset.slot, idx: Number(chip.dataset.idx) }; render(); }
 });
 
-paint();
+document.addEventListener('keydown', (e) => {
+  if (!capturing) return;
+  e.preventDefault();
+  if (e.key === 'Escape') { capturing = null; render(); return; }
+  if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+  if (e.key.length === 1 && !e.ctrlKey && !e.altKey) { warn.textContent = '单字符会和搜索输入冲突，请用方向键或加 Ctrl/Alt'; warn.classList.add('show'); capturing = null; render(); return; }
+  const combo = (e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + (e.key.length === 1 ? e.key.toUpperCase() : e.key);
+  const clash = SLOTS.some(([s]) => state[s].some((c, i) => c === combo && !(s === capturing.slot && i === capturing.idx)));
+  if (clash) { warn.textContent = `「${label(combo)}」已经绑给别的键了`; warn.classList.add('show'); capturing = null; render(); return; }
+  if (capturing.idx == null) state[capturing.slot].push(combo);
+  else state[capturing.slot][capturing.idx] = combo;
+  capturing = null;
+  render();
+}, true);
+
+render();
 </script>
 </body>
 </html>

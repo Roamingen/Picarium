@@ -42,14 +42,19 @@
     let panelSort = 'recent';
     let recentLimit = 60;
     let hoverDelay = 350;
-    let panelNav = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
-    let panelVim = true;
-    let panelInfoKey = 'Ctrl+Shift+K';
+    let panelKeys = {
+      up: ['ArrowUp', 'Ctrl+K'],
+      down: ['ArrowDown', 'Ctrl+J'],
+      left: ['ArrowLeft', 'Ctrl+H'],
+      right: ['ArrowRight', 'Ctrl+L'],
+      info: ['Ctrl+Shift+K'],
+    };
     let tagNames = [];
     let groupNames = [];
 
     const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-    const VIM = { h: 'left', l: 'right', k: 'up', j: 'down' };
+    const PANEL_SLOTS = ['up', 'down', 'left', 'right', 'info'];
+    const VIM_KEY = { up: 'Ctrl+K', down: 'Ctrl+J', left: 'Ctrl+H', right: 'Ctrl+L' };
     const KEY_SYM = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Space' };
 
     function keySym(k) {
@@ -61,9 +66,14 @@
       return String(combo).split('+').map(keySym).join('+');
     }
 
+    function slotKeys(slot) {
+      return Array.isArray(panelKeys[slot]) ? panelKeys[slot] : [];
+    }
+
     function paintFooter() {
+      // 底栏只显示每行第一个键，避免多个绑定时挤成一片
       const keys = ['up', 'down', 'left', 'right']
-        .map((d) => `<kbd>${keySym(panelNav[d])}</kbd>`)
+        .map((d) => `<kbd>${keySym(slotKeys(d)[0] || '—')}</kbd>`)
         .join(' ');
       navhint.innerHTML = `${keys} 选择`;
     }
@@ -76,10 +86,7 @@
     function dirFor(e) {
       const combo = comboOf(e);
       for (const d of ['up', 'down', 'left', 'right']) {
-        if (panelNav[d] === combo) return d;
-      }
-      if (panelVim && e.ctrlKey && !e.altKey && e.key.length === 1) {
-        return VIM[e.key.toLowerCase()] || null;
+        if (slotKeys(d).includes(combo)) return d;
       }
       return null;
     }
@@ -326,7 +333,7 @@
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); copy(); return; }
       if (e.key === 'Escape') { e.preventDefault(); invoke('hide_panel'); return; }
-      if (comboOf(e) === panelInfoKey) {
+      if (slotKeys('info').includes(comboOf(e))) {
         e.preventDefault();
         toggleInfo();
         return;
@@ -349,13 +356,22 @@
         if (st.panelSort) panelSort = st.panelSort;
         if (typeof st.recentLimit === 'number') recentLimit = st.recentLimit;
         if (typeof st.hoverDelay === 'number') hoverDelay = st.hoverDelay;
-        if (st.panelNav && typeof st.panelNav === 'object') {
-          for (const d of ['up', 'down', 'left', 'right']) {
-            if (typeof st.panelNav[d] === 'string') panelNav[d] = st.panelNav[d];
+        if (st.panelKeys && typeof st.panelKeys === 'object') {
+          for (const slot of PANEL_SLOTS) {
+            if (!Array.isArray(st.panelKeys[slot])) continue;
+            const keys = st.panelKeys[slot].filter((k) => typeof k === 'string' && k);
+            if (keys.length) panelKeys[slot] = keys;
           }
+        } else {
+          // 老设置：每方向一个键 + Ctrl HJKL 开关
+          const vimOk = st.panelVim !== false;
+          for (const slot of ['up', 'down', 'left', 'right']) {
+            const legacy = st.panelNav && typeof st.panelNav[slot] === 'string' ? st.panelNav[slot] : slotKeys(slot)[0];
+            const alt = vimOk ? VIM_KEY[slot] : '';
+            panelKeys[slot] = alt && alt !== legacy ? [legacy, alt] : [legacy];
+          }
+          if (typeof st.panelInfoKey === 'string' && st.panelInfoKey) panelKeys.info = [st.panelInfoKey];
         }
-        if (typeof st.panelVim === 'boolean') panelVim = st.panelVim;
-        if (typeof st.panelInfoKey === 'string' && st.panelInfoKey) panelInfoKey = st.panelInfoKey;
         if (st.theme) document.documentElement.dataset.theme = st.theme;
       } catch (_) {}
       paintFooter();

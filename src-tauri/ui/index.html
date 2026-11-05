@@ -401,33 +401,6 @@
       </div>
       <div class="set-row column">
         <div class="set-text">
-          <div class="set-label">面板导航键</div>
-          <div class="dim set-value">点按钮再按新键；单字符会和搜索输入冲突，请用方向键或加 Ctrl/Alt</div>
-        </div>
-        <div id="panel-nav-keys" class="nav-keys">
-          <button class="nav-key" data-dir="up" type="button"></button>
-          <button class="nav-key" data-dir="down" type="button"></button>
-          <button class="nav-key" data-dir="left" type="button"></button>
-          <button class="nav-key" data-dir="right" type="button"></button>
-        </div>
-        <div id="panel-nav-warn" class="nav-warn"></div>
-      </div>
-      <div class="set-row">
-        <div class="set-text">
-          <div class="set-label">Ctrl+HJKL 导航</div>
-          <div class="dim set-value">面板里额外支持 Ctrl+H/J/K/L；底栏不显示，免得挤</div>
-        </div>
-        <label class="switch"><input type="checkbox" id="set-panel-vim" /><span></span></label>
-      </div>
-      <div class="set-row">
-        <div class="set-text">
-          <div class="set-label">查看信息键</div>
-          <div class="dim set-value">等效于把鼠标停在当前卡片上；再按收起</div>
-        </div>
-        <button id="panel-info-key" class="nav-key" type="button"></button>
-      </div>
-      <div class="set-row column">
-        <div class="set-text">
           <div class="set-label">剪贴板黑名单</div>
           <div class="dim set-value">这些程序复制图片时不会被捕获；默认已屏蔽 Snipaste，带不带 .exe 都行</div>
         </div>
@@ -522,6 +495,12 @@
           <span class="dim">点「添加键」后按新键；连按两下字母可设序列（如 gg）。<kbd>dd</kbd> 在回收站里表示彻底删除。按 <kbd>?</kbd> 看完整速查。</span>
         </div>
         <div id="keymap-list" class="keymap-list"></div>
+        <div class="keys-section">快贴面板按键设置</div>
+        <div class="keys-head">
+          <span class="dim">每行可以绑多个键：点「+ 添加」再按新键，点键上的 ✕ 移除。面板底栏只显示每行的第一个键。Ctrl+HJKL 已作为方向键的第二个键，不需要可以删掉。</span>
+        </div>
+        <div id="panel-keys-list" class="pk-list"></div>
+        <div id="panel-keys-warn" class="nav-warn"></div>
       </div>
     </div>
   </div>
