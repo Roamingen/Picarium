@@ -808,6 +808,8 @@ fn main() {
             stickerbox_lib::commands::remove_group,
             mark_ungrouped_seen,
             stickerbox_lib::commands::tag_stats,
+            stickerbox_lib::commands::get_trash_days,
+            stickerbox_lib::commands::set_trash_days,
             stickerbox_lib::commands::trash_list,
             stickerbox_lib::commands::trash_restore,
             stickerbox_lib::commands::trash_delete,

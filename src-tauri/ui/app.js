@@ -548,6 +548,12 @@ function escapeHtml(s) {
 }
 
 function confirmDialog(text) {
+  const title = $('confirm-title');
+  if (title) {
+    title.hidden = true;
+    title.textContent = '';
+  }
+  $('confirm-ok').textContent = '确定';
   $('confirm-text').textContent = text;
   $('confirm').hidden = false;
   return new Promise((resolve) => {
@@ -920,6 +926,7 @@ function groupParam() {
 }
 
 async function refresh(q) {
+  paintTrashHint();
   if (currentGroup === '__trash__') {
     await loadTrash();
     return;
@@ -1152,7 +1159,7 @@ document.querySelector('main').addEventListener(
 );
 
 window.addEventListener('resize', () => {
-  if (grid.classList.contains('virtual')) renderVirtual(true);
+  if (currentGroup !== '__trash__' && grid.classList.contains('virtual')) renderVirtual(true);
 });
 
 function toggleSelect(sha, idx) {
@@ -1287,6 +1294,110 @@ $('select-mode').addEventListener('click', () => {
   updateBatchBar();
 });
 
+let trashDays = 7;
+const TRASH_PRESETS = [7, 30, 90];
+
+function trashAgeDays(it) {
+  const t = it.deleted_at ? new Date(it.deleted_at).getTime() : Date.now();
+  return Math.floor((Date.now() - t) / 86400000);
+}
+
+// 剩余天数：保留天数 − 已删除天数
+function daysLeftOf(it) {
+  return Math.max(0, trashDays - trashAgeDays(it));
+}
+
+function trashDueDate(it) {
+  const t = (it.deleted_at ? new Date(it.deleted_at).getTime() : Date.now()) + trashDays * 86400000;
+  const d = new Date(t);
+  const p2 = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+}
+
+function paintTrashHint() {
+  const hint = $('trash-hint');
+  if (!hint) return;
+  const on = currentGroup === '__trash__';
+  hint.hidden = !on;
+  if (on) {
+    const el = $('trash-hint-days');
+    if (el) el.textContent = String(trashDays);
+  }
+}
+
+/* 带标题/富文本的确认弹窗（复用 #confirm），返回 Promise<boolean> */
+function confirmHtml({ title = '', html = '', okText = '确定' } = {}) {
+  const t = $('confirm-title');
+  t.textContent = title;
+  t.hidden = !title;
+  $('confirm-text').innerHTML = html;
+  $('confirm-ok').textContent = okText;
+  $('confirm').hidden = false;
+  return new Promise((resolve) => {
+    confirmResolve = resolve;
+  });
+}
+
+function syncTrashDaysUI() {
+  const sel = $('set-trash-days');
+  if (sel) {
+    sel.value = TRASH_PRESETS.includes(trashDays) ? String(trashDays) : 'custom';
+    const wrap = $('set-trash-custom-wrap');
+    if (wrap) wrap.hidden = sel.value !== 'custom';
+    const num = $('set-trash-custom');
+    if (num) num.value = String(trashDays);
+  }
+  paintTrashHint();
+}
+
+async function applyTrashDays(next) {
+  next = Math.max(1, Math.min(365, Math.round(Number(next) || 0) || trashDays));
+  if (next === trashDays) return true;
+
+  if (next < trashDays) {
+    // 改小会真的清掉一批：先算清楚再问
+    const clear = (trashItems || []).filter((it) => trashAgeDays(it) >= next).length;
+    if (clear > 0) {
+      const ok = await confirmHtml({
+        title: `改成 ${next} 天？`,
+        html: `回收站里有 <b>${clear} 张</b>图会在下次启动时被清理。改大不受影响，改小才会清。`,
+        okText: `改成 ${next} 天`,
+      });
+      if (!ok) return false;
+    }
+  }
+
+  try {
+    await invoke('set_trash_days', { days: next });
+  } catch (err) {
+    toast('保存失败：' + err);
+    return false;
+  }
+  trashDays = next;
+  syncTrashDaysUI();
+  toast(`回收站保留 ${next} 天`);
+  if (currentGroup === '__trash__') await refresh();
+  return true;
+}
+
+$('set-trash-days').addEventListener('change', async (e) => {
+  if (e.target.value === 'custom') {
+    const wrap = $('set-trash-custom-wrap');
+    wrap.hidden = false;
+    const num = $('set-trash-custom');
+    num.focus();
+    num.select();
+    return;
+  }
+  const ok = await applyTrashDays(Number(e.target.value));
+  if (!ok) syncTrashDaysUI();
+});
+
+$('set-trash-custom').addEventListener('change', async (e) => {
+  const ok = await applyTrashDays(Number(e.target.value));
+  if (!ok) syncTrashDaysUI();
+});
+
 async function loadTrash() {
   hideTip();
   const items = await invoke('trash_list', {
@@ -1299,6 +1410,8 @@ async function loadTrash() {
   if (cursor >= items.length) cursor = Math.max(0, items.length - 1);
   trashSelected.clear();
   $('trashbar').hidden = true;
+  // 回收站不用虚拟滚动：否则 resize/滚动会走 renderVirtual，把角标和 EVA 框重建掉
+  grid.classList.remove('virtual');
   grid.innerHTML = '';
   empty.style.display = items.length ? 'none' : 'block';
   const p = empty.querySelector('p');
@@ -1316,6 +1429,20 @@ async function loadTrash() {
     img.onerror = () => img.remove();
     el.appendChild(img);
 
+    const left = daysLeftOf(it);
+    if (left <= 1) {
+      el.classList.add('dying');
+      const frame = document.createElement('span');
+      frame.className = 'dying-frame';
+      frame.innerHTML =
+        '<i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>' +
+        '<span class="dying-ribbon"><i class="dot"></i>即将删除</span>';
+      el.appendChild(frame);
+    }
+    const badge = document.createElement('span');
+    badge.className = 'days-badge' + (left <= 1 ? ' danger' : left <= 3 ? ' soon' : '');
+    badge.textContent = left <= 1 ? '今天清理' : `还剩 ${left} 天`;
+    el.appendChild(badge);
 
     let hoverTimer = null;
     el.addEventListener('mouseenter', (e) => {
@@ -1776,6 +1903,12 @@ function showTip(a, e) {
     <div class="tip-row">${escapeHtml(a.ext.toUpperCase())} · 导入于 ${fmtDate(a.added_at)}</div>
     <div class="tip-row">来源：${escapeHtml(friendlySource(a))}</div>
     <div class="tip-row">分组：${escapeHtml(groups)}</div>
+    ${currentGroup === '__trash__' && a.deleted_at ? (() => {
+      const left = daysLeftOf(a);
+      return left <= 1
+        ? '<div class="tip-row tip-trash danger">回收站：今天就会被清理（下次启动时删除）</div>'
+        : `<div class="tip-row tip-trash">回收站：还剩 ${left} 天（${trashDueDate(a)} 到期清理）</div>`;
+    })() : ''}
     <div class="tip-tags">${escapeHtml(tags)}</div>
   `;
   tip.classList.add('show');
@@ -3033,6 +3166,7 @@ async function openSettings() {
   $('set-star-color').value = starColor;
   $('set-hover-delay').value = hoverDelay;
   $('set-delete-mode').value = deleteMode;
+  syncTrashDaysUI();
   $('ghost-x').value = ghostX;
   $('ghost-y').value = ghostY;
   $('set-version').textContent = `StickerBox v${s.version}`;
@@ -3160,6 +3294,7 @@ const SETTING_TAB_BY_LABEL = {
   滚动留白: 'appearance',
   表情库位置: 'data',
   彻底删除时: 'data',
+  回收站保留: 'data',
   设置备份: 'data',
 };
 
@@ -5542,6 +5677,14 @@ async function runAcceptSuite() {
     check('回收站可勾选', trashSelected.size === 1, `sel=${trashSelected.size}`);
     await press('q');
     check('q 退出回收站多选', trashSelected.size === 0 && $('trashbar').hidden, `sel=${trashSelected.size}`);
+    const tBadge = grid.querySelector('.trash-card .days-badge');
+    check(
+      '回收站卡片显示剩余天数',
+      !!tBadge && /还剩 \d+ 天|今天清理/.test(tBadge.textContent || ''),
+      tBadge ? tBadge.textContent : '无角标'
+    );
+    const tHint = $('trash-hint');
+    check('回收站顶部提示保留天数', !tHint.hidden && tHint.textContent.includes(String(trashDays)), tHint.textContent.trim());
 
     assetFilters.maxBytes = 1;
     await refresh();
@@ -5634,6 +5777,27 @@ async function runAcceptSuite() {
     await invoke('patch_settings', { patch: { selftestFlag: 42 } });
     const st = await invoke('get_settings');
     check('设置写入并可读回', st.selftestFlag === 42, `flag=${st.selftestFlag}`);
+
+    // 回收站保留天数：改大直接生效，改小先确认
+    await openSettings();
+    await sleep(120);
+    const selDays = $('set-trash-days');
+    selDays.value = '30';
+    selDays.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(320);
+    check('保留天数改大直接生效', (await invoke('get_trash_days')) === 30 && $('confirm').hidden, 'days=' + (await invoke('get_trash_days')));
+    selDays.value = '7';
+    selDays.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(320);
+    check('改小但没图会被清时不打扰', $('confirm').hidden === true && (await invoke('get_trash_days')) === 7, 'days=' + (await invoke('get_trash_days')));
+
+    const confirmP = confirmHtml({ title: '改成 7 天？', html: '回收站里有 <b>2 张</b>图会在下次启动时被清理。', okText: '改成 7 天' });
+    await sleep(90);
+    const shown = !$('confirm').hidden && $('confirm-title').textContent === '改成 7 天？' && $('confirm-text').textContent.includes('2 张');
+    $('confirm-cancel').click();
+    const cancelled = (await confirmP) === false;
+    check('改小会清图时先弹确认', shown && cancelled, `shown=${shown} cancel=${cancelled}`);
+    $('settings').hidden = true;
 
     await selectGroup('__star__');
     check('切到收藏', currentGroup === '__star__', currentGroup);
@@ -5927,6 +6091,11 @@ window.addEventListener('unhandledrejection', (e) => {
   enhanceNumberInputs();
   if (!Object.keys(keymap).length) buildKeymap({});
   await syncSettings();
+  try {
+    trashDays = (await invoke('get_trash_days')) || 7;
+  } catch (_) {
+    trashDays = 7;
+  }
   await syncClipButton();
   showFooterTip();
   syncClear();

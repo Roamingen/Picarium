@@ -3086,3 +3086,126 @@ input[type="checkbox"]:checked {
 }
 .pk-add:hover { color: var(--fg); border-color: var(--dim); }
 .pk-add.capturing { border-style: solid; border-color: var(--accent); color: var(--accent-fg); }
+
+/* ---------- 回收站：剩余天数 / EVA 即将删除框 ---------- */
+
+.trash-hint {
+  padding: 8px 18px 0 194px; /* 侧栏 176 + 网格内边距，跟卡片左缘对齐 */
+  color: var(--dim-2);
+  font-size: 11.5px;
+}
+.trash-hint b {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.days-badge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: #cfd6e4;
+  background: rgba(10, 12, 16, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+.days-badge.soon {
+  color: #ffd8a8;
+  border-color: rgba(240, 179, 94, 0.5);
+}
+.days-badge.danger {
+  color: #ffd0d3;
+  border-color: rgba(255, 47, 61, 0.6);
+  background: rgba(60, 10, 14, 0.72);
+}
+
+.trash-card.dying {
+  box-shadow:
+    0 0 0 1.5px #ff2f3d,
+    0 0 22px -6px rgba(255, 47, 61, 0.75);
+}
+
+.dying-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+}
+.dying-frame::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(255, 47, 61, 0.11) 0 6px,
+    rgba(255, 47, 61, 0) 6px 12px
+  );
+}
+.dying-frame .c {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border: 2px solid #ff2f3d;
+}
+.dying-frame .c.tl { left: 2px; top: 2px; border-right: 0; border-bottom: 0; }
+.dying-frame .c.tr { right: 2px; top: 2px; border-left: 0; border-bottom: 0; }
+.dying-frame .c.bl { left: 2px; bottom: 2px; border-right: 0; border-top: 0; }
+.dying-frame .c.br { right: 2px; bottom: 2px; border-left: 0; border-top: 0; }
+
+.dying-ribbon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #fff;
+  background: linear-gradient(90deg, #ff2f3d 0 62%, rgba(255, 47, 61, 0.12) 62% 100%);
+}
+.dying-ribbon .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #fff;
+  animation: dying-blink 1.1s steps(1) infinite;
+}
+@keyframes dying-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0.15; }
+}
+
+/* 设置里的保留天数 */
+.trash-days {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trash-custom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.trash-custom[hidden] { display: none; }
+
+/* 确认弹窗：盖在设置面板之上 */
+#confirm.modal-mask { z-index: 130; }
+.confirm-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.confirm-title[hidden] { display: none; }
+#confirm .confirm-text b { color: var(--danger); }
+.tip-row.tip-trash { color: var(--warn); }
+.tip-row.tip-trash.danger { color: #ff8a8f; }
