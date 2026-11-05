@@ -806,21 +806,44 @@ body { overflow-x: hidden; overflow-y: auto; }
 .sheet-body { max-height: 62vh; overflow-y: auto; padding-bottom: calc(18px + var(--safe-bottom)); }
 
 /* ---------- 回收站 ---------- */
-.tg { grid-template-columns: repeat(2, 1fr); }
+.tg { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .titem {
-  position: relative;
+  position: relative; min-width: 0;
   display: flex; flex-direction: column; gap: 6px; text-align: left;
   background: var(--surface3); border: 1px solid var(--line);
   border-radius: 14px; padding: 8px; color: var(--fg);
 }
 .titem:active { transform: scale(.98); }
 .tthumb {
+  position: relative;
   display: block; width: 100%; aspect-ratio: 1; overflow: hidden;
   border-radius: 10px; background: var(--surface2);
 }
 .tthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.tname { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tname { min-width: 0; font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tsub { font-size: 11px; color: var(--dim); }
+.tsub.soon { color: #e3b341; }
+.tsub.danger { color: #ff5a63; font-weight: 600; }
+/* 一天内到期：EVA 红框 + 斜纹 + 顶部红条 */
+.titem.dying .tthumb {
+  outline: 1.5px solid #ff2f3d; outline-offset: -1.5px;
+  box-shadow: 0 0 18px -6px rgba(255, 47, 61, .9);
+}
+.titem.dying .tthumb::after {
+  content: ""; position: absolute; inset: 0; border-radius: 10px; pointer-events: none;
+  background: repeating-linear-gradient(45deg, rgba(255, 47, 61, .16) 0 6px, transparent 6px 12px);
+}
+.eva-tag {
+  position: absolute; left: 0; top: 0; z-index: 1;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px; border-radius: 10px 0 10px 0;
+  background: #ff2f3d; color: #fff; font-size: 9.5px; font-weight: 700; letter-spacing: .3px;
+}
+.eva-tag i { width: 5px; height: 5px; border-radius: 50%; background: #fff; animation: eva-blink 1.2s steps(2, end) infinite; }
+@keyframes eva-blink { 50% { opacity: .15; } }
+.mdays { display: flex; align-items: center; gap: 8px; margin: 4px 0 2px; }
+.mdays input { flex: 1; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface2); color: var(--fg); font-size: 16px; }
+.mdays span { font-size: 13px; color: var(--dim); }
 
 /* ---------- 我的 ---------- */
 .ghead .mgt { margin-left: auto; }

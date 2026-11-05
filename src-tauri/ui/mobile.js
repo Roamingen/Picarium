@@ -2407,9 +2407,13 @@ function batchSingle(act) {
 }
 
 /* 置顶管理：置顶哪些 + 显示几个 */
-function daysLeft(item) {
+function trashAgeDays(item) {
   const t = item.deleted_at ? new Date(item.deleted_at).getTime() : Date.now();
-  return Math.max(0, TRASH_DAYS - Math.floor((Date.now() - t) / 86400000));
+  return Math.floor((Date.now() - t) / 86400000);
+}
+
+function daysLeft(item) {
+  return Math.max(0, TRASH_DAYS - trashAgeDays(item));
 }
 
 async function loadTrash() {
@@ -2425,20 +2429,23 @@ async function loadTrash() {
   S.trashItems = items;
   $("btn-tfilter").classList.toggle("active", hasFilters(S.tFilters));
   $("tcount").textContent = items.length ? ` ${items.length} 张` : "";
-  $("trash-meta").textContent = `删除的图片会在这里保留 ${TRASH_DAYS} 天，期间可以恢复或彻底删除。`;
+  $("trash-meta").textContent = `删除的图片会在这里保留 ${TRASH_DAYS} 天，期间可以恢复或彻底删除，到期后下次启动自动清理。`;
   if (!items.length) {
     grid.innerHTML = `<div class="empty">回收站是空的。<br><small>删除的表情会先放这里，${TRASH_DAYS} 天后自动清理。</small></div>`;
     return;
   }
   grid.innerHTML = items
-    .map(
-      (it) => `<button class="titem${trashSel.has(it.sha) ? " sel" : ""}" data-sha="${escapeAttr(it.sha)}">
+    .map((it) => {
+      const d = daysLeft(it);
+      const dying = d <= 1;
+      const sub = d <= 0 ? "今天清理" : `${d} 天后清理`;
+      return `<button class="titem${trashSel.has(it.sha) ? " sel" : ""}${dying ? " dying" : ""}" data-sha="${escapeAttr(it.sha)}">
         <span class="tcheck">${SVG.check}</span>
-        <span class="tthumb"><img src="${thumbUrl(it.sha)}" alt="" loading="lazy" onerror="this.remove()"></span>
+        <span class="tthumb">${dying ? `<span class="eva-tag"><i></i>即将删除</span>` : ""}<img src="${thumbUrl(it.sha)}" alt="" loading="lazy" onerror="this.remove()"></span>
         <span class="tname">${escapeHtml(it.name || "未命名")}</span>
-        <span class="tsub">${daysLeft(it)} 天后清理</span>
-      </button>`
-    )
+        <span class="tsub${d <= 1 ? " danger" : d <= 3 ? " soon" : ""}">${sub}</span>
+      </button>`;
+    })
     .join("");
 }
 
@@ -2567,7 +2574,15 @@ function applyPrefs() {
 function renderMe() {
   $("me-home").textContent = (S.stats && S.stats.root) || "—";
   $("me-inbox-n").textContent = S.sharedPaths.length ? `${S.sharedPaths.length} 张待整理` : "0 个待整理";
-  for (const b of document.querySelectorAll("#seg-trash button")) b.classList.toggle("on", Number(b.dataset.days) === TRASH_DAYS);
+  for (const b of document.querySelectorAll("#seg-trash button")) {
+    if (b.dataset.custom) {
+      const custom = ![7, 30, 90].includes(TRASH_DAYS);
+      b.classList.toggle("on", custom);
+      b.textContent = custom ? `${TRASH_DAYS} 天` : "自定义";
+    } else {
+      b.classList.toggle("on", Number(b.dataset.days) === TRASH_DAYS);
+    }
+  }
   const theme = localStorage.getItem("sb.theme") || "auto";
   for (const b of document.querySelectorAll("#seg-theme button")) b.classList.toggle("on", b.dataset.theme === theme);
   const cols = String(Number(localStorage.getItem("sb.cols")) || 3);
@@ -3269,18 +3284,68 @@ $("seg-pinrows").addEventListener("click", (e) => {
   renderMe();
   renderPins();
 });
-$("seg-trash").addEventListener("click", async (e) => {
-  const b = e.target.closest("button[data-days]");
-  if (!b) return;
+async function applyTrashDays(next) {
+  next = Math.max(1, Math.min(365, Math.round(Number(next) || 7)));
+  if (next === TRASH_DAYS) return true;
+  // 改小时先算有几张会被清，真有才问——和桌面端同一套语义
+  if (next < TRASH_DAYS) {
+    let items = [];
+    try {
+      items = await invokeRetry("trash_list", { q: null, filters: null });
+    } catch {}
+    const hit = items.filter((it) => trashAgeDays(it) >= next).length;
+    if (hit) {
+      const ok = await confirmSheet(
+        `改成 ${next} 天？回收站里有 ${hit} 张图已经超过 ${next} 天，下次启动会被清理。`,
+        "回收站保留",
+        `改成 ${next} 天`
+      );
+      if (!ok) return false;
+    }
+  }
   try {
-    await invoke("set_trash_days", { days: Number(b.dataset.days) });
-    TRASH_DAYS = Number(b.dataset.days);
+    await invoke("set_trash_days", { days: next });
+    TRASH_DAYS = next;
     renderMe();
-    toast(`回收站保留 ${TRASH_DAYS} 天`);
+    toast(`回收站保留 ${next} 天`);
     if (S.tab === "trash") await loadTrash();
+    return true;
   } catch (err) {
     toast("保存失败：" + err);
+    return false;
   }
+}
+
+function openTrashDaysSheet() {
+  openSheet(
+    "回收站保留",
+    `<div class="mdays"><input id="trash-days-input" type="number" inputmode="numeric" min="1" max="365" value="${TRASH_DAYS}"><span>天</span></div>
+     <div class="snote">到期后下次启动自动清理；改小时会先告诉你有几张要清。</div>
+     ${sheetActions("保存", "trash-days-ok")}`
+  );
+  const input = $("trash-days-input");
+  input.focus();
+  input.select();
+  $("sheet-body").onclick = async (e) => {
+    if (e.target.id === "sheet-cancel") {
+      sheetResolve = null;
+      closeSheet();
+      return;
+    }
+    if (e.target.id !== "trash-days-ok") return;
+    const v = Number(input.value);
+    if (!(v >= 1 && v <= 365)) return toast("保留天数要在 1–365 之间");
+    sheetResolve = null;
+    closeSheet();
+    await applyTrashDays(v);
+  };
+}
+
+$("seg-trash").addEventListener("click", async (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.custom) return openTrashDaysSheet();
+  if (b.dataset.days) await applyTrashDays(Number(b.dataset.days));
 });
 
 $("sel-close").addEventListener("click", () => setImgSelMode(false));
