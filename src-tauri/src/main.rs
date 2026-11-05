@@ -336,27 +336,6 @@ fn set_clip_hotkey(
 }
 
 #[tauri::command]
-fn batch_tags(
-    state: State<'_, AppState>,
-    shas: Vec<String>,
-    tags: Vec<String>,
-) -> Result<usize, String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.add_tags(&shas, tags).map_err(|e| format!("{e:#}"))
-}
-
-
-#[tauri::command]
-fn batch_untag(
-    state: State<'_, AppState>,
-    shas: Vec<String>,
-    tags: Vec<String>,
-) -> Result<(), String> {
-    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-    lib.remove_tags(&shas, &tags).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
 fn batch_delete(state: State<'_, AppState>, shas: Vec<String>) -> Result<usize, String> {
     let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
     let mut n = 0;
@@ -809,8 +788,7 @@ fn main() {
             import_settings,
             set_order,
             stickerbox_lib::commands::batch_star,
-            batch_tags,
-            batch_untag,
+            stickerbox_lib::commands::add_tags,
             stickerbox_lib::commands::remove_tags,
             stickerbox_lib::commands::set_asset_tags,
             stickerbox_lib::commands::create_tag,

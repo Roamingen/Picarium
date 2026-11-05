@@ -4201,7 +4201,7 @@ function openBatchPanel(kind, opts = {}) {
     try {
       if (n === m) {
         if (isGroup) await invoke('batch_ungroup', { shas, group: name });
-        else await invoke('batch_untag', { shas, tags: [name] });
+        else await invoke('remove_tags', { shas, tags: [name] });
         for (const s of shas) {
           const st = setOf(s);
           if (st) (isGroup ? st.groups : st.tags).delete(name);
@@ -4210,7 +4210,7 @@ function openBatchPanel(kind, opts = {}) {
         const miss = shas.filter((s) => !hasSet(s, name));
         if (!miss.length) return;
         if (isGroup) await invoke('add_to_group', { shas: miss, group: name });
-        else await invoke('batch_tags', { shas: miss, tags: [name] });
+        else await invoke('add_tags', { shas: miss, tags: [name] });
         for (const s of shas) {
           const st = setOf(s);
           if (st) (isGroup ? st.groups : st.tags).add(name);
@@ -4227,7 +4227,7 @@ function openBatchPanel(kind, opts = {}) {
     if (!nm) return;
     try {
       if (isGroup) await invoke('add_to_group', { shas, group: nm });
-      else await invoke('batch_tags', { shas, tags: [nm] });
+      else await invoke('add_tags', { shas, tags: [nm] });
       for (const s of shas) {
         const st = setOf(s);
         if (st) (isGroup ? st.groups : st.tags).add(nm);
@@ -5228,7 +5228,7 @@ async function runAcceptSuite() {
     check('筛选面板关闭按钮可用', $('filter-panel').hidden);
 
     // 标签筛选
-    await invoke('batch_tags', { shas: [shownItems[0].sha], tags: ['验收标签'] });
+    await invoke('add_tags', { shas: [shownItems[0].sha], tags: ['验收标签'] });
     await loadGroups();
     await openFilterPanel();
     const tagInput = $('f-tags').querySelector('.picker-input');
