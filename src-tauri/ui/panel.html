@@ -12,7 +12,7 @@
         <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2" />
         <line x1="15.5" y1="15.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
       </svg>
-      <input id="q" class="panel-search" placeholder="搜索：中文 / 拼音 / 首字母…" autocomplete="off" spellcheck="false" />
+      <input id="q" class="panel-search" placeholder="搜索：中文 / 拼音；#标签 @分组" autocomplete="off" spellcheck="false" />
       <span id="count" class="panel-count"></span>
     </div>
 
@@ -45,6 +45,8 @@
     let panelNav = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' };
     let panelVim = true;
     let panelInfoKey = 'Ctrl+Shift+K';
+    let tagNames = [];
+    let groupNames = [];
 
     const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
     const VIM = { h: 'left', l: 'right', k: 'up', j: 'down' };
@@ -240,8 +242,77 @@
       }
     }
 
-    async function search(q) {
-      items = await invoke('list_assets', { q, limit: recentLimit, sort: panelSort });
+    // 面板搜索语法：#标签、@分组，都按前缀匹配；前缀没命中就退回普通文字搜索。
+    // 前缀命中多个（#浏 → 浏览 / 浏览器）算 OR；多个 token 之间 AND；- 前缀表示排除。
+    function parseQuery(raw) {
+      const out = { q: '', extra: [], tagGroups: [], notTags: [], groupGroups: [], notGroups: [] };
+      const free = [];
+      for (const w of String(raw).trim().split(/\s+/).filter(Boolean)) {
+        let neg = false;
+        let s = w;
+        if (s.startsWith('-') && s.length > 1) {
+          neg = true;
+          s = s.slice(1);
+        }
+        let kind = '';
+        if (s.startsWith('#')) {
+          kind = 'tag';
+          s = s.slice(1);
+        } else if (s.startsWith('@')) {
+          kind = 'group';
+          s = s.slice(1);
+        }
+        if (!kind) {
+          free.push(w);
+          continue;
+        }
+        if (!s) continue; // 刚敲下 # / @，先不筛选
+        const pool = kind === 'tag' ? tagNames : groupNames;
+        const low = s.toLowerCase();
+        const hits = pool.filter((n) => n.toLowerCase().startsWith(low));
+        if (!hits.length) {
+          if (neg) continue; // 排除项没命中，等于什么都没排
+          free.push(w); // 前缀没命中 → 当普通文字搜
+          continue;
+        }
+        if (neg) {
+          const bucket = kind === 'tag' ? out.notTags : out.notGroups;
+          for (const h of hits) if (!bucket.includes(h)) bucket.push(h);
+        } else {
+          (kind === 'tag' ? out.tagGroups : out.groupGroups).push(hits);
+        }
+      }
+      out.q = free[0] || '';
+      out.extra = free.slice(1);
+      return out;
+    }
+
+    async function loadFacets() {
+      try {
+        const [ts, gs] = await Promise.all([invoke('tag_stats'), invoke('group_stats')]);
+        tagNames = (ts || []).map((t) => t.name).filter(Boolean);
+        groupNames = ((gs && gs.groups) || []).map((g) => g.name).filter(Boolean);
+      } catch (_) {}
+    }
+
+    async function search(raw) {
+      const parsed = parseQuery(raw);
+      const filters = {};
+      if (parsed.tagGroups.length) filters.tagGroups = parsed.tagGroups;
+      if (parsed.notTags.length) filters.notTags = parsed.notTags;
+      if (parsed.groupGroups.length) filters.groupGroups = parsed.groupGroups;
+      if (parsed.notGroups.length) filters.notGroups = parsed.notGroups;
+      const args = { q: parsed.q, limit: recentLimit, sort: panelSort };
+      if (Object.keys(filters).length) args.filters = JSON.stringify(filters);
+      items = await invoke('list_assets', args);
+      // q 只吃第一个自由词，多出来的词在这里做 AND，名字/拼音/首字母都认
+      if (parsed.extra.length) {
+        const words = parsed.extra.map((w) => w.toLowerCase());
+        items = items.filter((a) => words.every((w) => {
+          const name = String(a.name || '').toLowerCase();
+          return name.includes(w) || String(a.py || '').includes(w) || String(a.py_abbr || '').includes(w);
+        }));
+      }
       cursor = 0;
       render();
     }
@@ -293,6 +364,7 @@
     window.__TAURI__.event.listen('panel-open', async () => {
       input.value = '';
       await applySettings();
+      await loadFacets();
       await search('');
       input.focus();
       input.select();
@@ -300,6 +372,7 @@
 
     (async () => {
       await applySettings();
+      await loadFacets();
       input.focus();
       search('');
     })();

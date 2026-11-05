@@ -232,6 +232,13 @@ pub struct AssetFilters {
     max_h: Option<u32>,
     exts: Vec<String>,
     tags: Vec<String>,
+    /// 面板的 # 搜索：每组内任一命中即可，组间是 AND
+    tag_groups: Vec<Vec<String>>,
+    /// 面板的 -# 排除
+    not_tags: Vec<String>,
+    /// 面板的 @ 搜索：同上
+    group_groups: Vec<Vec<String>>,
+    not_groups: Vec<String>,
     source: String,
     source_keys: Vec<String>,
     from: String,
@@ -277,6 +284,38 @@ pub fn parse_filters(v: Option<serde_json::Value>) -> AssetFilters {
                 .collect()
         })
         .unwrap_or_default();
+    let str_list = |k: &str| {
+        obj.get(k)
+            .and_then(|x| x.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|e| e.as_str())
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+            })
+            .unwrap_or_default()
+    };
+    let group_list = |k: &str| {
+        obj.get(k)
+            .and_then(|x| x.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|g| g.as_array())
+                    .map(|g| {
+                        g.iter()
+                            .filter_map(|e| e.as_str())
+                            .map(|s| s.to_string())
+                            .collect::<Vec<String>>()
+                    })
+                    .filter(|v| !v.is_empty())
+                    .collect::<Vec<Vec<String>>>()
+            })
+            .unwrap_or_default()
+    };
+    f.tag_groups = group_list("tagGroups");
+    f.not_tags = str_list("notTags");
+    f.group_groups = group_list("groupGroups");
+    f.not_groups = str_list("notGroups");
     f.source = text("source");
     f.source_keys = obj
         .get("sourceKeys")
@@ -332,6 +371,29 @@ pub fn apply_filters(list: Vec<Asset>, f: &AssetFilters) -> Vec<Asset> {
                 return false;
             }
             if !f.tags.is_empty() && !f.tags.iter().all(|t| a.tags.iter().any(|x| x == t)) {
+                return false;
+            }
+            // 面板的 #/@ 语法：一组前缀命中的名字之间 OR，多个 token 之间 AND
+            if !f.tag_groups.is_empty()
+                && !f
+                    .tag_groups
+                    .iter()
+                    .all(|g| g.iter().any(|t| a.tags.iter().any(|x| x == t)))
+            {
+                return false;
+            }
+            if f.not_tags.iter().any(|t| a.tags.iter().any(|x| x == t)) {
+                return false;
+            }
+            if !f.group_groups.is_empty()
+                && !f
+                    .group_groups
+                    .iter()
+                    .all(|g| g.iter().any(|x| a.groups.iter().any(|y| y == x)))
+            {
+                return false;
+            }
+            if f.not_groups.iter().any(|g| a.groups.iter().any(|x| x == g)) {
                 return false;
             }
             if !f.source.is_empty() && a.source != f.source {

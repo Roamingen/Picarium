@@ -5435,6 +5435,31 @@ async function runAcceptSuite() {
     await loadGroups();
     await selectGroup('验收组');
     check('进入验收组', currentGroup === '验收组', currentGroup);
+
+    // 面板 #/@ 语法背后的过滤：组内 OR、组间 AND、- 排除
+    const tagShas = shownItems.slice(0, 2).map((a) => a.sha);
+    await invoke('add_tags', { shas: tagShas, tags: ['标签过滤甲'] });
+    const tagHit = await invoke('list_assets', {
+      q: '', group: null, limit: 200, sort: '',
+      filters: JSON.stringify({ tagGroups: [['标签过滤甲']] }),
+    });
+    check('过滤：tagGroups 命中标签', tagHit.length === 2 && tagHit.every((a) => a.tags.includes('标签过滤甲')), `n=${tagHit.length}`);
+    const tagMiss = await invoke('list_assets', {
+      q: '', group: null, limit: 200, sort: '',
+      filters: JSON.stringify({ notTags: ['标签过滤甲'] }),
+    });
+    check('过滤：notTags 排除标签', tagMiss.length > 0 && tagMiss.every((a) => !a.tags.includes('标签过滤甲')), `n=${tagMiss.length}`);
+    await invoke('delete_tag', { name: '标签过滤甲' });
+    const grpHit = await invoke('list_assets', {
+      q: '', group: null, limit: 200, sort: '',
+      filters: JSON.stringify({ groupGroups: [['验收组']] }),
+    });
+    check('过滤：groupGroups 命中分组', grpHit.length === 3 && grpHit.every((a) => a.groups.includes('验收组')), `n=${grpHit.length}`);
+    const grpMiss = await invoke('list_assets', {
+      q: '', group: null, limit: 200, sort: '',
+      filters: JSON.stringify({ notGroups: ['验收组'] }),
+    });
+    check('过滤：notGroups 排除分组', grpMiss.length > 0 && grpMiss.every((a) => !a.groups.includes('验收组')), `n=${grpMiss.length}`);
     await press('g');
     await press('g');
     await press('v');
