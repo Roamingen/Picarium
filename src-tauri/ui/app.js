@@ -545,6 +545,76 @@ function renderPickerIn(el, options, set, placeholder, opts = {}) {
   inputRow.appendChild(wrap);
   el.append(chips, inputRow);
 
+  // 候选下拉用 fixed 定位：祖先里只要有 overflow:auto（如筛选面板的 .fp-body），
+  // 绝对定位的下拉就会被那块滚动区裁掉底边。fixed 相对视口定位，不受祖先裁剪；
+  // 每次显示时按输入框位置重算，下面放不下就翻到上面，并夹在视口内。
+  let detachReposition = null;
+  const hideSuggest = () => {
+    list.hidden = true;
+    if (detachReposition) {
+      detachReposition();
+      detachReposition = null;
+    }
+  };
+  const placeSuggest = () => {
+    if (list.hidden) return;
+    const r = input.getBoundingClientRect();
+    const gap = 4;
+    const pad = 8;
+    const width = r.width || 160;
+    list.style.position = 'fixed';
+    list.style.margin = '0';
+    list.style.right = 'auto';
+    list.style.width = width + 'px';
+    list.style.minWidth = width + 'px';
+    list.style.left = Math.max(pad, Math.min(r.left, window.innerWidth - width - pad)) + 'px';
+    list.style.top = r.bottom + gap + 'px';
+    const h = list.offsetHeight;
+    const roomBelow = window.innerHeight - r.bottom - gap;
+    const roomAbove = r.top - gap;
+    let top = r.bottom + gap;
+    if (h > roomBelow && roomAbove > roomBelow) top = Math.max(pad, r.top - gap - h);
+    if (top + h > window.innerHeight - pad) top = Math.max(pad, window.innerHeight - h - pad);
+    list.style.top = top + 'px';
+  };
+  const showSuggest = () => {
+    list.hidden = false;
+    placeSuggest();
+    if (detachReposition) return;
+    // 滚动/缩放时跟着锚点重算位置；输入框被滚出所在滚动容器（如 .fp-body）才收起
+    const scrollHost = () => {
+      let p = input.parentElement;
+      while (p && p !== document.body) {
+        const s = getComputedStyle(p);
+        if (/(auto|scroll)/.test(s.overflowY) && p.scrollHeight > p.clientHeight + 1) return p;
+        p = p.parentElement;
+      }
+      return null;
+    };
+    const onMove = () => {
+      if (!input.isConnected || !input.offsetParent) {
+        hideSuggest();
+        return;
+      }
+      const r = input.getBoundingClientRect();
+      const host = scrollHost();
+      if (host) {
+        const hr = host.getBoundingClientRect();
+        if (r.bottom < hr.top + 1 || r.top > hr.bottom - 1) {
+          hideSuggest();
+          return;
+        }
+      }
+      placeSuggest();
+    };
+    window.addEventListener('scroll', onMove, { capture: true, passive: true });
+    window.addEventListener('resize', onMove, { passive: true });
+    detachReposition = () => {
+      window.removeEventListener('scroll', onMove, { capture: true });
+      window.removeEventListener('resize', onMove);
+    };
+  };
+
   const repaintChips = () => {
     chips.innerHTML = '';
     if (!set.size) return;
@@ -580,7 +650,7 @@ function renderPickerIn(el, options, set, placeholder, opts = {}) {
     const cands = candidates();
     list.innerHTML = '';
     if (!cands.length) {
-      list.hidden = true;
+      hideSuggest();
       return;
     }
     for (const name of cands) {
@@ -596,7 +666,7 @@ function renderPickerIn(el, options, set, placeholder, opts = {}) {
       row.addEventListener('click', () => add(name));
       list.appendChild(row);
     }
-    list.hidden = false;
+    showSuggest();
   };
 
   const add = (name) => {
@@ -611,7 +681,11 @@ function renderPickerIn(el, options, set, placeholder, opts = {}) {
 
   input.addEventListener('input', renderSuggest);
   input.addEventListener('focus', renderSuggest);
-  input.addEventListener('blur', () => setTimeout(() => { list.hidden = true; }, 120));
+  // 失焦后延迟收起：120ms 内若又回到输入框（点候选行、窗口切回）就别收；
+  // 早期版本这里无条件 hide，窗口激活导致的短暂失焦会把刚显示的下拉也收掉。
+  input.addEventListener('blur', () => setTimeout(() => {
+    if (document.activeElement !== input) hideSuggest();
+  }, 120));
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Tab') {
       const cands = candidates();
@@ -633,7 +707,7 @@ function renderPickerIn(el, options, set, placeholder, opts = {}) {
     }
     if (e.key === 'Escape') {
       input.blur();
-      list.hidden = true;
+      hideSuggest();
     }
   });
 
@@ -5459,6 +5533,49 @@ async function runAcceptSuite() {
     closeTagManage();
     await sleep(120);
     check('关标签管理回到筛选面板', !$('filter-panel').hidden && $('tagmanage').hidden);
+
+    // 筛选面板的标签候选：祖先 .fp-body 是 overflow-y:auto 的滚动区，
+    // 候选下拉必须是 fixed 且完整落在视口内（旧实现被滚动区底边裁掉）
+    await invoke('create_tag', { name: '候选测试' });
+    await reloadTagRows();
+    fillFilterPanel();
+    await sleep(120);
+    const tagPick = $('f-tags').querySelector('.picker-input');
+    if (tagPick) {
+      tagPick.focus();
+      tagPick.value = '候';
+      tagPick.dispatchEvent(new Event('input', { bubbles: true }));
+      await sleep(120);
+      const sg = $('f-tags').querySelector('.picker-suggest');
+      const sr = sg.getBoundingClientRect();
+      const st = getComputedStyle(sg);
+      check('筛选标签候选改 fixed 定位', !sg.hidden && st.position === 'fixed', `pos=${st.position} hidden=${sg.hidden}`);
+      check(
+        '候选下拉完整落在视口内',
+        sr.height > 0 && sr.top >= -0.5 && (window.innerHeight <= 0 || sr.bottom <= window.innerHeight + 0.5),
+        `top=${Math.round(sr.top)} bottom=${Math.round(sr.bottom)} vh=${window.innerHeight}`
+      );
+      const firstRow = sg.querySelector('.picker-suggest-row');
+      if (firstRow) {
+        const rr = firstRow.getBoundingClientRect();
+        const hit = document.elementFromPoint(rr.left + 12, rr.top + rr.height / 2);
+        check('候选行可点中（未被别层盖住）', !!hit && sg.contains(hit), hit ? hit.className : 'null');
+        firstRow.click();
+        await sleep(150);
+        check('点候选行加入筛选标签', panelTagSet.has('候选测试'), [...panelTagSet].join(','));
+      } else {
+        check('候选行可点中（未被别层盖住）', false, 'no cands');
+      }
+      tagPick.blur();
+      await sleep(200);
+      check('候选下拉随失焦收起', sg.hidden);
+    } else {
+      check('筛选标签候选跳过（未找到输入框）', false, 'no input');
+    }
+    panelTagSet.clear();
+    updateFilterBadge();
+    await invoke('delete_tag', { name: '候选测试' });
+    await reloadTagRows();
     closeFilterPanel();
 
     // 卡片右键菜单：右键出菜单、多选只留批量项、双击开编辑、mouse3 不再绑编辑
