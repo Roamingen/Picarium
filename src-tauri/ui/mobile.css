@@ -51,6 +51,24 @@ html[data-theme="light"] {
   --card-line: #252a33;
   --panel-fg: #e8eaed;
   --panel-dim: #8b93a1;
+  --font-ui: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-ui-size: 14px;
+  --font-ui-line: 1.5;
+  --font-ui-weight: 400;
+  --font-ui-letter: 0px;
+  --font-ui-features: normal;
+  --font-list: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-list-size: 14px;
+  --font-list-line: 1.5;
+  --font-list-weight: 400;
+  --font-list-letter: 0px;
+  --font-list-features: normal;
+  --font-detail: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-detail-size: 14px;
+  --font-detail-line: 1.5;
+  --font-detail-weight: 400;
+  --font-detail-letter: 0px;
+  --font-detail-features: normal;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -65,7 +83,12 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--fg);
-  font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-family: var(--font-ui);
+  font-size: var(--font-ui-size);
+  line-height: var(--font-ui-line);
+  font-weight: var(--font-ui-weight);
+  letter-spacing: var(--font-ui-letter);
+  font-feature-settings: var(--font-ui-features);
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
@@ -1873,3 +1896,446 @@ body.kbd .tagsheet .ffoot { display: flex; }
 .tact.danger { color: var(--danger); }
 .tact:last-child { border-bottom: 0; }
 .tact:active { background: var(--surface2); }
+
+/* ---------- 界面字体：列表 / 详情角色 ---------- */
+
+.folder .fname {
+  font-family: var(--font-list);
+  font-size: var(--font-list-size);
+  line-height: var(--font-list-line);
+  font-weight: var(--font-list-weight);
+  letter-spacing: var(--font-list-letter);
+  font-feature-settings: var(--font-list-features);
+}
+.folder .fsub {
+  font-family: var(--font-list);
+  font-size: calc(var(--font-list-size) * .8);
+  line-height: var(--font-list-line);
+  font-weight: var(--font-list-weight);
+  letter-spacing: var(--font-list-letter);
+  font-feature-settings: var(--font-list-features);
+}
+.tname {
+  font-family: var(--font-list);
+  font-size: var(--font-list-size);
+  line-height: var(--font-list-line);
+  font-weight: var(--font-list-weight);
+  letter-spacing: var(--font-list-letter);
+  font-feature-settings: var(--font-list-features);
+}
+.tsub {
+  font-family: var(--font-list);
+  font-size: calc(var(--font-list-size) * .85);
+  line-height: var(--font-list-line);
+  font-weight: var(--font-list-weight);
+  letter-spacing: var(--font-list-letter);
+  font-feature-settings: var(--font-list-features);
+}
+.prow .pname {
+  font-family: var(--font-list);
+  font-size: var(--font-list-size);
+  line-height: var(--font-list-line);
+  font-weight: var(--font-list-weight);
+  letter-spacing: var(--font-list-letter);
+  font-feature-settings: var(--font-list-features);
+}
+.prow .pcount {
+  font-family: var(--font-list);
+  font-size: calc(var(--font-list-size) * .9);
+  line-height: var(--font-list-line);
+  font-weight: var(--font-list-weight);
+  letter-spacing: var(--font-list-letter);
+  font-feature-settings: var(--font-list-features);
+}
+
+.vname {
+  font-family: var(--font-detail);
+  font-size: calc(var(--font-detail-size) * 1.15);
+  line-height: var(--font-detail-line);
+  font-weight: var(--font-detail-weight);
+  letter-spacing: var(--font-detail-letter);
+  font-feature-settings: var(--font-detail-features);
+}
+.vmeta, .vtag, .toast {
+  font-family: var(--font-detail);
+  font-size: calc(var(--font-detail-size) * .86);
+  line-height: var(--font-detail-line);
+  font-weight: var(--font-detail-weight);
+  letter-spacing: var(--font-detail-letter);
+  font-feature-settings: var(--font-detail-features);
+}
+.sheet-h, .fhead b, .fscope, .sheet .fbody, .sheet .fbody button, .menu button {
+  font-family: var(--font-detail);
+}
+.sheet-actions button { font-family: var(--font-detail); font-size: var(--font-detail-size); }
+
+/* ---------- 界面字体：全屏页 ---------- */
+
+.fontmask {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  background: var(--bg);
+}
+.fontpage {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  animation: fontpage-in .18s ease-out;
+}
+@keyframes fontpage-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.fonthead { flex: 0 0 auto; padding-bottom: 4px; }
+.fontdone {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 8px 4px;
+  flex: 0 0 auto;
+}
+.fontdone:disabled { opacity: .5; }
+.fontscroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 4px 0 calc(24px + var(--safe-bottom));
+}
+
+.fontpreview {
+  margin: 6px 14px 16px;
+  padding: 16px;
+  border: 1px solid var(--line2);
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--surface3), var(--surface));
+}
+.fp-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--dim);
+  font-size: 11.5px;
+  letter-spacing: .2px;
+}
+.fp-pill {
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+  color: var(--dim);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+.fp-main { margin-top: 18px; color: var(--fg); }
+.fp-aa {
+  font-size: 1.55em;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fp-line {
+  margin-top: 8px;
+  color: var(--dim);
+  font-size: .92em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fp-foot {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
+}
+.fp-note {
+  margin-top: 5px;
+  color: var(--dim2);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.sect-hint {
+  float: right;
+  color: var(--dim2);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+#font-roles .fontrole {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  text-align: left;
+}
+#font-roles .fontrole:last-child { border-bottom: 0; }
+#font-roles .fontrole:active { background: var(--surface2); }
+.fr-ic {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 15px;
+  font-weight: 600;
+}
+.fr-main { flex: 1 1 auto; min-width: 0; }
+.fr-main b { display: block; font-size: 14px; font-weight: 600; }
+.fr-main small {
+  display: block;
+  margin-top: 3px;
+  color: var(--dim);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fr-sample {
+  flex: 0 0 auto;
+  max-width: 96px;
+  color: var(--dim);
+  font-size: 17px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fr-meta { flex: 0 0 auto; color: var(--dim2); font-size: 10.5px; }
+.fr-arrow { flex: 0 0 auto; width: 16px; height: 16px; color: var(--dim2); }
+
+.font-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px 14px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.font-tabs::-webkit-scrollbar { display: none; }
+.font-tabs button {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: var(--surface3);
+  color: var(--dim);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 8px 13px;
+  border-radius: 999px;
+}
+.font-tabs button.on {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
+.fontswitch {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex: 0 0 auto;
+  display: inline-flex;
+}
+.fontswitch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.fontswitch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--surface2);
+  border: 1px solid var(--line2);
+  transition: background .16s, border-color .16s;
+}
+.fontswitch span::after {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--dim);
+  transition: transform .16s, background .16s;
+}
+.fontswitch input:checked + span {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.fontswitch input:checked + span::after {
+  transform: translateX(18px);
+  background: var(--on-accent);
+}
+
+.fontmask .locked { opacity: .45; pointer-events: none; }
+
+.fontstepper { display: flex; align-items: center; gap: 4px; }
+.fontstepper button {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--surface2);
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+.fontstepper b {
+  min-width: 48px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.fontselect {
+  max-width: 140px;
+  border: 1px solid var(--line);
+  background: var(--surface2);
+  color: var(--fg);
+  border-radius: 9px;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.fontchips { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 16px 14px; }
+.fontchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface3);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 5px 8px 5px 10px;
+  font: inherit;
+  font-size: 11.5px;
+}
+.fontchip button {
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.fontnone { color: var(--dim2); font-size: 11.5px; margin: -2px 16px 14px; }
+.fontnote {
+  margin: 2px 20px 18px;
+  color: var(--dim);
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+
+/* ---------- 界面字体：底部字体选择器 ---------- */
+
+.fontpick { z-index: 60; }
+.fontpick .sheet { max-height: 86dvh; padding-bottom: calc(12px + var(--safe-bottom)); }
+.fontpick .fhead { padding-top: 2px; }
+.fontpick .fhead .fscope { margin-left: auto; max-width: 40%; }
+.fontpick .tagsearch { margin: 0 0 10px; }
+.fontpick .tagsearch .search { margin: 0; }
+.fontfilters { margin-bottom: 10px; }
+.fontfilters button { flex: 1; }
+.fontonly {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 10px;
+  color: var(--dim);
+  font-size: 12.5px;
+}
+.fontonly input { width: 16px; height: 16px; accent-color: var(--accent); }
+.fontlist {
+  max-height: 45dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--line);
+}
+.fontrow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  padding: 10px 2px;
+}
+.fontrow:active { background: var(--surface2); }
+.fontrow.on { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.fontrow-sample {
+  flex: 0 0 54px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface3);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 17px;
+  color: var(--fg);
+  overflow: hidden;
+}
+.fontrow-main { flex: 1 1 auto; min-width: 0; }
+.fontrow-main b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fontrow-main small {
+  display: block;
+  margin-top: 2px;
+  color: var(--dim);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fontrow-tags { display: flex; gap: 4px; flex: 0 0 auto; }
+.fontrow-tags em {
+  font-style: normal;
+  color: var(--dim);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 5px;
+  font-size: 9.5px;
+  line-height: 1.2;
+}
+.fontrow-check { flex: 0 0 18px; text-align: center; color: var(--accent); font-weight: 700; }
+.fontempty { padding: 26px 8px; text-align: center; color: var(--dim); font-size: 13px; }
+.fontempty small { display: block; margin-top: 6px; color: var(--dim2); font-size: 11.5px; }

@@ -586,6 +586,25 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<serde_json::Value, Str
 }
 
 #[tauri::command]
+pub fn set_fonts(state: State<'_, AppState>, fonts: serde_json::Value) -> Result<(), String> {
+    if !fonts.is_object() {
+        return Err("字体设置必须是对象".into());
+    }
+    let path = settings_file(&state)?;
+    let mut cur = read_settings_value(&path);
+    let Some(obj) = cur.as_object_mut() else {
+        return Err("设置文件格式无效".into());
+    };
+    obj.insert("fonts".into(), fonts);
+    // 运行时字段不落盘
+    obj.remove("root");
+    obj.remove("version");
+    let text = serde_json::to_string_pretty(&cur).map_err(|e| e.to_string())?;
+    std::fs::write(&path, text).map_err(|e| format!("写入字体设置失败：{e}"))?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn trash_list(
     state: State<'_, AppState>,
     q: Option<String>,

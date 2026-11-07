@@ -406,6 +406,7 @@
       <div class="merow"><span>收藏标记</span><div class="seg" id="seg-fav">
         <button data-fav="heart">红心</button><button data-fav="star">黄星</button>
       </div></div>
+      <div class="merow tap" id="me-font-row"><span>界面字体</span><i id="me-font">Sans Serif · 14px</i></div>
       </div>
       <div class="sect">拖拽</div>
       <div class="mcard">
@@ -556,8 +557,94 @@
       </div>
     </div>
 
+    <!-- 界面字体：全屏页 + 底部字体选择器。本批只列系统通用族，字体文件导入下一批。 -->
+    <div class="fontmask" id="fontmask" hidden>
+      <section class="fontpage">
+        <header class="ghead fonthead">
+          <button class="iconbtn back" id="font-back" title="返回">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 5-7 7 7 7"/></svg>
+          </button>
+          <div class="gtitle">字体<small id="font-head-sub">外观</small></div>
+          <button class="fontdone" id="font-done">完成</button>
+        </header>
+        <div class="fontscroll">
+          <div class="fontpreview" id="font-preview">
+            <div class="fp-top"><span id="fp-label">界面 · 预览</span><span class="fp-pill" id="fp-pill">14px · 1.50</span></div>
+            <div class="fp-main" id="fp-main">
+              <div class="fp-aa">Aa 汉字 0123</div>
+              <div class="fp-line">确定 · 取消 · 搜索 · 设置</div>
+            </div>
+            <div class="fp-foot" id="fp-foot">Sans Serif · 系统通用族</div>
+            <div class="fp-note" id="fp-note">这里是整个 App 的界面字体。</div>
+          </div>
+
+          <div id="font-overview">
+            <div class="sect">作用范围<span class="sect-hint">3 档</span></div>
+            <div class="mcard" id="font-roles"></div>
+            <div class="sect">字号方案<span class="sect-hint">只改字号 / 行高</span></div>
+            <div class="mcard">
+              <div class="merow"><span>方案</span><div class="seg" id="font-presets"></div></div>
+            </div>
+            <div class="fontnote">字体来自系统通用族；字体文件导入下一批支持。列表与详情默认跟随界面，可单独关掉。</div>
+          </div>
+
+          <div id="font-editor" hidden>
+            <div class="font-tabs" id="font-tabs"></div>
+            <div class="mcard">
+              <div class="merow" id="font-follow-row">
+                <span id="font-follow-label">跟随「界面」</span>
+                <label class="fontswitch"><input type="checkbox" id="font-follow" /><span></span></label>
+              </div>
+            </div>
+            <div class="sect">字体<span class="sect-hint">系统通用族</span></div>
+            <div class="mcard" id="font-edit-fields">
+              <div class="merow tap" data-field="latin"><span>西文字体</span><i id="font-latin">Sans Serif</i></div>
+              <div class="merow tap" data-field="cjk"><span>中文字体</span><i id="font-cjk">Sans Serif</i></div>
+              <div class="merow tap" data-field="fallback"><span>回退字体</span><i id="font-fallback">未设置</i></div>
+            </div>
+            <div class="fontchips" id="font-fallbacks"></div>
+            <div class="sect">字号与行高</div>
+            <div class="mcard">
+              <div class="merow"><span>字号</span><div class="fontstepper"><button data-step="size-">−</button><b id="font-size">14px</b><button data-step="size+">+</button></div></div>
+              <div class="merow"><span>行高</span><div class="fontstepper"><button data-step="line-">−</button><b id="font-line">1.50</b><button data-step="line+">+</button></div></div>
+              <div class="merow"><span>字重</span><select class="fontselect" id="font-weight">
+                <option value="300">300 细</option><option value="400">400 常规</option><option value="500">500 中粗</option><option value="600">600 半粗</option><option value="700">700 粗</option>
+              </select></div>
+            </div>
+            <div class="fontnote" id="font-editor-note"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="sheetmask fontpick" id="fontpickmask" hidden>
+      <div class="sheet" id="fontpick-sheet">
+        <div class="grabzone"><div class="grab"></div></div>
+        <div class="fhead">
+          <b id="fontpick-title">西文字体</b><span class="fscope" id="fontpick-sub">界面 · 系统通用族</span>
+          <button class="iconbtn ghost" id="fontpick-close" title="关闭">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="tagsearch">
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="fontpick-q" placeholder="搜索字体名" autocomplete="off" spellcheck="false" />
+          </div>
+        </div>
+        <div class="seg fontfilters" id="fontpick-filters">
+          <button data-filter="all" class="on">全部</button><button data-filter="system">系统</button><button data-filter="imported">导入</button>
+        </div>
+        <label class="fontonly" id="fontpick-only"><input type="checkbox" id="fontpick-cjk-only" checked /><span>只看含中文</span></label>
+        <div class="fontlist" id="fontpick-list"></div>
+        <div class="fontnote" id="fontpick-note"></div>
+      </div>
+    </div>
+
     <div class="toast" id="toast" hidden></div>
   </div>
+  <script src="font-config.js" defer></script>
+  <script src="mobile-font.js" defer></script>
   <script src="mobile.js" defer></script>
 </body>
 </html>

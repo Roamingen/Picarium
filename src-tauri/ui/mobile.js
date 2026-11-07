@@ -118,6 +118,7 @@ function toast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (el.hidden = true), 2200);
 }
+window.toast = toast;
 
 function groupParam() {
   if (S.view === "all") return null;
@@ -1530,7 +1531,9 @@ function backGroups() {
 function activeLayer() {
   const shown = (id) => { const el = $(id); return el && !el.hidden; };
   if (shown("lightbox")) return { close: () => closeLightbox() };
+  if (shown("fontpickmask")) return { close: () => { if (window.SBFontMobile) SBFontMobile.closePicker(); } };
   if (shown("sheetmask")) return { close: () => { if (sheetResolve) { sheetResolve(false); sheetResolve = null; } closeSheet(); } };
+  if (shown("fontmask")) return { close: () => { if (window.SBFontMobile) SBFontMobile.back(); } };
   if (shown("gmenu")) return { close: () => closeGmenu() };
   if (shown("filtermask")) return { close: () => { $("filtermask").hidden = true; syncGuard(); } };
   if (shown("pickmask")) return { close: exitPicker };
@@ -1595,6 +1598,7 @@ function confirmSheet(text, title = "确认", okText = "确定") {
     };
   });
 }
+window.confirmSheet = confirmSheet;
 
 function sheetActions(okText, okId, danger = false) {
   return `<div class="sheet-actions"><button id="sheet-cancel">取消</button><button class="primary${danger ? " danger" : ""}" id="${okId}">${okText}</button></div>`;
@@ -2596,6 +2600,7 @@ function renderMe() {
   for (const b of document.querySelectorAll("#seg-pinrow button")) b.classList.toggle("on", +b.dataset.pinrow === S.pinsPerRow);
   for (const b of document.querySelectorAll("#seg-pinrows button")) b.classList.toggle("on", +b.dataset.pinrows === S.pinRows);
   $("me-tags-n").textContent = `${(S.tags || []).length} 个`;
+  if (window.SBFontMobile) SBFontMobile.renderEntry();
   if (meSearchOpen) renderMeSearch();
 }
 
@@ -4668,6 +4673,7 @@ $("pickmask").addEventListener("click", (e) => {
 });
 
 applyPrefs();
+if (window.SBFontMobile) SBFontMobile.init();
 loadTrashDays();
 matchMedia("(prefers-color-scheme: light)").addEventListener("change", applyPrefs);
 

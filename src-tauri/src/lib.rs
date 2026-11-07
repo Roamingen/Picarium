@@ -58,6 +58,7 @@ pub fn run() {
             commands::trash_delete,
             commands::trash_purge,
             commands::get_settings,
+            commands::set_fonts,
             commands::group_list,
             commands::set_group_cover,
             commands::set_starred_cover,

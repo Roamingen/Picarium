@@ -42,8 +42,33 @@
     }),
   };
 
+  /* 安卓只有 3 档：界面 / 列表与卡片 / 详情与浮层；默认用系统通用族，不猜手机上有什么字体。 */
+  const MOBILE_ROLES = [
+    { id: 'ui', name: '界面', desc: '按钮 / 搜索 / 设置' },
+    { id: 'list', name: '列表与卡片', desc: '标题 / 标签 / 列表', follow: true },
+    { id: 'detail', name: '详情与浮层', desc: '详情 / 弹层 / 提示', follow: true },
+  ];
+  const MOBILE_ROLE_IDS = ['ui', 'list', 'detail'];
+  const MOBILE_SIZE_MIN = 12;
+  const MOBILE_SIZE_MAX = 20;
+  const MOBILE_BASE = {
+    latin: 'sans-serif',
+    cjk: 'sans-serif',
+    fallbacks: [],
+    size: 14,
+    line: 1.5,
+    weight: 400,
+    letter: 0,
+    features: '',
+  };
+  const MOBILE_DEFAULTS = {
+    ui: clone(MOBILE_BASE),
+    list: Object.assign(clone(MOBILE_BASE), { follow: true }),
+    detail: Object.assign(clone(MOBILE_BASE), { follow: true }),
+  };
+
   const GENERIC = new Set([
-    'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy',
+    'serif', 'sans-serif', 'sans-serif-condensed', 'monospace', 'cursive', 'fantasy',
     'system-ui', 'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded',
     'emoji', 'math', 'fangsong',
   ]);
@@ -113,6 +138,83 @@
     return all[id] || all.ui;
   }
 
+  function normalizeMobile(raw) {
+    const out = clone(MOBILE_DEFAULTS);
+    const roles = raw && typeof raw === 'object' && raw.roles && typeof raw.roles === 'object'
+      ? raw.roles
+      : (raw && typeof raw === 'object' ? raw : {});
+
+    for (const id of MOBILE_ROLE_IDS) {
+      const src = roles[id];
+      if (!src || typeof src !== 'object') continue;
+      const dst = out[id];
+
+      if (id !== 'ui') dst.follow = src.follow !== false;
+      dst.latin = text(src.latin, MOBILE_DEFAULTS[id].latin);
+      dst.cjk = text(src.cjk, MOBILE_DEFAULTS[id].cjk);
+      if (Array.isArray(src.fallbacks)) {
+        const seen = new Set();
+        dst.fallbacks = [];
+        for (const item of src.fallbacks) {
+          if (typeof item !== 'string') continue;
+          const name = item.trim();
+          if (!name || seen.has(name.toLowerCase())) continue;
+          seen.add(name.toLowerCase());
+          dst.fallbacks.push(name);
+          if (dst.fallbacks.length >= MAX_FALLBACKS) break;
+        }
+      }
+      dst.size = round(num(src.size, MOBILE_DEFAULTS[id].size, MOBILE_SIZE_MIN, MOBILE_SIZE_MAX), 0.5);
+      dst.line = round(num(src.line, MOBILE_DEFAULTS[id].line, LINE_MIN, LINE_MAX), 0.05);
+      dst.weight = Math.round(num(src.weight, MOBILE_DEFAULTS[id].weight, 300, 700) / 100) * 100;
+      dst.letter = round(num(src.letter, MOBILE_DEFAULTS[id].letter, -0.5, 2), 0.05);
+      dst.features = typeof src.features === 'string' ? src.features.trim() : '';
+    }
+
+    if (!out.ui.latin) out.ui.latin = MOBILE_DEFAULTS.ui.latin;
+    if (!out.ui.cjk) out.ui.cjk = MOBILE_DEFAULTS.ui.cjk;
+    return out;
+  }
+
+  function effectiveMobile(fonts, id) {
+    const all = fonts && fonts.ui ? fonts : normalizeMobile(fonts);
+    if (id === 'list' || id === 'detail') {
+      if (all[id].follow) return all.ui;
+    }
+    return all[id] || all.ui;
+  }
+
+  function stackMobile(fonts, id) {
+    const e = effectiveMobile(fonts, id);
+    const names = [e.latin, e.cjk].concat(e.fallbacks || []);
+    const seen = new Set();
+    const families = [];
+    const push = (name) => {
+      const value = String(name || '').trim();
+      if (!value || seen.has(value.toLowerCase())) return;
+      seen.add(value.toLowerCase());
+      families.push(quote(value));
+    };
+    for (const name of names) push(name);
+    push('system-ui');
+    push('sans-serif');
+    return families.join(', ');
+  }
+
+  function summaryMobile(fonts, id) {
+    const e = effectiveMobile(fonts, id);
+    const short = (name) => {
+      const value = String(name || '');
+      return value.length > 18 ? value.slice(0, 17) + '…' : value;
+    };
+    const names = e.latin === e.cjk ? [e.latin] : [e.latin, e.cjk];
+    return names.filter(Boolean).map(short).join(' / ') + ' · ' + e.size + 'px';
+  }
+
+  function roleMobile(id) {
+    return MOBILE_ROLES.find((item) => item.id === id) || MOBILE_ROLES[0];
+  }
+
   function quote(name) {
     const value = String(name || '').trim();
     if (!value) return '';
@@ -152,15 +254,25 @@
   window.SBFonts = {
     ROLES,
     ROLE_IDS,
+    MOBILE_ROLES,
+    MOBILE_ROLE_IDS,
     MAX_FALLBACKS,
     SIZE_MIN,
     SIZE_MAX,
+    MOBILE_SIZE_MIN,
+    MOBILE_SIZE_MAX,
     LINE_MIN,
     LINE_MAX,
     DEFAULTS,
+    MOBILE_DEFAULTS,
     normalize,
     effective,
     stack,
+    normalizeMobile,
+    effectiveMobile,
+    stackMobile,
+    summaryMobile,
+    roleMobile,
     quote,
     summary,
     role,

@@ -1,8 +1,8 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "bundle": {
     "android": {
-      "versionCode": 3000
+      "versionCode": 4000
     }
   },
   "app": {
