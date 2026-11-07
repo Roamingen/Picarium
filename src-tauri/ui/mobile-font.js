@@ -240,32 +240,34 @@
     }
   }
 
-  function renderPreview(roleId) {
-    const e = F.effectiveMobile(draft, roleId);
-    const info = roleInfo(roleId);
-    const following = roleId !== 'ui' && draft[roleId].follow;
-    const main = $('fp-main');
-    if (main) {
-      main.style.fontFamily = F.stackMobile(draft, roleId);
-      main.style.fontSize = `${e.size}px`;
-      main.style.lineHeight = String(e.line);
-      main.style.fontWeight = String(e.weight);
-      main.style.letterSpacing = `${e.letter}px`;
+  function renderPreview() {
+    for (const [roleId, elId] of [['ui', 'fp-ui'], ['list', 'fp-list'], ['detail', 'fp-detail']]) {
+      const el = $(elId);
+      if (!el) continue;
+      const e = F.effectiveMobile(draft, roleId);
+      el.style.fontFamily = F.stackMobile(draft, roleId);
+      el.style.fontSize = `${e.size}px`;
+      el.style.lineHeight = String(e.line);
+      el.style.fontWeight = String(e.weight);
+      el.style.letterSpacing = `${e.letter}px`;
+      el.style.fontFeatureSettings = e.features || 'normal';
     }
-    const label = $('fp-label');
-    if (label) label.textContent = `${info.name} · 预览${following ? '（跟随界面）' : ''}`;
-    const pill = $('fp-pill');
-    if (pill) pill.textContent = `${e.size}px · ${Number(e.line).toFixed(2)}`;
-    const foot = $('fp-foot');
-    if (foot) foot.textContent = `${F.summaryMobile(draft, roleId)} · 系统通用族`;
-    const note = $('fp-note');
-    if (note) {
-      note.textContent = following
-        ? '正在跟随「界面」的字体、字号与行高。'
-        : roleId === 'ui'
-          ? '这里是整个 App 的界面字体，点「完成」保存。'
-          : '只影响这一档，不会改动其它页面。';
+  }
+
+  function renderEditSample() {
+    if (!draft) return;
+    const e = F.effectiveMobile(draft, activeRole);
+    const text = $('font-sample-text');
+    if (text) {
+      text.style.fontFamily = F.stackMobile(draft, activeRole);
+      text.style.fontSize = `${e.size}px`;
+      text.style.lineHeight = String(e.line);
+      text.style.fontWeight = String(e.weight);
+      text.style.letterSpacing = `${e.letter}px`;
+      text.style.fontFeatureSettings = e.features || 'normal';
     }
+    const meta = $('font-sample-meta');
+    if (meta) meta.textContent = `${e.size}px · 行高 ${Number(e.line).toFixed(2)}`;
   }
 
   function renderRoles() {
@@ -273,14 +275,16 @@
     if (!box) return;
     box.innerHTML = ROLE_IDS.map((id) => {
       const info = roleInfo(id);
-      const e = F.effectiveMobile(draft, id);
       const following = id !== 'ui' && draft[id].follow;
       const icon = id === 'ui' ? 'Aa' : id === 'list' ? '≡' : '◇';
-      const meta = following ? '跟随界面' : `${e.size}px`;
-      return `<button class="fontrole" data-role="${id}">
-        <span class="fr-ic">${icon}</span>
-        <span class="fr-main"><b>${esc(info.name)}</b><small>${esc(info.desc)}</small></span>
-        <span class="fr-meta">${esc(meta)}</span>
+      const tag = id === 'ui'
+        ? { text: '基础', cls: 'base' }
+        : following
+          ? { text: '跟随', cls: 'follow' }
+          : { text: '单独', cls: 'own' };
+      return `<button class="fontrole" data-role="${id}" title="${escAttr(info.desc)}">
+        <span class="fr-ic" style="font-family:${escAttr(F.stackMobile(draft, id))}">${icon}</span>
+        <span class="fr-main"><b>${esc(info.name)}<span class="fr-tag ${tag.cls}">${tag.text}</span></b><small>${esc(F.summaryMobile(draft, id))}</small></span>
         <svg class="fr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
       </button>`;
     }).join('');
@@ -372,18 +376,22 @@
     }
     const subtitle = $('font-head-sub');
     if (subtitle) subtitle.textContent = info.name;
+    renderEditSample();
   }
 
   function render() {
     if (!draft) return;
-    const role = mode === 'editor' ? activeRole : 'ui';
-    renderPreview(role);
+    const preview = $('font-preview');
+    if (preview) preview.hidden = mode !== 'overview';
+    const sample = $('font-sample');
+    if (sample) sample.hidden = mode !== 'editor';
     const overview = $('font-overview');
     const editor = $('font-editor');
     if (overview) overview.hidden = mode !== 'overview';
     if (editor) editor.hidden = mode !== 'editor';
     const subtitle = $('font-head-sub');
     if (subtitle) subtitle.textContent = mode === 'overview' ? '外观' : roleInfo(activeRole).name;
+    renderPreview();
     if (mode === 'overview') {
       renderRoles();
       renderPresets();
@@ -507,7 +515,7 @@
         role.fallbacks.push(id);
       }
       renderPicker();
-      renderPreview(picker.roleId);
+      renderPreview();
       renderEditor();
       return;
     }
@@ -538,7 +546,7 @@
     } else if (field === 'line') {
       role.line = Math.round(Math.min(F.LINE_MAX, Math.max(F.LINE_MIN, role.line + delta)) * 100) / 100;
     }
-    renderPreview(activeRole);
+    renderPreview();
     renderEditor();
   }
 
@@ -601,7 +609,7 @@
         const list = draft[activeRole].fallbacks;
         const idx = list.indexOf(rm.dataset.rm);
         if (idx >= 0) list.splice(idx, 1);
-        renderPreview(activeRole);
+        renderPreview();
         renderEditor();
       }
     });
@@ -614,7 +622,8 @@
         return;
       }
       draft[activeRole].weight = Number(weight.value);
-      renderPreview(activeRole);
+      renderPreview();
+      renderEditSample();
     });
 
     const pickClose = $('fontpick-close');

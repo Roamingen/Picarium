@@ -569,13 +569,23 @@
         </header>
         <div class="fontscroll">
           <div class="fontpreview" id="font-preview">
-            <div class="fp-top"><span id="fp-label">界面 · 预览</span><span class="fp-pill" id="fp-pill">14px · 1.50</span></div>
-            <div class="fp-main" id="fp-main">
-              <div class="fp-aa">Aa 汉字 0123</div>
-              <div class="fp-line">确定 · 取消 · 搜索 · 设置</div>
+            <div class="fp-top"><span>实时预览</span><span class="fp-live"><i></i>跟手</span></div>
+            <div class="fp-stage">
+              <div class="fp-ui" id="fp-ui">
+                <div class="fp-search"><svg class="fp-search-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg><span>搜索表情包…</span><svg class="fp-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></div>
+                <div class="fp-tabs"><b>全部</b><span>最近使用</span><span>收藏</span></div>
+              </div>
+              <div class="fp-list" id="fp-list">
+                <div class="fp-cards">
+                  <div class="fp-card"><div class="fp-thumb fp-thumb-a">🌊</div><div class="fp-name">海边日落.png</div><div class="fp-tags"># 风景 · # 设计</div></div>
+                  <div class="fp-card"><div class="fp-thumb fp-thumb-b">🐱</div><div class="fp-name">猫猫贴贴.gif</div><div class="fp-tags"># 猫猫 · # 表情</div></div>
+                </div>
+              </div>
+              <div class="fp-detail" id="fp-detail">
+                <div class="fp-detail-row"><span class="fp-dot"></span><b>详情浮层</b><span class="fp-detail-name">海边日落.png</span><span class="fp-size">120 × 96</span></div>
+              </div>
             </div>
-            <div class="fp-foot" id="fp-foot">Sans Serif · 系统通用族</div>
-            <div class="fp-note" id="fp-note">这里是整个 App 的界面字体。</div>
+            <div class="fp-note" id="fp-note">三档字体同时生效；系统通用族的实际字形由 Android 决定。</div>
           </div>
 
           <div id="font-overview">
@@ -595,6 +605,10 @@
                 <span id="font-follow-label">跟随「界面」</span>
                 <label class="fontswitch"><input type="checkbox" id="font-follow" /><span></span></label>
               </div>
+            </div>
+            <div class="font-sample" id="font-sample">
+              <div class="fs-head"><span>字体样本</span><span id="font-sample-meta">14px · 行高 1.50</span></div>
+              <div class="fs-text" id="font-sample-text">Aa 汉字 0123 · 搜索表情包</div>
             </div>
             <div class="sect">字体<span class="sect-hint">系统通用族</span></div>
             <div class="mcard" id="font-edit-fields">
