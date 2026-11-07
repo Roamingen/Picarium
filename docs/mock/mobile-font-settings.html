@@ -124,20 +124,12 @@
   .preset{flex:0 0 auto;height:28px;padding:0 10px;border:1px solid var(--line-2);border-radius:999px;background:transparent;color:var(--dim);font-size:10px;white-space:nowrap}
   .preset.on{color:var(--accent);border-color:rgba(110,168,254,.4);background:var(--accent-soft)}
   .preset-custom{flex:0 0 auto;height:24px;display:inline-flex;align-items:center;padding:0 7px;border:1px dashed rgba(240,180,90,.3);border-radius:999px;color:var(--orange);font-size:9px}
-  .setting-row{display:flex;align-items:center;gap:8px;width:100%;margin-top:7px;padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:var(--card);text-align:left}
-  .setting-main{flex:1;min-width:0;border:0;background:none;padding:0;text-align:left}
-  .setting-title{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:550}
-  .setting-sub{margin-top:2px;color:var(--dim-2);font-size:9px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .switch{position:relative;display:inline-flex;width:34px;height:20px;flex:0 0 auto;vertical-align:middle}
   .switch input{position:absolute;opacity:0;width:0;height:0}
   .switch span{position:absolute;inset:0;border-radius:999px;background:#353d4b;transition:background .15s;cursor:pointer}
   .switch span::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#f2f5fa;transition:transform .15s}
   .switch input:checked+span{background:var(--accent)}
   .switch input:checked+span::after{transform:translateX(14px)}
-  .nf-glyphs{margin-top:7px;padding:8px 10px;border:1px solid var(--line);border-radius:11px;background:#11151c;display:flex;align-items:center;gap:10px;min-height:38px}
-  .nf-glyphs .nf-icons{font-size:15px;letter-spacing:3px;line-height:1;color:#c7d4e5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .nf-glyphs .nf-note{margin-left:auto;color:var(--dim-2);font-size:8.5px;white-space:nowrap}
-  .nf-glyphs.off .nf-icons{opacity:.28}
   .mfoot{margin-top:10px;padding:0 2px;color:var(--dim-2);font-size:8.7px;line-height:1.6}
 
   /* ---------- editor ---------- */
@@ -172,7 +164,6 @@
   .chain-player .x{border:0;background:none;color:var(--dim-2);font-size:11px;line-height:1;padding:0 1px}
   .chain-player .x:hover{color:var(--danger)}
   .chain-player.locked{border-style:dashed;color:var(--dim-2);background:transparent}
-  .chain-player.nf{color:var(--orange);border-color:rgba(240,180,90,.28);background:var(--orange-soft)}
   .chain-empty{color:var(--dim-2);font-size:9px;line-height:23px}
   .add-fallback{height:24px;margin-top:5px;padding:0 7px;border:1px dashed var(--line-2);border-radius:6px;background:none;color:var(--dim);font-size:9px}
   .add-fallback:disabled{opacity:.4}
@@ -251,7 +242,7 @@
   .note-card p{margin:0;color:var(--dim);font-size:11px;line-height:1.7}
   .note-card p+p{margin-top:6px}
   .note-card code{color:var(--dim);background:#1c222c;padding:1px 4px;border-radius:3px;font-size:10px}
-  .note-card pre{margin:7px 0 0;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:#0d1015;color:#aeb8c8;font-size:9.5px;line-height:1.55;overflow:auto;white-space:pre}
+  .note-card pre{margin:7px 0 0;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:#0d1015;color:#aeb8c8;font-size:9.5px;line-height:1.55;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
   .decisions{margin-top:13px;padding:14px 16px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
   .decisions h2{margin:0 0 8px;font-size:13px;font-weight:600}
   .decisions ol{margin:0;padding-left:18px;color:var(--dim);font-size:11px;line-height:1.8}
@@ -283,11 +274,12 @@
   <header class="hero">
     <div class="kicker"><i></i> StickerBox · 设计稿 · 2026-11-07</div>
     <h1>安卓字体设置 <span class="pill">Android</span></h1>
-    <p>把 PC 上的 Zed 式字体设置搬到手机：<b>界面 / 列表与卡片 / 详情与浮层</b>三档可以各自选西文、中文、回退链和字号。安卓 WebView 不能枚举系统字体，所以来源只有<b>系统通用族</b>和<b>用户导入的字体文件</b>；Nerd Font 也必须导入。</p>
+    <p>把 PC 上的 Zed 式字体设置搬到手机：<b>界面 / 列表与卡片 / 详情与浮层</b>三档可以各自选西文、中文、回退链和字号。安卓 WebView 不能枚举系统字体，所以来源只有<b>系统通用族</b>和<b>用户导入的字体文件</b>；Nerd Font 不是特殊通道，导入后就是一个普通字体。</p>
     <div class="meta">
       <span class="tag blue">系统通用族 + 导入</span>
       <span class="tag green">3 个作用范围</span>
-      <span class="tag orange">Nerd Font 只接管 PUA</span>
+      <span class="tag orange">NF 当普通字体</span>
+      <span class="tag">字号 12–20</span>
       <span class="tag">不改卡片 / 控件高度</span>
       <a class="top-link" href="font-settings.html">PC 端 mock →</a>
     </div>
@@ -299,11 +291,11 @@
     <div class="principle"><span class="num">03</span><h3>字体只影响文字</h3><p>卡片、网格、按钮和底部选择器的高度不变；字号上限建议 18，先在小屏和长文件名下验收。</p></div>
   </div>
 
-  <div class="callout"><span class="ic">!</span><div><b>平台边界（先说明）：</b>安卓 WebView 没有 <code>queryLocalFonts</code> 一类的枚举能力，也不会暴露“微软雅黑 / 思源黑体”这样的系统家族名。本稿只列 4 个通用族 + 导入文件；列表里预置的三个“导入”字体是<b>演示数据</b>，真实导入流程在底部选择器里。</div></div>
+  <div class="callout"><span class="ic">!</span><div><b>平台边界（先说明）：</b>安卓 WebView 没有 <code>queryLocalFonts</code> 一类的枚举能力，也不会暴露“微软雅黑 / 思源黑体”这样的系统家族名。本稿只列 4 个通用族 + 导入文件；列表里预置的三个“导入”字体是<b>演示数据</b>，真实导入流程在底部选择器里。<b>Nerd Font 同样从文件导入，之后只作为普通字体出现在列表里，没有全局开关。</b></div></div>
 
   <section class="stage">
     <div class="mock-col">
-      <div class="mock-head"><span><b>01 · 概览</b> 作用范围 / 方案 / Nerd Font</span><span>点角色行切换右侧</span></div>
+      <div class="mock-head"><span><b>01 · 概览</b> 作用范围 / 字号方案 / 导入说明</span><span>点角色行切换右侧</span></div>
       <div class="phone" id="phone-overview">
         <div class="screen">
           <div class="cam"></div>
@@ -340,19 +332,7 @@
             <div class="section-label"><span>字体方案</span><b>只改字号 / 行高</b></div>
             <div class="preset-row" id="m-preset-row"></div>
 
-            <div class="setting-row">
-              <button class="setting-main" id="m-nf-open" type="button">
-                <span class="setting-title">Nerd Font 图标</span>
-                <span class="setting-sub" id="m-nf-label">JetBrainsMono NF · 已导入</span>
-              </button>
-              <label class="switch" aria-label="启用 Nerd Font"><input type="checkbox" id="m-nf-toggle"><span></span></label>
-            </div>
-            <div class="nf-glyphs" id="m-nf-glyphs">
-              <span class="nf-icons" id="m-nf-test">&#xF07B; &#xF121; &#xF013; &#xE0B0;</span>
-              <span class="nf-note" id="m-nf-note">只接管图标区</span>
-            </div>
-
-            <div class="mfoot">进入字体选择器后可以导入 <code>.ttf / .otf / .ttc / .woff2</code>；字体只存本机。Nerd Font 只接管 PUA 区，不会抢走正文的 Latin / CJK。</div>
+            <div class="mfoot">进入字体选择器后可以导入 <code>.ttf / .otf / .ttc / .woff2</code>；字体只存本机。Nerd Font 也从这里导入，之后就是普通字体：选中才用它的字形，没有全局开关。</div>
           </div>
         </div>
       </div>
@@ -411,7 +391,7 @@
               </div>
             </div>
 
-            <div class="edit-note">列表 / 详情默认跟随界面；关掉跟随会复制当前值，再改只影响这一档。中文选择系统通用族时，实际字形由 Android 的 fallback 决定。</div>
+            <div class="edit-note">列表 / 详情默认跟随界面；关掉跟随会复制当前值，再改只影响这一档。中文选择系统通用族时，实际字形由 Android 的 fallback 决定；Nerd Font 也在同一份列表里，当普通字体选。</div>
           </div>
 
           <div class="mbackdrop" id="m-backdrop" hidden></div>
@@ -437,48 +417,56 @@
   </section>
 
   <section class="notes">
-    <div class="notes-head"><h2>实现备注</h2><span>确认后的实现批，不是 mock 表面</span></div>
+    <div class="notes-head"><h2>实现备注</h2><span>实现批按这份规格走，不是 mock 表面</span></div>
     <div class="note-grid">
       <div class="note-card">
-        <h3>字体栈：西文 → 中文 → 回退 → NF</h3>
-        <p>每个作用范围生成一条 CSS 字体栈；顺序是 Latin、CJK、回退链，最后才是只覆盖 PUA 的 Nerd Font 符号槽。系统兜底永远放在最后。</p>
+        <h3>字体栈：西文 → 中文 → 回退 → 系统兜底</h3>
+        <p>每个作用范围只生成一条 CSS 字体栈。Nerd Font 不是单独的符号槽，它只是西文、中文或回退链里被选中的某个家族。</p>
         <pre>font-family:
   var(--latin),
   var(--cjk),
   var(--fallback-1),
-  "SB Nerd Symbols",
+  system-ui,
   sans-serif;</pre>
       </div>
       <div class="note-card">
-        <h3>Nerd Font 必须导入</h3>
-        <p>安卓没有可用的系统 NF 字体。导入后用 <code>FontFace</code> 或本地文件协议加载，再创建 <code>unicode-range</code> 只覆盖图标区的符号槽；这样 NF 的等宽 Latin 不会抢正文。</p>
-        <pre>new FontFace("SB Nerd Symbols",
-  "url(asset:///fonts/nf.ttf)", {
-    unicodeRange:
-      "U+E000-F8FF, U+F0000-FFFFD"
-  });</pre>
+        <h3>Nerd Font：普通字体，不做 unicode-range</h3>
+        <p>导入后它就是字体列表里的一个家族，带 <code>NF</code> 徽标。放在回退链里时，只有前面字体缺字的 PUA 图标会落到它；选成西文主字体时，Latin 也会跟着变成 NF 的等宽字形，这是用户的选择，不再有全局开关。</p>
+        <pre>/* 普通导入字体的 @font-face；没有 unicode-range */
+@font-face { font-family: "导入的 NF"; src: url(blob:…); }
+font-family: var(--latin), "导入的 NF", system-ui, sans-serif;</pre>
       </div>
       <div class="note-card">
-        <h3>导入流程：先读 cmap，再分角色</h3>
-        <p><code>ttf-parser</code> 读 family 与 cmap：是否含中文、是否等宽、是否含 PUA，决定列表里的「中文 / 等宽 / NF」徽标。TTC 只取第一个字面；导入文件复制到 App 私有目录，卸载时一起删除。</p>
-        <p>WebView 不能枚举，所以「刷新系统字体」这个动作不存在；只能刷新导入列表。</p>
+        <h3>来源与导入：ttf-parser 读 family / cmap</h3>
+        <p>安卓 WebView 不能枚举系统字体，只能列 4 个通用族；导入文件用 <code>ttf-parser</code> 读 family 与 cmap，按是否含「汉」、是否等宽、是否含 PUA，标 <b>中文 / 等宽 / NF</b> 徽标。TTC 取第一个字面，文件复制到 App 私有目录，卸载时一起删除。</p>
+        <p>字体选择列表只刷新「导入」分组；不存在「刷新系统字体」这个动作。</p>
       </div>
       <div class="note-card">
-        <h3>持久化与验收</h3>
-        <p>设置写进 <code>settings.json</code> 的 <code>fonts</code> 段，和 PC 同一结构，安卓只多 <code>imported</code> 文件清单。主窗 / 浮层启动时都要能读到。</p>
-        <p>验收在 <b>12 / 14 / 16 / 18</b> 四档、长英文名、中文、NF 图标下看：列表标题截断、选择器行不撑高、底部 sheet 不遮住确认按钮、无横向溢出。</p>
+        <h3>持久化、入口与验收</h3>
+        <p>设置写进 <code>settings.json</code> 的 <code>fonts</code> 段，和 PC 同构，安卓多一份 <code>imported</code> 文件清单；启动时先注册 <code>FontFace</code> 再套字体栈。入口是 <b>我的 › 外观 › 界面字体</b>，打开全屏字体页，摘要显示当前西文 / 中文 / 字号 / 跟随状态。</p>
+        <p>验收在 <b>12 / 14 / 16 / 18 / 20</b> 五档、长英文名、中文、NF 图标和浅 / 深主题下看：列表标题截断、选择器行不撑高、底部 sheet 不遮按钮、无横向溢出。</p>
       </div>
     </div>
   </section>
 
   <section class="decisions">
-    <h2>需要你拍板</h2>
+    <h2>已定方案（2026-11-07）</h2>
     <ol>
-      <li>作用范围 3 档够不够？现在分 <b>界面 / 列表与卡片 / 详情与浮层</b>；要不要再把输入框、标签编辑器单独拆一档？</li>
-      <li>安卓字体来源选 <b>A. 系统通用族 + 用户导入</b>（本稿，0 包体）、<b>B. 内置 1–2 款开源字体</b>（+1–3MB，开箱即用）、还是 <b>C. 只跟系统</b>？</li>
-      <li>Nerd Font 默认开还是关？本稿默认开，演示字体是已导入的 JetBrainsMono NF。</li>
-      <li>字号上限 18 还是 20？本稿滑杆到 20，备注建议 18 以内；手机小屏更容易裁切。</li>
-      <li>是否需要“每个作用范围单独设行高 / 字重”？本稿有，但只做了字号、行高、字重三项；字距和 OpenType 特性先不放到手机端。</li>
+      <li>作用范围 3 档：<b>界面 / 列表与卡片 / 详情与浮层</b>；输入框、标签编辑器不单拆，跟着所属页面走。</li>
+      <li>字体来源选 <b>A：系统通用族 + 用户导入</b>；不内置字体文件，包体不变。</li>
+      <li><b>Nerd Font 当普通字体</b>：不做全局开关、不做 <code>unicode-range</code> 符号槽；导入后在列表里直接选，选中才用它的字形。</li>
+      <li>字号滑杆 <b>12–20</b>，默认 14；20 是允许上限，长文本和 320px 窄屏建议先按 18 验收。</li>
+      <li>每档可设字号 / 行高 / 字重；字距和 OpenType 特性手机端先不做。</li>
+      <li>列表 / 详情默认跟随界面；关掉跟随才复制一份当前值独立改。</li>
+    </ol>
+  </section>
+
+  <section class="decisions">
+    <h2>本轮不做</h2>
+    <ol>
+      <li>导入字体的删除 / 重命名：等文件管理一起做。</li>
+      <li>按页面单独拆输入框 / 标签编辑器的字体。</li>
+      <li>方案 B（内置开源字体）和方案 C（只跟系统）。</li>
     </ol>
   </section>
 
@@ -491,8 +479,6 @@
 
 <div class="toast" id="m-toast" hidden></div>
 <input type="file" id="m-file" accept=".ttf,.otf,.ttc,.woff2" hidden>
-
-<style id="m-nf-face">@font-face{font-family:"SB Nerd Symbols";src:local("JetBrainsMono Nerd Font Mono"),local("JetBrainsMono NFM");unicode-range:U+E000-F8FF,U+F0000-FFFFD,U+100000-10FFFD;}</style>
 
 <script>
 (function () {
@@ -540,7 +526,6 @@
 
   var state = {
     roles: clone(DEFAULT_ROLES),
-    nf: {enabled:true, fontId:"imp-nf"},
     selected:"ui"
   };
   var sheet = {open:true, kind:"latin", role:"ui", q:"", source:"all", onlyFitting:false, fallbackDraft:[]};
@@ -575,8 +560,8 @@
       var f = getFont(fid);
       if (f && fams.indexOf(f.family) < 0) fams.push(f.family);
     });
-    if (state.nf.enabled) fams.push('"SB Nerd Symbols"');
-    fams.push("sans-serif");
+    fams = fams.filter(function (fam) { return fam !== "system-ui" && fam !== "sans-serif"; });
+    fams.push("system-ui", "sans-serif");
     return fams.join(", ");
   }
   function varsFor(id) {
@@ -630,7 +615,6 @@
     return "Aa 0123 →";
   }
   function selectedFontId() {
-    if (sheet.kind === "nf") return state.nf.fontId;
     if (sheet.kind === "fallback") return null;
     return eff(sheet.role)[sheet.kind];
   }
@@ -657,15 +641,6 @@
     }
     if (!current) html += '<span class="preset-custom">自定义</span>';
     $("#m-preset-row").innerHTML = html;
-
-    var nf = getFont(state.nf.fontId);
-    $("#m-nf-toggle").checked = state.nf.enabled;
-    $("#m-nf-label").textContent = nf.label + " · " + (nf.kind === "imported" ? "已导入" : "系统");
-    var icons = $("#m-nf-test");
-    icons.style.fontFamily = nf.family;
-    icons.textContent = "\u{f07b} \u{f121} \u{f013} \u{e0b0}";
-    $("#m-nf-glyphs").classList.toggle("off", !state.nf.enabled);
-    $("#m-nf-note").textContent = state.nf.enabled ? "只接管图标区" : "已关闭";
   }
   function renderRoleTabs() {
     $("#m-role-tabs").innerHTML = ROLES.map(function (r) {
@@ -709,8 +684,7 @@
       return '<span class="chain-player"><span class="n">' + (3 + i) + '</span>' + esc(f.label) +
         '<button type="button" class="x" data-rm="' + i + '" aria-label="移除">✕</button></span>';
     }).join("");
-    chain += '<span class="chain-player locked">系统默认</span>';
-    if (state.nf.enabled) chain += '<span class="chain-player nf">NF 图标</span>';
+    chain += '<span class="chain-player locked">系统兜底</span>';
     $("#m-chain").innerHTML = chain;
     $("#m-add-fallback").disabled = !!role.follow || e.fallbacks.length >= 5;
     $("#m-size").value = e.size;
@@ -723,29 +697,25 @@
   }
   function renderSheetFilters() {
     var counts = visibleSheetFonts().length;
-    var srcs = sheet.kind === "nf"
-      ? [{id:"all", label:"全部"}, {id:"imported", label:"导入"}]
-      : [{id:"all", label:"全部"}, {id:"system", label:"系统"}, {id:"imported", label:"导入"}];
+    var srcs = [{id:"all", label:"全部"}, {id:"system", label:"系统"}, {id:"imported", label:"导入"}];
     var html = srcs.map(function (s) {
       return '<button type="button" class="filter-chip' + (sheet.source === s.id ? " on" : "") + '" data-src="' + s.id + '">' + s.label + '</button>';
     }).join("");
     html += '<span class="filter-count">' + counts + ' 个</span>';
     $("#m-filter-row").innerHTML = html;
-    var showOnly = sheet.kind === "cjk" || sheet.kind === "nf";
+    var showOnly = sheet.kind === "cjk";
     $("#m-only-row").hidden = !showOnly;
     if (showOnly) {
-      $("#m-only-label").textContent = sheet.kind === "cjk" ? "只看含中文的字体" : "只看 Nerd Font";
+      $("#m-only-label").textContent = "只看含中文的字体";
       $("#m-only-fitting").checked = sheet.onlyFitting;
     }
   }
   function visibleSheetFonts() {
     var list = allFonts();
-    if (sheet.kind === "nf") list = list.filter(function (f) { return f.nf; });
     if (sheet.source === "system") list = list.filter(function (f) { return f.kind === "system"; });
     if (sheet.source === "imported") list = list.filter(function (f) { return f.kind === "imported"; });
-    if (sheet.onlyFitting) {
-      if (sheet.kind === "cjk") list = list.filter(function (f) { return f.cjk; });
-      if (sheet.kind === "nf") list = list.filter(function (f) { return f.nf; });
+    if (sheet.onlyFitting && sheet.kind === "cjk") {
+      list = list.filter(function (f) { return f.cjk; });
     }
     var q = sheet.q.trim().toLowerCase();
     if (q) {
@@ -793,15 +763,13 @@
     back.hidden = !sheet.open;
     if (!sheet.open) return;
 
-    var titles = {latin:"西文字体", cjk:"中文字体", fallback:"回退字体", nf:"Nerd Font 图标"};
-    $("#m-sheet-title").textContent = sheet.kind === "nf" ? "Nerd Font 图标字体" : (ROLE[sheet.role].short + " · " + titles[sheet.kind]);
-    $("#m-sheet-sub").textContent = sheet.kind === "nf"
-      ? "必须导入字体文件；只接管 PUA 图标区"
-      : sheet.kind === "fallback"
-        ? "按顺序尝试；系统默认永远兜底"
-        : "系统通用族 + 导入字体，选择后即时生效";
+    var titles = {latin:"西文字体", cjk:"中文字体", fallback:"回退字体"};
+    $("#m-sheet-title").textContent = ROLE[sheet.role].short + " · " + titles[sheet.kind];
+    $("#m-sheet-sub").textContent = sheet.kind === "fallback"
+      ? "按顺序尝试；系统兜底永远在最后"
+      : "系统通用族 + 导入字体，选择后即时生效";
 
-    var current = sheet.kind === "nf" ? getFont(state.nf.fontId) : sheet.kind === "fallback" ? null : getFont(eff(sheet.role)[sheet.kind]);
+    var current = sheet.kind === "fallback" ? null : getFont(eff(sheet.role)[sheet.kind]);
     var sample = $("#m-sheet-sample");
     var meta = $("#m-sheet-meta");
     if (current) {
@@ -837,14 +805,14 @@
     renderAll();
   }
   function openSheet(role, kind) {
-    if (kind !== "nf" && isFollowing(role)) {
+    if (isFollowing(role)) {
       toast("这一档正在跟随「界面」；先关掉跟随再单独设置。");
       return;
     }
     state.selected = role;
     sheet = {
       open:true, kind:kind, role:role, q:"", source:"all",
-      onlyFitting: kind === "cjk" || kind === "nf",
+      onlyFitting: kind === "cjk",
       fallbackDraft: kind === "fallback" ? clone(eff(role).fallbacks || []) : []
     };
     renderAll();
@@ -867,14 +835,6 @@
     }
     if (isFollowing(sheet.role)) {
       toast("这一档正在跟随「界面」；先关掉跟随。");
-      return;
-    }
-    if (sheet.kind === "nf") {
-      state.nf.fontId = id;
-      state.nf.enabled = true;
-      state.selected = "ui";
-      closeSheet();
-      toast("Nerd Font 已切换为「" + f.label + "」。");
       return;
     }
     eff(sheet.role)[sheet.kind] = id;
@@ -963,28 +923,6 @@
       toast("只支持 .ttf / .otf / .ttc / .woff2。");
       return;
     }
-    if (ctx.kind === "nf") {
-      var fam = "SB Import " + (++importSeq);
-      var url = URL.createObjectURL(file);
-      var face = new FontFace(fam, 'url("' + url + '")', {
-        unicodeRange: "U+E000-F8FF, U+F0000-FFFFD, U+100000-10FFFD"
-      });
-      face.load().then(function (loaded) {
-        document.fonts.add(loaded);
-        customFonts.push({
-          id:fam, label:label, family:'"' + fam + '"', kind:"imported", nf:true, mono:true,
-          sub:"导入 · " + Math.max(1, Math.round(file.size / 1024)) + " KB"
-        });
-        state.nf.fontId = fam;
-        state.nf.enabled = true;
-        state.selected = "ui";
-        closeSheet();
-        toast("已导入 NF 字体「" + label + "」，并启用。");
-      }).catch(function () {
-        toast("这个字体文件无法加载；TTC 请先拆出单个字面。");
-      });
-      return;
-    }
     var fam2 = "SB Import " + (++importSeq);
     var url2 = URL.createObjectURL(file);
     var face2 = new FontFace(fam2, 'url("' + url2 + '")');
@@ -1021,12 +959,6 @@
       var b = ev.target.closest(".preset");
       if (b) applyPreset(b.dataset.preset);
     });
-    $("#m-nf-toggle").addEventListener("change", function (ev) {
-      state.nf.enabled = ev.target.checked;
-      renderAll();
-      toast(state.nf.enabled ? "Nerd Font 已启用：只接管图标区。" : "Nerd Font 已关闭：图标回退到系统符号。");
-    });
-    $("#m-nf-open").addEventListener("click", function () { openSheet("ui", "nf"); });
 
     $("#m-role-tabs").addEventListener("click", function (ev) {
       var b = ev.target.closest(".role-tab");
