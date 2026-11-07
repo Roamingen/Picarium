@@ -99,6 +99,11 @@ const ICONS = {
   folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
   tag: '<path d="M20.59 13.41 13.4 20.6a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><circle cx="7" cy="7" r="1.2"/>',
   merge: '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
+  'panel-left': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+  'layout-grid': '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
+  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
 };
 
 function icon(name, size) {
@@ -121,6 +126,10 @@ function paintIcons() {
   iconOnly('pin', 'pin', 17);
   iconOnly('q-clear', 'x', 14);
   iconOnly('group-add', 'plus', 14);
+  iconOnly('sidebar-toggle', 'panel-left', 18);
+  document.querySelectorAll('.side-ico[data-icon]').forEach((el) => {
+    el.innerHTML = icon(el.dataset.icon, 16);
+  });
 
   const withText = (id, name, label) => {
     const el = $(id);
@@ -1144,6 +1153,7 @@ function render(items) {
     grid.appendChild(frag);
     paintCursor();
   }
+  updateContentHead();
   updateBatchBar();
 }
 
@@ -1925,21 +1935,34 @@ function friendlySource(a) {
 }
 
 function showTip(a, e) {
-  const tags = a.tags && a.tags.length ? a.tags.join(' · ') : '无标签';
+  const tags = a.tags && a.tags.length ? a.tags : ['无标签'];
   const groups = a.groups && a.groups.length ? a.groups.join(' · ') : '未分组';
+  const trashRow =
+    currentGroup === '__trash__' && a.deleted_at
+      ? (() => {
+          const left = daysLeftOf(a);
+          return left <= 1
+            ? '<div class="tip-trash-row danger">回收站：今天就会被清理（下次启动时删除）</div>'
+            : `<div class="tip-trash-row">回收站：还剩 ${left} 天（${trashDueDate(a)} 到期清理）</div>`;
+        })()
+      : '';
   tip.innerHTML = `
-    <div class="tip-name">${escapeHtml(a.name)}</div>
-    <div class="tip-row">${a.width} × ${a.height} · ${fmtSize(a.bytes)}</div>
-    <div class="tip-row">${escapeHtml(a.ext.toUpperCase())} · 导入于 ${fmtDate(a.added_at)}</div>
-    <div class="tip-row">来源：${escapeHtml(friendlySource(a))}</div>
-    <div class="tip-row">分组：${escapeHtml(groups)}</div>
-    ${currentGroup === '__trash__' && a.deleted_at ? (() => {
-      const left = daysLeftOf(a);
-      return left <= 1
-        ? '<div class="tip-row tip-trash danger">回收站：今天就会被清理（下次启动时删除）</div>'
-        : `<div class="tip-row tip-trash">回收站：还剩 ${left} 天（${trashDueDate(a)} 到期清理）</div>`;
-    })() : ''}
-    <div class="tip-tags">${escapeHtml(tags)}</div>
+    <div class="tip-body">
+      <div class="tip-copy">
+        <div class="tip-name">${escapeHtml(a.name)}</div>
+        <div class="tip-meta">${escapeHtml(a.ext.toUpperCase())} · ${a.animated ? '动图' : '静态'} · ${a.width} × ${a.height} · ${fmtSize(a.bytes)}</div>
+        <div class="tip-facts">
+          <span class="tip-fact">来源 <b>${escapeHtml(friendlySource(a))}</b></span>
+          <span class="tip-fact">分组 <b>${escapeHtml(groups)}</b></span>
+        </div>
+        <div class="tip-tags">${tags.map((t) => `<span class="tip-tag">${escapeHtml(t)}</span>`).join('')}</div>
+        ${trashRow}
+      </div>
+    </div>
+    <div class="tip-foot">
+      <span class="tip-keys"><kbd>Enter</kbd> 复制 · 右键更多</span>
+      <span class="tip-keys"><kbd>Esc</kbd> 关闭</span>
+    </div>
   `;
   tip.classList.add('show');
   moveTip(e);
@@ -1958,6 +1981,31 @@ function moveTip(e) {
 
 function hideTip() {
   tip.classList.remove('show');
+}
+
+function groupLabel() {
+  if (currentGroup === '__all__') return '全部';
+  if (currentGroup === '__none__') return '未分组';
+  if (currentGroup === '__star__') return '收藏';
+  if (currentGroup === '__recent__') return '最近使用';
+  if (currentGroup === '__trash__') return '回收站';
+  return currentGroup;
+}
+
+function updateContentHead() {
+  const title = $('content-title');
+  const sub = $('content-sub');
+  if (!title || !sub) return;
+  title.textContent = groupLabel();
+  const count = shownItems.length;
+  const animated = shownItems.filter((a) => a.animated).length;
+  if (currentGroup === '__trash__') {
+    sub.textContent = count ? `${count} 张待处理` : '回收站是空的';
+  } else if (currentGroup === '__none__') {
+    sub.textContent = `${count} 张表情${animated ? ` · ${animated} 张动图` : ''} · 尚未分组`;
+  } else {
+    sub.textContent = `${count} 张表情${animated ? ` · ${animated} 张动图` : ''}`;
+  }
 }
 
 /* ---------- 分组 ---------- */
@@ -1992,20 +2040,26 @@ async function loadGroups() {
   $('c-trash').textContent = trashItems.length;
 
   const list = $('group-list');
-  const pinnedList = $('pinned-list');
-  const pinnedWrap = $('pinned-wrap');
   list.innerHTML = '';
-  pinnedList.innerHTML = '';
-  pinnedWrap.hidden = !meta.groups.some((g) => g.pinned);
-  for (const g of meta.groups) {
+  const makeGroupRow = (g) => {
     const b = document.createElement('button');
-    b.className = 'side-item' + (currentGroup === g.name ? ' active' : '') + (g.pinned ? ' pinned' : '');
+    b.className = 'side-item group-row' + (currentGroup === g.name ? ' active' : '');
     b.dataset.group = g.name;
     b.draggable = true;
-    const cover = g.cover
-      ? `<img class="g-cover" src="${convertFileSrc(g.cover, 'thumb')}" alt="" loading="lazy" onerror="this.remove()">`
-      : icon('folder-plus', 14);
-    b.innerHTML = `<span class="g-thumb">${cover}</span><span class="g-name">${escapeHtml(g.name)}</span><span class="g-count">${g.count}</span>`;
+    const isAnim = !!(g.animated && g.cover_path);
+    const coverSrc = g.cover
+      ? isAnim
+        ? convertFileSrc(g.cover_path)
+        : convertFileSrc(g.cover, 'thumb')
+      : '';
+    const cover = coverSrc
+      ? `<img class="g-cover${isAnim ? ' anim' : ''}" src="${coverSrc}" alt="" loading="lazy" onerror="this.remove()">`
+      : icon('folder-plus', 20);
+    const sub = `${g.count} 张表情`;
+    b.innerHTML =
+      `<span class="g-thumb">${cover}</span>` +
+      `<span class="g-info"><span class="g-name">${escapeHtml(g.name)}</span><span class="g-sub">${sub}</span></span>` +
+      `<span class="g-count">${g.count}</span>`;
     b.addEventListener('click', () => selectGroup(g.name));
     b.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -2055,8 +2109,17 @@ async function loadGroups() {
       await Promise.all([refresh(), loadGroups()]);
       toast(`已把 ${shas.length} 张加入「${g.name}」`);
     });
-    (g.pinned ? pinnedList : list).appendChild(b);
+    return b;
+  };
+
+  const pinnedGroups = meta.groups.filter((g) => g.pinned);
+  if (pinnedGroups.length) {
+    const block = document.createElement('div');
+    block.className = 'pinned-block';
+    for (const g of pinnedGroups) block.appendChild(makeGroupRow(g));
+    list.appendChild(block);
   }
+  for (const g of meta.groups.filter((g) => !g.pinned)) list.appendChild(makeGroupRow(g));
 
   if (editing) renderEditChips();
 }
@@ -2126,11 +2189,28 @@ async function selectGroup(name) {
 }
 
 function openGroupMenu(name, x, y) {
+  hideTip();
   menuGroup = name;
   const m = $('gmenu');
+  const g = groupMeta.find((x) => x.name === name) || { count: 0, pinned: false };
+  const pinLabel = g.pinned ? '取消置顶' : '置顶到图库';
+  m.innerHTML = `
+    <div class="ctx-head">
+      <div class="ctx-title"><b>${escapeHtml(name)}</b><small>${g.count} 张表情</small></div>
+    </div>
+    <button class="ctx-item" data-act="open">${icon('folder', 15)}<span class="ctx-label">打开分组</span><span class="ctx-kbd">Enter</span></button>
+    <button class="ctx-item" data-act="rename">${icon('pencil', 15)}<span class="ctx-label">重命名</span><span class="ctx-kbd">F2</span></button>
+    <button class="ctx-item" data-act="pin">${icon('pin', 15)}<span class="ctx-label">${pinLabel}</span>${g.pinned ? '<span class="ctx-check">✓</span>' : ''}</button>
+    <button class="ctx-item" data-act="cover">${icon('image', 15)}<span class="ctx-label">换封面…</span></button>
+    <div class="ctx-sep"></div>
+    <button class="ctx-item" data-act="clear">${icon('x', 15)}<span class="ctx-label">解散分组（表情保留）</span></button>
+    <button class="ctx-item danger" data-act="delete">${icon('trash', 15)}<span class="ctx-label">删除分组及其中表情</span><span class="ctx-kbd">Del</span></button>
+  `;
   m.hidden = false;
-  m.style.left = Math.min(x, window.innerWidth - 210) + 'px';
-  m.style.top = Math.min(y, window.innerHeight - 140) + 'px';
+  const w = m.offsetWidth || 238;
+  const h = m.offsetHeight || 300;
+  m.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + 'px';
+  m.style.top = Math.max(8, Math.min(y, window.innerHeight - h - 8)) + 'px';
 }
 
 function closeGroupMenu() {
@@ -2150,11 +2230,12 @@ const CARD_MENU_ITEMS = [
   { sep: true },
   { act: 'addtag', label: '加入标签…', icon: 'tag' },
   { act: 'addgroup', label: '加入分组…', icon: 'folder-plus' },
+  { act: 'setcover', label: '设为封面', icon: 'image' },
   { sep: true },
   { act: 'trash', label: '移到回收站', icon: 'trash', key: 'dd', danger: true },
 ];
 // 多选时只留批量项（单图专属的藏起来）
-const CARD_MENU_BATCH_HIDE = new Set(['edit', 'copyimg', 'copypath']);
+const CARD_MENU_BATCH_HIDE = new Set(['edit', 'copyimg', 'copypath', 'setcover']);
 
 let cardMenuSha = null;
 let cardMenuBatch = false;
@@ -2163,6 +2244,11 @@ function buildCardMenu() {
   const box = $('cardmenu');
   if (!box || box.dataset.built) return;
   box.dataset.built = '1';
+  const head = document.createElement('div');
+  head.className = 'ctx-head';
+  head.innerHTML =
+    '<div class="ctx-title"><b id="cm-head-title"></b><small id="cm-head-sub"></small></div>';
+  box.appendChild(head);
   for (const it of CARD_MENU_ITEMS) {
     if (it.sep) {
       const sep = document.createElement('div');
@@ -2182,13 +2268,32 @@ function buildCardMenu() {
 }
 
 function openCardMenu(a, x, y) {
+  hideTip();
   buildCardMenu();
   cardMenuSha = a.sha;
   cardMenuBatch = !!(selectionMode || selected.size > 0);
   const m = $('cardmenu');
   const inTrash = currentGroup === '__trash__';
+  const canCover = !cardMenuBatch && !inTrash && currentGroup && !currentGroup.startsWith('__');
+  const headTitle = $('cm-head-title');
+  const headSub = $('cm-head-sub');
+  if (headTitle) headTitle.textContent = cardMenuBatch ? `已选 ${selected.size} 张` : a.name || '未命名';
+  if (headSub) {
+    headSub.textContent = cardMenuBatch
+      ? '批量操作'
+      : `${a.width || 0} × ${a.height || 0} · ${fmtSize(a.bytes || 0)}`;
+  }
+  const coverBtn = m.querySelector('[data-cm="setcover"]');
+  if (coverBtn) {
+    coverBtn.hidden = !canCover;
+    const label = coverBtn.querySelector('.cm-label');
+    if (label) label.textContent = canCover ? `设为「${currentGroup}」封面` : '设为封面';
+  }
   for (const b of m.querySelectorAll('[data-cm]')) {
-    b.hidden = (cardMenuBatch && CARD_MENU_BATCH_HIDE.has(b.dataset.cm)) || (inTrash && b.dataset.cm === 'trash');
+    b.hidden =
+      (b.dataset.cm === 'setcover' && !canCover) ||
+      (cardMenuBatch && CARD_MENU_BATCH_HIDE.has(b.dataset.cm)) ||
+      (inTrash && b.dataset.cm === 'trash');
   }
   m.hidden = false;
   // 藏掉被隐藏项旁边的分隔线，别让菜单开头/结尾、或中间出现两条线
@@ -2262,6 +2367,14 @@ async function cardMenuAction(act) {
       openBatchPanel(kind, cardMenuBatch ? {} : { sha });
       return;
     }
+    if (act === 'setcover') {
+      if (!currentGroup || currentGroup.startsWith('__')) return;
+      await invoke('set_group_cover', { group: currentGroup, sha });
+      await loadGroups();
+      toast(`已设为「${currentGroup}」封面`);
+      logAction(`已把「${item.name || ''}」设为「${currentGroup}」封面`);
+      return;
+    }
     if (act === 'trash') {
       const ok = await confirmDialog(
         shas.length > 1 ? `删除选中的 ${shas.length} 张到回收站？` : `删除「${item.name || ''}」到回收站？`
@@ -2281,6 +2394,11 @@ async function groupAction(act) {
   const name = menuGroup;
   closeGroupMenu();
   if (!name) return;
+
+  if (act === 'open') {
+    await selectGroup(name);
+    return;
+  }
 
   if (act === 'rename') {
     const nv = await promptDialog(`重命名分组「${name}」`, name);
@@ -2700,7 +2818,10 @@ async function doImport(paths) {
 
 async function showStats() {
   const s = await invoke('library_stats');
-  $('stats').textContent = `${s.assets} 张 · ${fmtSize(s.bytes)} · ${s.root}`;
+  $('stats').textContent = `${s.assets} 张 · ${fmtSize(s.bytes)}`;
+  $('stats').title = s.root;
+  const status = $('status-count');
+  if (status) status.textContent = `本地库 · ${s.assets} 张表情`;
 }
 
 /* ---------- 事件 ---------- */
@@ -2730,13 +2851,7 @@ $('q-clear').addEventListener('click', () => {
   qInput.focus();
 });
 
-$('dir').addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter') return;
-  const p = $('dir').value.trim();
-  if (!p) return;
-  $('dir').value = '';
-  doImport([p]);
-});
+// 路径输入框已移除：导入入口在设置里，拖放仍然可用。
 
 $('pick').addEventListener('click', pickFolder);
 $('pick-files').addEventListener('click', pickFiles);
@@ -2900,8 +3015,8 @@ $('tagmerge').addEventListener('click', (e) => {
 });
 
 $('gmenu').addEventListener('click', (e) => {
-  const act = e.target.dataset && e.target.dataset.act;
-  if (act) groupAction(act);
+  const btn = e.target.closest('[data-act]');
+  if (btn) groupAction(btn.dataset.act);
 });
 
 $('cardmenu').addEventListener('click', (e) => {
@@ -2973,11 +3088,11 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// 导入进度：直接把路径输入框替换成进度条
+// 导入进度：固定进度条，不再替换工具栏
 function setImporting(on) {
-  const bar = document.querySelector('.toolbar');
-  if (bar) bar.classList.toggle('importing', on);
-  $('import-bar').hidden = !on;
+  const bar = $('import-bar');
+  if (!bar) return;
+  bar.hidden = !on;
   if (!on) {
     $('import-fill').style.width = '0%';
     $('import-text').textContent = '';
@@ -3015,6 +3130,35 @@ $('pin').addEventListener('click', async () => {
     pinned = !pinned;
     toast('置顶失败：' + e);
   }
+});
+
+// 侧栏收起 / 展开（和 DeepSeek Harness 一样的面板按钮）
+function applySidebarCollapsed() {
+  const on = localStorage.getItem('stickerbox-sidebar-collapsed') === '1';
+  document.body.classList.toggle('sidebar-collapsed', on);
+  const btn = $('sidebar-toggle');
+  if (btn) {
+    btn.setAttribute('aria-expanded', String(!on));
+    btn.title = on ? '展开侧栏（Ctrl+B）' : '收起侧栏（Ctrl+B）';
+  }
+}
+
+function toggleSidebar() {
+  const on = !document.body.classList.contains('sidebar-collapsed');
+  document.body.classList.toggle('sidebar-collapsed', on);
+  localStorage.setItem('stickerbox-sidebar-collapsed', on ? '1' : '0');
+  applySidebarCollapsed();
+  setTimeout(() => {
+    if (virtualOn()) renderVirtual(true);
+  }, 240);
+}
+
+$('sidebar-toggle').addEventListener('click', toggleSidebar);
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey && (e.key === 'b' || e.key === 'B'))) return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  e.preventDefault();
+  toggleSidebar();
 });
 
 /* ---------- 批量操作 ---------- */
@@ -5495,7 +5639,7 @@ function openFilterPanel() {
     const pr = panel.getBoundingClientRect();
     let left = r.left - 40;
     left = Math.max(12, Math.min(left, window.innerWidth - pr.width - 12));
-    const top = r.bottom + 8;
+    const top = Math.max(r.bottom + 8, (document.querySelector('header.topbar')?.getBoundingClientRect().bottom || 0) + 8);
     panel.style.left = `${left}px`;
     panel.style.top = `${top}px`;
     panel.style.right = 'auto';
@@ -6431,6 +6575,7 @@ window.addEventListener('unhandledrejection', (e) => {
 (async () => {
   paintIcons();
   paintSelectMode();
+  applySidebarCollapsed();
   enhanceNumberInputs();
   if (!Object.keys(keymap).length) buildKeymap({});
   await syncSettings();

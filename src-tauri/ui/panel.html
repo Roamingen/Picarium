@@ -12,7 +12,7 @@
         <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2" />
         <line x1="15.5" y1="15.5" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
       </svg>
-      <input id="q" class="panel-search" placeholder="搜索：中文 / 拼音；#标签 @分组" autocomplete="off" spellcheck="false" />
+      <input id="q" class="panel-search" placeholder="搜索表情，按名称 / 拼音过滤" autocomplete="off" spellcheck="false" />
       <span id="count" class="panel-count"></span>
     </div>
 
@@ -191,14 +191,24 @@
     }
 
     function showTip(a, e) {
-      const tags = a.tags && a.tags.length ? a.tags.join(' · ') : '无标签';
+      const tags = a.tags && a.tags.length ? a.tags : ['无标签'];
       const groups = a.groups && a.groups.length ? a.groups.join(' · ') : '未分组';
-      tipEl.innerHTML = `<div class="tip-name">${esc(a.name)}</div>`
-        + `<div class="tip-row">${a.width} × ${a.height} · ${fmtSize(a.bytes)}</div>`
-        + `<div class="tip-row">${esc(a.ext.toUpperCase())} · 导入于 ${fmtDate(a.added_at)}</div>`
-        + `<div class="tip-row">来源：${esc(friendlySource(a))}</div>`
-        + `<div class="tip-row">分组：${esc(groups)}</div>`
-        + `<div class="tip-tags">${esc(tags)}</div>`;
+      tipEl.innerHTML = `
+        <div class="tip-body">
+          <div class="tip-copy">
+            <div class="tip-name">${esc(a.name)}</div>
+            <div class="tip-meta">${esc(a.ext.toUpperCase())} · ${a.animated ? '动图' : '静态'} · ${a.width} × ${a.height} · ${fmtSize(a.bytes)}</div>
+            <div class="tip-facts">
+              <span class="tip-fact">来源 <b>${esc(friendlySource(a))}</b></span>
+              <span class="tip-fact">分组 <b>${esc(groups)}</b></span>
+            </div>
+            <div class="tip-tags">${tags.map((t) => `<span class="tip-tag">${esc(t)}</span>`).join('')}</div>
+          </div>
+        </div>
+        <div class="tip-foot">
+          <span class="tip-keys"><kbd>Enter</kbd> 复制</span>
+          <span class="tip-keys"><kbd>Esc</kbd> 关闭</span>
+        </div>`;
       tipEl.classList.add('show');
       moveTip(e);
     }

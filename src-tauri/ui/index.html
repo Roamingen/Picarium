@@ -7,59 +7,64 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header>
-    <div class="brand">StickerBox</div>
-    <div class="search-wrap">
-      <input id="q" class="search" placeholder="筛选：名字 / 拼音 / 首字母" autocomplete="off" spellcheck="false" />
-      <button id="q-clear" class="search-clear" title="清空" hidden>✕</button>
+  <header class="topbar">
+    <div class="topbar-side">
+      <button id="sidebar-toggle" class="side-toggle" type="button" title="收起侧栏（Ctrl+B）" aria-label="收起侧栏" aria-expanded="true"></button>
+      <div class="topbar-brand">
+        <div class="brand">StickerBox</div>
+        <span id="stats" class="dim top-stats">…</span>
+      </div>
     </div>
-    <div class="spacer"></div>
-    <span id="stats" class="dim">…</span>
-    <button id="clip-toggle" class="clip-toggle" title="点击开启/暂停剪贴板捕获">
-      <span id="clip-dot" class="clip-dot"></span><span id="clip-text">剪贴板捕获</span>
-    </button>
-    <button id="settings-btn" class="pin-btn" title="设置">⚙️</button>
-    <button id="pin" class="pin-btn" title="置顶窗口">📌</button>
+    <div class="topbar-main">
+      <div class="search-wrap">
+        <input id="q" class="search" placeholder="搜索表情，按名称 / 拼音过滤" autocomplete="off" spellcheck="false" />
+        <button id="q-clear" class="search-clear" title="清空" hidden>✕</button>
+      </div>
+      <div class="search-actions">
+        <button id="filter-btn" class="btn top-btn">筛选</button>
+        <button id="select-mode" class="btn top-btn">多选</button>
+      </div>
+      <div class="spacer"></div>
+      <button id="clip-toggle" class="clip-toggle" title="点击开启/暂停剪贴板捕获">
+        <span id="clip-dot" class="clip-dot"></span><span id="clip-text">剪贴板捕获</span>
+      </button>
+      <button id="settings-btn" class="pin-btn" title="设置">⚙️</button>
+      <button id="pin" class="pin-btn" title="置顶窗口">📌</button>
+    </div>
   </header>
 
-  <div class="toolbar">
-    <button id="pick" class="btn">导入文件夹…</button>
-    <button id="pick-files" class="btn">导入图片…</button>
-    <button id="select-mode" class="btn">多选</button>
-    <button id="filter-btn" class="btn">筛选</button>
-    <input id="dir" class="path" placeholder="或粘贴路径后回车" spellcheck="false" />
-    <span class="dim drop-hint">也可以直接把文件/文件夹拖进窗口</span>
-    <button id="empty-trash" class="btn danger" hidden>清空回收站</button>
-    <div id="import-bar" class="import-bar" hidden>
-      <div id="import-fill" class="import-fill"></div>
-      <span id="import-text" class="import-text"></span>
-    </div>
+  <div id="import-bar" class="import-bar" hidden>
+    <div id="import-fill" class="import-fill"></div>
+    <span id="import-text" class="import-text"></span>
   </div>
   <div id="trash-hint" class="trash-hint" hidden>删除的图片会在这里保留 <b id="trash-hint-days">7</b> 天，到期后下次启动自动清理。</div>
 
   <div class="workspace">
     <aside class="sidebar">
-      <button class="side-item active" data-group="__all__">全部<span id="c-all">0</span></button>
-      <button class="side-item" data-group="__none__">未分组<span id="c-none" class="badge">0</span></button>
-      <button class="side-item" data-group="__star__">收藏<span id="c-star">0</span></button>
-      <button class="side-item" data-group="__recent__">最近使用<span id="c-recent">0</span></button>
-      <div id="pinned-wrap" hidden>
-        <div class="side-title">置顶分组</div>
-        <div id="pinned-list"></div>
-      </div>
+      <button class="side-item active" data-group="__all__"><span class="side-ico" data-icon="layout-grid"></span>全部<span id="c-all">0</span></button>
+      <button class="side-item" data-group="__none__"><span class="side-ico" data-icon="inbox"></span>未分组<span id="c-none" class="badge">0</span></button>
+      <button class="side-item" data-group="__star__"><span class="side-ico" data-icon="star"></span>收藏<span id="c-star">0</span></button>
+      <button class="side-item" data-group="__recent__"><span class="side-ico" data-icon="clock"></span>最近使用<span id="c-recent">0</span></button>
       <div class="side-title">分组<button id="group-add" class="side-add" title="新建分组">＋</button></div>
       <div id="group-list"></div>
       <div class="side-title">其他</div>
-      <button class="side-item" id="tag-manage-open">标签管理<span id="c-tags">0</span></button>
-      <button class="side-item" data-group="__trash__">回收站<span id="c-trash">0</span></button>
+      <button class="side-item" id="tag-manage-open"><span class="side-ico" data-icon="tag"></span>标签管理<span id="c-tags">0</span></button>
+      <button class="side-item" data-group="__trash__"><span class="side-ico" data-icon="trash"></span>回收站<span id="c-trash">0</span></button>
     </aside>
 
     <main>
+      <div class="content-head">
+        <div>
+          <div id="content-title" class="content-title">全部</div>
+          <div id="content-sub" class="content-sub">0 张表情</div>
+        </div>
+        <div class="content-actions"></div>
+      </div>
       <div id="grid" class="grid"></div>
       <button id="load-more" class="load-more" hidden>加载更多</button>
       <div id="empty" class="empty">
         <p>这里还没有表情。</p>
-        <p class="dim">点「选择文件夹…」，或者把一堆图片直接拖进窗口。</p>
+        <p class="dim">去「设置 → 导入表情」，或者把一堆图片直接拖进窗口。</p>
       </div>
     </main>
   </div>
@@ -86,8 +91,13 @@
     <button class="btn small ghost" data-act="clear">Esc 取消</button>
   </div>
 
-  <footer>
-    <span id="last-action" class="last-action hint">Shift + 左键：从紫色锚点连续选到当前位置</span>
+  <footer class="statusbar">
+    <span id="last-action" class="last-action hint">右键管理分组</span>
+    <div class="status-right">
+      <div id="whichkey" class="whichkey" hidden></div>
+      <button id="empty-trash" class="btn small danger" hidden>清空回收站</button>
+      <span id="status-count" class="dim status-count"></span>
+    </div>
   </footer>
 
   <div id="tip" class="tip"></div>
@@ -154,15 +164,9 @@
     </div>
   </div>
 
-  <div id="cardmenu" class="menu cm" hidden></div>
+  <div id="cardmenu" class="menu cm ctx-menu" role="menu" hidden></div>
 
-  <div id="gmenu" class="menu" hidden>
-    <button data-act="cover">换封面…</button>
-    <button data-act="pin">置顶到图库</button>
-    <button data-act="rename">重命名分组…</button>
-    <button data-act="clear">解散分组（表情保留）</button>
-    <button data-act="delete" class="danger">删除分组及其中表情</button>
-  </div>
+  <div id="gmenu" class="menu ctx-menu" role="menu" hidden></div>
 
   <div id="coverpick" class="modal-mask" hidden>
     <div class="modal wide">
@@ -252,6 +256,16 @@
           <div id="set-root" class="dim set-value">…</div>
         </div>
         <button id="set-open" class="btn">打开文件夹</button>
+      </div>
+      <div class="set-row set-import-row">
+        <div class="set-text">
+          <div class="set-label">导入表情</div>
+          <div class="dim set-value">选择文件夹或图片；也可以直接把文件拖进主窗口</div>
+        </div>
+        <div class="set-import-btns">
+          <button id="pick" class="btn small" type="button">文件夹…</button>
+          <button id="pick-files" class="btn small" type="button">图片…</button>
+        </div>
       </div>
       <div class="set-row">
         <div class="set-text">
@@ -616,8 +630,6 @@
       <button id="f-apply" class="btn small primary">应用</button>
     </div>
   </div>
-
-  <div id="whichkey" class="whichkey" hidden></div>
 
   <div id="help" class="help-mask" hidden>
     <div class="help-box">

@@ -666,11 +666,16 @@ pub fn group_list(state: State<'_, AppState>) -> Result<serde_json::Value, Strin
                 .and_then(|sha| lib.find(sha))
                 .map(|a| a.animated)
                 .unwrap_or(false);
+            let cover_path = cover
+                .as_deref()
+                .and_then(|sha| lib.find(sha))
+                .map(|a| a.path.clone());
             serde_json::json!({
                 "name": name,
                 "count": stats.get(name).copied().unwrap_or(0),
                 "bytes": bytes.get(name).copied().unwrap_or(0),
                 "cover": cover,
+                "cover_path": cover_path,
                 "animated": animated,
                 "pinned": pinned.iter().any(|p| p == name),
             })
