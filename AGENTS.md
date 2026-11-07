@@ -59,7 +59,7 @@ docs/               设计、路线、验收、交接
 - 前端状态：`app.js` 单文件（约 4k 行），无构建步骤
 - 主题：内置深/浅 + Catppuccin 四套 + `themes/*.json` 自定义
 - 图标：内嵌 Lucide SVG（`ICONS` 映射）
-- 当前验收：**133 条前端断言 + 20 条 core 测试**；性能：3000 张首屏约 0.7s / 70 节点
+- 当前验收：**141 条前端断言 + 20 条 core 测试**；性能：3000 张首屏约 0.7s / 70 节点
 
 ## 5. 常用命令
 
@@ -139,3 +139,23 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
 
 - 任何界面（PC 或手机）的改动，**先出 HTML 预览**（放 `docs/mock/`），给用户看完、点头后再写实现。**默认只交 HTML，不主动出截图**；用户明确要看图时才用 Chrome headless 截到 `.demo/`。
 - 禁止"一拍脑袋"直接改 `mobile.js` / `app.js` / CSS 上线；小修（颜色、文案、间距）也要在汇报里说明改了什么，必要时附对比图。
+
+## 10. 发版与版本号
+
+- 格式 `0.MINOR.PATCH`（1.0 之前）：一批功能落地 → MINOR+1（PATCH 归零）；修 bug / 小改 → PATCH+1。**功能做完就改，不要攒到发版**。PC 与安卓各自独立，允许不同号，只增不减。
+- 版本真源（脚本只读这里，别散记）：
+  - PC：`src-tauri/tauri.conf.json` 的 `version`；`src-tauri/Cargo.toml` 的 `version` 由脚本同步成同一个数（设置页显示的是 Cargo 版本）
+  - 安卓：`src-tauri/tauri.android.conf.json` 的 `version`；`bundle.android.versionCode` 显式给码，公式 `major*1000000 + minor*1000 + patch`
+- **当前版本：PC `0.3.0` / 安卓 `0.2.0`（2026-11-07）**——升完版本号要同步改这一行。
+- 固定产物目录（本机，已 gitignore，不入库）：
+  - `release/pc/StickerBox-<ver>.exe`
+  - `release/android/StickerBox-<ver>-arm64-v8a.apk`
+  - `release/versions.json`：两端版本、构建时间、sha256
+- 一条命令出包（只在交付 / 装自己机器时跑，平时别跑 release）：
+
+  ```powershell
+  pwsh -NoProfile -File scripts/release.ps1 -Target all -Bump minor
+  ```
+
+  `-Target pc|android|all`；不带 `-Bump` 就按当前版本重出；`-DryRun` 只打印计划不出包；`-BumpOnly` 只升号写配置、不构建（功能落地先升号时用）。PC 步骤 = release 构建 + 覆盖 `%LOCALAPPDATA%\StickerBox\StickerBox.exe` + 修 HKCU 开机自启；`install-release.ps1` 保留成「只更新本机」的快捷方式（内部转调 release.ps1 -Target pc）。
+- 安卓只打 `aarch64`，不做 universal；首次出安卓包后核对 `aapt2 dump badging` 里的 versionName/versionCode 是否等于配置值。
