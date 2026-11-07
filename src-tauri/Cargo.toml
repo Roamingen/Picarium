@@ -1,6 +1,6 @@
 [package]
 name = "stickerbox"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "StickerBox desktop shell (Tauri 2)"
 
@@ -26,6 +26,8 @@ ndk-context = "0.1"
 
 [target.'cfg(windows)'.dependencies]
 arboard = "3"
+fontdb = { version = "0.24.0", default-features = false, features = ["fs"] }
+ttf-parser = "0.25"
 windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_System_DataExchange",

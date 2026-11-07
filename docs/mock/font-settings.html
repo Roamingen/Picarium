@@ -1,0 +1,1487 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StickerBox · 界面字体（PC 设计稿）</title>
+<style>
+  :root{
+    --bg:#101218; --bg-2:#14161a; --surface:#191d24; --surface-2:#1c1f26; --surface-3:#232833;
+    --fg:#e8eaed; --dim:#8b93a1; --dim-2:#5d6573; --line:#2a2f38; --line-2:#333a47; --line-3:#3c4453;
+    --accent:#6ea8fe; --accent-2:#4c9aff; --accent-soft:rgba(110,168,254,.12);
+    --green:#7ad3a0; --green-soft:rgba(122,211,160,.12);
+    --orange:#f0b45a; --orange-soft:rgba(240,180,90,.12);
+    --purple:#c084fc; --purple-soft:rgba(192,132,252,.12);
+    --danger:#ff6b78; --danger-soft:rgba(255,107,120,.12);
+    --shadow:0 24px 80px rgba(0,0,0,.55);
+    --radius:12px; --radius-sm:8px;
+    --page-font:"Segoe UI","Microsoft YaHei UI","Microsoft YaHei",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:dark}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--page-font);font-size:13px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  button,input,select{font-family:inherit}
+  button{cursor:pointer}
+  [hidden]{display:none!important}
+  ::selection{background:rgba(110,168,254,.28)}
+
+  .page{max-width:1240px;margin:0 auto;padding:34px 24px 64px}
+  .hero{padding:8px 2px 26px;border-bottom:1px solid var(--line)}
+  .hero-kicker{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:11.5px;letter-spacing:.02em}
+  .hero-kicker .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(110,168,254,.14)}
+  .hero-row{display:flex;gap:32px;align-items:flex-start;justify-content:space-between;margin-top:10px}
+  h1{margin:0;font-size:30px;line-height:1.25;letter-spacing:-.01em;font-weight:650}
+  .h1-tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;margin-left:10px;border:1px solid var(--line-3);border-radius:999px;color:var(--dim);font-size:11px;font-weight:500;vertical-align:middle;letter-spacing:.04em}
+  .lede{max-width:760px;margin:8px 0 0;color:var(--dim);font-size:13.5px;line-height:1.75}
+  .lede b{color:var(--fg);font-weight:550}
+  .hero-links{display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex:0 0 auto;padding-top:4px}
+  .hero-note{color:var(--dim-2);font-size:11px;white-space:nowrap}
+  .hero-chips{display:flex;flex-wrap:wrap;gap:14px;margin-top:18px;color:var(--dim);font-size:11.5px}
+  .chip{display:inline-flex;align-items:center;gap:6px}
+  .chip i{width:7px;height:7px;border-radius:50%;background:var(--dim-2);display:inline-block}
+  .chip .c-blue{background:var(--accent)} .chip .c-green{background:var(--green)} .chip .c-orange{background:var(--orange)} .chip .c-purple{background:var(--purple)}
+
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:30px;padding:0 12px;border:1px solid var(--line-3);border-radius:8px;background:var(--surface-2);color:var(--fg);font-size:12px;line-height:1;transition:border-color .15s,background .15s,color .15s}
+  .btn:hover{background:var(--surface-3);border-color:var(--line-3)}
+  .btn.small{height:28px;padding:0 10px;font-size:11.5px}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#0f1522;font-weight:600}
+  .btn.primary:hover{background:#82b6ff}
+  .btn.ghost{background:transparent;color:var(--dim)}
+  .btn.ghost:hover{color:var(--fg)}
+  .link-btn{border:0;background:none;color:var(--dim);font-size:11.5px;padding:3px 2px;border-radius:4px}
+  .link-btn:hover{color:var(--accent);text-decoration:underline}
+  .icon-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid var(--line-2);border-radius:8px;background:var(--surface-2);color:var(--dim);font-size:14px}
+  .icon-btn:hover{color:var(--fg);border-color:var(--line-3)}
+  .spacer{flex:1}
+
+  .principles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0 16px}
+  .principle{position:relative;padding:15px 16px 14px;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(180deg,rgba(255,255,255,.018),rgba(255,255,255,0));overflow:hidden}
+  .principle .p-no{position:absolute;right:12px;top:10px;color:var(--dim-2);font-size:10px;letter-spacing:.08em}
+  .principle h3{margin:0 0 6px;font-size:13px;font-weight:600}
+  .principle p{margin:0;color:var(--dim);font-size:11.5px;line-height:1.7}
+  .principle p b{color:var(--fg);font-weight:550}
+
+  .callout{display:flex;gap:12px;align-items:flex-start;padding:13px 15px;margin:0 0 30px;border:1px solid rgba(240,180,90,.24);border-radius:var(--radius);background:rgba(240,180,90,.055);color:var(--dim);font-size:11.5px;line-height:1.75}
+  .callout .callout-icon{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;margin-top:1px;border-radius:50%;background:rgba(240,180,90,.16);color:var(--orange);font-size:11px;font-weight:700}
+  .callout b{color:var(--fg);font-weight:600}
+  .callout code{color:var(--orange);background:rgba(240,180,90,.08);padding:1px 5px;border-radius:4px;font-size:10.5px}
+
+  .block{margin-top:8px}
+  .block-head{display:flex;align-items:flex-start;gap:12px;margin:0 0 14px}
+  .block-no{display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;margin-top:1px;border:1px solid var(--line-3);border-radius:7px;color:var(--dim);font-size:10px;font-weight:600;letter-spacing:.04em}
+  .block-head h2{margin:0;font-size:15px;font-weight:600}
+  .block-head p{margin:3px 0 0;color:var(--dim);font-size:11.5px}
+  .block-tag{margin-left:auto;color:var(--dim-2);font-size:10.5px;padding-top:6px;white-space:nowrap}
+
+  /* ---------- entry row ---------- */
+  .entry-card{width:1160px;max-width:100%;margin:0 0 14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:12px 16px 10px}
+  .entry-head{color:var(--dim-2);font-size:10.5px;letter-spacing:.03em;padding-bottom:7px;border-bottom:1px solid var(--line)}
+  .entry-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .entry-row:last-of-type{border-bottom:0}
+  .entry-icon{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:600;flex:0 0 auto}
+  .entry-icon.nf{background:var(--orange-soft);color:var(--orange);font-family:var(--page-font)}
+  .entry-text{flex:1;min-width:0}
+  .entry-title{font-size:12.5px;font-weight:550}
+  .entry-sub{margin-top:1px;color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .entry-foot{color:var(--dim-2);font-size:10.5px;padding-top:9px}
+
+  /* ---------- pc window ---------- */
+  .pc-window{width:1160px;max-width:100%;height:760px;display:flex;flex-direction:column;border:1px solid #2f3542;border-radius:14px;background:var(--bg-2);box-shadow:0 32px 90px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.02) inset;overflow:hidden}
+  .pc-titlebar{height:34px;flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:0 0 0 13px;background:#1b1f26;border-bottom:1px solid #262b34;color:var(--dim);font-size:11px;user-select:none}
+  .pc-brand{display:flex;align-items:center;gap:7px;color:var(--fg);font-size:11.5px;font-weight:550}
+  .pc-logo{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:5px;background:linear-gradient(135deg,#6ea8fe,#8b5cf6);color:#0f1522;font-size:9px;font-weight:800}
+  .pc-title{position:absolute;left:50%;transform:translateX(-50%);color:var(--dim-2);font-size:10.5px}
+  .pc-controls{margin-left:auto;display:flex;height:100%}
+  .pc-controls span{display:inline-flex;align-items:center;justify-content:center;width:42px;height:100%;color:var(--dim-2);font-size:10px}
+  .pc-controls span:hover{background:#262c36;color:var(--fg)}
+  .pc-controls span:last-child:hover{background:#c42b2b;color:#fff}
+
+  .settings{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg-2);position:relative}
+  .settings-head{height:50px;flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid var(--line)}
+  .settings-title{font-size:15px;font-weight:600;letter-spacing:.01em}
+  .settings-sub{color:var(--dim-2);font-size:10.5px;padding-top:2px}
+  .tabs{height:34px;flex:0 0 auto;display:flex;align-items:stretch;gap:20px;padding:0 20px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.008)}
+  .tab{position:relative;border:0;background:none;color:var(--dim);font-size:12px;padding:0 1px}
+  .tab:hover{color:var(--fg)}
+  .tab.active{color:var(--fg);font-weight:550}
+  .tab.active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px 2px 0 0;background:var(--accent)}
+
+  .subpage{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 20px;overflow:hidden}
+  .subhead{height:46px;flex:0 0 auto;display:flex;align-items:center;gap:10px}
+  .back{border:0;background:none;color:var(--dim);font-size:12px;padding:4px 2px;border-radius:5px}
+  .back:hover{color:var(--fg)}
+  .subhead-title{font-size:14px;font-weight:600}
+  .subhead-badge{display:inline-flex;align-items:center;height:18px;padding:0 6px;border:1px solid rgba(110,168,254,.28);border-radius:4px;background:var(--accent-soft);color:var(--accent);font-size:9.5px;letter-spacing:.03em}
+  .subhead .btn{margin-left:2px}
+  .preset-sep{width:1px;height:18px;background:var(--line);margin:0 2px}
+  .preset-label{color:var(--dim-2);font-size:9.5px}
+  .preset{height:22px;padding:0 7px;border:1px solid var(--line-2);border-radius:5px;background:transparent;color:var(--dim);font-size:10px}
+  .preset:hover{color:var(--fg);border-color:var(--line-3)}
+  .preset.on{background:var(--accent-soft);border-color:rgba(110,168,254,.3);color:var(--accent)}
+  .preset-custom{color:var(--orange);font-size:9.5px;border:1px dashed rgba(240,180,90,.3);border-radius:4px;padding:1px 5px}
+  .switch{position:relative;display:inline-flex;width:34px;height:20px;flex:0 0 auto;vertical-align:middle}
+  .switch.small{width:30px;height:18px}
+  .switch input{position:absolute;opacity:0;width:0;height:0}
+  .switch span{position:absolute;inset:0;border-radius:999px;background:var(--line-3);transition:background .15s;cursor:pointer}
+  .switch span::after{content:"";position:absolute;left:3px;top:3px;width:14px;height:14px;border-radius:50%;background:#f2f5fa;transition:transform .15s}
+  .switch.small span::after{width:12px;height:12px;left:3px;top:3px}
+  .switch input:checked+span{background:var(--accent)}
+  .switch input:checked+span::after{transform:translateX(14px)}
+  .switch.small input:checked+span::after{transform:translateX(12px)}
+  .switch input:focus-visible+span{box-shadow:0 0 0 3px rgba(110,168,254,.25)}
+
+  .editor{flex:1;min-height:0;display:grid;grid-template-columns:210px minmax(0,1fr) 412px;gap:14px;padding-bottom:10px}
+  .scopes{min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:11px 8px 10px;overflow:auto}
+  .side-label{color:var(--dim-2);font-size:10px;letter-spacing:.06em;padding:0 7px 8px}
+  .scope-item{position:relative;display:block;width:100%;text-align:left;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--fg);padding:8px 8px 8px 10px;margin-bottom:3px;transition:background .12s,border-color .12s}
+  .scope-item:hover{background:rgba(255,255,255,.025)}
+  .scope-item.active{background:var(--accent-soft);border-color:rgba(110,168,254,.24)}
+  .scope-item.active::before{content:"";position:absolute;left:-1px;top:9px;bottom:9px;width:2px;border-radius:2px;background:var(--accent)}
+  .scope-top{display:flex;align-items:center;gap:6px}
+  .scope-name{font-size:12.5px;font-weight:550}
+  .scope-tag{margin-left:auto;display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:4px;font-size:9px;letter-spacing:.02em}
+  .scope-tag.base{background:var(--accent-soft);color:var(--accent)}
+  .scope-tag.follow{background:var(--green-soft);color:var(--green)}
+  .scope-tag.own{background:var(--orange-soft);color:var(--orange)}
+  .scope-sum{margin-top:2px;color:var(--dim);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .side-div{height:1px;background:var(--line);margin:9px 4px 10px}
+  .nf-card{border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.012);padding:9px 9px 8px}
+  .nf-card-head{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11.5px;font-weight:550}
+  .nf-font{display:flex;align-items:center;gap:6px;width:100%;margin-top:7px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface-2);color:var(--dim);font-size:10.5px;padding:4px 6px;text-align:left}
+  .nf-font:hover{border-color:var(--orange);color:var(--fg)}
+  .nf-font .nf-arrow{margin-left:auto;color:var(--dim-2)}
+  .nf-test{margin-top:8px;color:var(--fg);font-size:20px;line-height:1.2;letter-spacing:3px;min-height:24px;white-space:nowrap;overflow:hidden}
+  .nf-test.off{opacity:.35}
+  .nf-test.missing{color:var(--danger)}
+  .nf-hint{margin-top:5px;color:var(--dim-2);font-size:10px;line-height:1.45}
+  .side-note{margin-top:auto;padding:9px 5px 0;color:var(--dim-2);font-size:10px;line-height:1.5}
+
+  .form{min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+  .form-head{height:38px;flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--line)}
+  .form-title{font-size:13px;font-weight:600}
+  .form-tag{display:inline-flex;align-items:center;height:17px;padding:0 5px;border-radius:4px;background:var(--surface-3);color:var(--dim);font-size:9px}
+  .form-head .link-btn{margin-left:auto}
+  .follow-bar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);background:var(--green-soft)}
+  .follow-main{font-size:11.5px;color:var(--green)}
+  .follow-hint{margin-left:auto;color:var(--dim-2);font-size:10px}
+  .form-scroll{flex:1;min-height:0;overflow:auto;padding:12px 12px 16px;scrollbar-width:thin;scrollbar-color:var(--line-3) transparent}
+  .form-scroll::-webkit-scrollbar{width:8px}
+  .form-scroll::-webkit-scrollbar-thumb{background:var(--line-3);border-radius:8px;border:2px solid var(--surface)}
+  .form-scroll.is-following .group:not(.follow-keep){opacity:.48;pointer-events:none}
+  .group{margin-bottom:15px}
+  .group:last-child{margin-bottom:0}
+  .group-title{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:10.5px;letter-spacing:.04em;margin:0 0 9px}
+  .group-title::after{content:"";flex:1;height:1px;background:var(--line)}
+  .field{margin-bottom:11px}
+  .field:last-child{margin-bottom:0}
+  .field-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+  .field-label{color:var(--dim);font-size:11.5px}
+  .field-label .en{color:var(--dim-2);font-size:9px;letter-spacing:.04em;margin-left:2px}
+  .field-hint{margin-left:auto;color:var(--dim-2);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px}
+  .font-btn{display:flex;align-items:center;gap:10px;width:100%;min-height:38px;padding:7px 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface-2);color:var(--fg);text-align:left;transition:border-color .15s,background .15s}
+  .font-btn:hover{border-color:var(--accent);background:var(--surface-3)}
+  .font-btn .fb-name{font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+  .font-btn .fb-sample{margin-left:auto;color:var(--dim);font-size:15px;line-height:1.2;white-space:nowrap}
+  .font-btn .fb-arrow{color:var(--dim-2);font-size:15px;flex:0 0 auto}
+  .font-btn .fb-warn{width:6px;height:6px;border-radius:50%;background:var(--orange);flex:0 0 auto}
+  .warn-line{display:flex;align-items:flex-start;gap:6px;margin:-3px 0 9px;padding:6px 8px;border-radius:6px;background:var(--orange-soft);color:var(--orange);font-size:10px;line-height:1.5}
+  .warn-line::before{content:"!";display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;margin-top:0;border-radius:50%;background:rgba(240,180,90,.18);font-size:9px;font-weight:700;flex:0 0 auto}
+  .chain{display:flex;flex-wrap:wrap;gap:5px;align-items:center;min-height:26px}
+  .chain-item{display:inline-flex;align-items:center;gap:3px;max-width:100%;padding:3px 4px 3px 6px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface-2);font-size:10.5px;line-height:1.4}
+  .chain-item .cn{color:var(--dim-2);font-size:8.5px;margin-right:1px}
+  .chain-item .cx{border:0;background:none;color:var(--dim-2);font-size:10px;padding:0 2px;border-radius:3px}
+  .chain-item .cx:hover{color:var(--danger)}
+  .chain-item .cm{display:inline-flex;flex-direction:column;gap:0;margin-left:1px}
+  .chain-item .cm button{border:0;background:none;color:var(--dim-2);font-size:8px;line-height:8px;padding:0 1px}
+  .chain-item .cm button:hover{color:var(--accent)}
+  .chain-item .cm button:disabled{opacity:.2;cursor:default}
+  .chain-item.locked{border-style:dashed;background:transparent;color:var(--dim-2);padding-right:6px}
+  .chain-item.nf{border-color:rgba(240,180,90,.28);color:var(--orange);background:var(--orange-soft)}
+  .chain-empty{color:var(--dim-2);font-size:10.5px;padding:2px 0}
+  .add-btn{align-self:flex-start;margin-top:6px;border:1px dashed var(--line-3);background:transparent;color:var(--dim);border-radius:6px;font-size:10.5px;padding:4px 7px}
+  .add-btn:hover{color:var(--fg);border-color:var(--dim)}
+  .size-line{display:flex;align-items:center;gap:9px;min-height:30px;margin-bottom:7px}
+  .size-line .field-label{flex:0 0 58px;margin:0}
+  .size-line input[type=range]{flex:1;min-width:0;accent-color:var(--accent);height:4px}
+  .num{width:54px;height:26px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface-2);color:var(--fg);text-align:center;font-size:11.5px;outline:none}
+  .num:focus{border-color:var(--accent)}
+  .num::-webkit-inner-spin-button{opacity:.4}
+  .unit{color:var(--dim-2);font-size:10px;flex:0 0 auto}
+  .num-read{min-width:34px;text-align:right;color:var(--dim);font-size:11px;font-variant-numeric:tabular-nums}
+  .quick-row{display:flex;align-items:center;gap:5px;margin:-1px 0 10px 67px;flex-wrap:wrap}
+  .mini-chip{border:1px solid var(--line-2);background:transparent;color:var(--dim);border-radius:5px;font-size:10px;padding:2px 6px}
+  .mini-chip:hover{color:var(--fg);border-color:var(--line-3)}
+  .mini-chip.on{background:var(--accent-soft);border-color:rgba(110,168,254,.3);color:var(--accent)}
+  .quick-note{color:var(--dim-2);font-size:9.5px;margin-left:3px}
+  .seg{display:flex;background:var(--surface-2);border:1px solid var(--line-2);border-radius:6px;padding:1px;flex:1;min-width:0}
+  .seg button{flex:1;border:0;background:none;color:var(--dim);font-size:10.5px;padding:4px 3px;border-radius:4px;white-space:nowrap}
+  .seg button:hover{color:var(--fg)}
+  .seg button.on{background:var(--surface-3);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .advanced{border-top:1px solid var(--line);margin-top:2px;padding-top:10px}
+  .advanced summary{cursor:pointer;color:var(--dim);font-size:10.5px;list-style:none;display:flex;align-items:center;gap:6px}
+  .advanced summary::-webkit-details-marker{display:none}
+  .advanced summary::before{content:"›";color:var(--dim-2);transition:transform .15s;display:inline-block}
+  .advanced[open] summary::before{transform:rotate(90deg)}
+  .adv-body{padding-top:8px}
+  .text-input{width:100%;height:28px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface-2);color:var(--fg);font-size:11px;padding:0 8px;outline:none}
+  .text-input:focus{border-color:var(--accent)}
+  .adv-hint{color:var(--dim-2);font-size:9.5px;line-height:1.5;margin-top:4px}
+  .adv-hint code{color:var(--dim);background:var(--surface-3);padding:0 4px;border-radius:3px;font-size:9px}
+
+  .preview{min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:10px 11px 9px}
+  .preview-head{display:flex;align-items:center;justify-content:space-between;height:20px;font-size:11px;color:var(--dim)}
+  .preview-live{display:flex;align-items:center;gap:5px;color:var(--dim-2);font-size:9.5px}
+  .preview-live i{width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 0 2px rgba(122,211,160,.12)}
+  .pv-tabs{display:flex;gap:1px;margin:7px 0 8px;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:2px;flex:0 0 auto}
+  .pv-tab{flex:1;border:0;background:none;color:var(--dim-2);font-size:10px;padding:4px 2px;border-radius:4px;white-space:nowrap}
+  .pv-tab:hover{color:var(--fg)}
+  .pv-tab.active{background:var(--surface-3);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .pv-stage{position:relative;flex:1;min-height:340px;border:1px solid var(--line);border-radius:8px;background:#0f1115;overflow:hidden}
+  .pv-pane{display:none;position:absolute;inset:0;overflow:hidden}
+  .pv-pane.active{display:block}
+  .hl-badge,.bounds-badge{position:absolute;z-index:9;top:7px;right:7px;border:1px solid rgba(110,168,254,.3);border-radius:4px;background:rgba(16,18,24,.9);color:var(--accent);font-size:9px;padding:2px 5px;pointer-events:none}
+  .bounds-badge{top:auto;bottom:7px;left:7px;right:auto;border-color:rgba(240,180,90,.3);color:var(--orange)}
+  .pv-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:8px;color:var(--dim-2);font-size:9.5px}
+  .chk{display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none;color:var(--dim);font-size:10px}
+  .chk input{accent-color:var(--accent);width:12px;height:12px;margin:0}
+  .pv-current{margin-left:auto;color:var(--dim-2);white-space:nowrap}
+  .pv-note{padding-top:5px;color:var(--dim-2);font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .subfoot{height:36px;flex:0 0 auto;display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);color:var(--dim-2);font-size:10px}
+  .subfoot-right{margin-left:auto;color:var(--dim)}
+
+  /* ---------- mini app ---------- */
+  .mini-app{height:100%;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;color:var(--fg)}
+  .mini-titlebar{height:26px;flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:0 9px;border-bottom:1px solid var(--line);background:#171a20;color:var(--dim);font-size:9px}
+  .mini-logo{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:4px;background:linear-gradient(135deg,#6ea8fe,#8b5cf6);color:#0f1522;font-size:7px;font-weight:800}
+  .mini-titlebar-sub{margin-left:auto;color:var(--dim-2);font-size:8.5px}
+  .mini-searchrow{height:37px;flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:0 9px}
+  .mini-search{flex:1;display:flex;align-items:center;gap:7px;height:26px;padding:0 8px;border:1px solid var(--line-2);border-radius:7px;background:var(--surface-2);color:var(--dim-2);font-size:10px;min-width:0}
+  .mini-search .ms-ico{font-size:12px;color:var(--dim-2)}
+  .mini-search .ms-ph{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .mini-search kbd{margin-left:auto;flex:0 0 auto}
+  .mini-add{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:7px;background:var(--accent);color:#0f1522;font-size:14px;font-weight:600}
+  .mini-layout{flex:1;min-height:0;display:flex}
+  .mini-side{flex:0 0 94px;min-height:0;padding:7px 7px 8px;border-right:1px solid var(--line);background:#121419;overflow:hidden}
+  .mini-nav{display:flex;align-items:center;gap:4px;height:22px;padding:0 6px;border-radius:5px;color:var(--dim);font-size:10px;white-space:nowrap}
+  .mini-nav span{margin-left:auto;color:var(--dim-2)}
+  .mini-nav.active{background:var(--accent-soft);color:var(--accent)}
+  .mini-side-sec{color:var(--dim-2);font-size:8px;letter-spacing:.06em;margin:9px 6px 3px}
+  .mini-tag{display:flex;align-items:center;gap:4px;height:20px;padding:0 6px;border-radius:4px;color:var(--dim);font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mini-tag i{font-style:normal;color:var(--dim-2)}
+  .mini-main{flex:1;min-width:0;display:flex;flex-direction:column;padding:7px 8px 6px;overflow:hidden}
+  .mini-toolbar{height:25px;flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:0 1px}
+  .mini-h{font-size:11.5px;font-weight:600!important}
+  .mini-meta{color:var(--dim-2);font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mini-kbd{margin-left:auto;flex:0 0 auto}
+  .mini-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-content:start;padding-top:2px}
+  .mini-card{min-width:0;height:84px;border:1px solid var(--line);border-radius:6px;background:var(--surface);overflow:hidden}
+  .mini-thumb{position:relative;height:42px;display:flex;align-items:center;justify-content:center;font-size:21px;overflow:hidden}
+  .mini-thumb::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 45%,rgba(0,0,0,.22))}
+  .mini-thumb span{position:relative;z-index:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.25))}
+  .mini-star{position:absolute;z-index:2;right:4px;top:3px;color:#ffd166;font-size:9px;font-weight:400;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+  .mini-name{padding:4px 5px 0;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mini-tags{display:flex;gap:3px;padding:2px 5px 4px;overflow:hidden;white-space:nowrap}
+  .mini-tags span{color:var(--dim-2);line-height:1.3}
+  .mini-status{height:22px;flex:0 0 auto;display:flex;align-items:center;gap:8px;padding-top:4px;color:var(--dim-2);font-size:8.5px}
+  .mini-status span:last-child{margin-left:auto}
+  .t1{background:linear-gradient(135deg,#244a6b,#e08a4b)}
+  .t2{background:linear-gradient(135deg,#5b2b47,#c96a8a)}
+  .t3{background:linear-gradient(135deg,#2f4a35,#8aa65b)}
+  .t4{background:linear-gradient(135deg,#3a3f4b,#7b8496)}
+  .t5{background:linear-gradient(135deg,#372a4f,#7b5ba6)}
+  .t6{background:linear-gradient(135deg,#5a4a22,#d4ad52)}
+
+  /* ---------- panel preview ---------- */
+  .panel-bg{height:100%;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 35%,rgba(110,168,254,.07),transparent 60%),#0d0f13;padding:14px}
+  .panel-bg::before{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:22px 22px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.55),transparent 70%);pointer-events:none}
+  .mini-panel{position:relative;width:92%;height:92%;display:flex;flex-direction:column;border:1px solid #363d4b;border-radius:9px;background:#181c23;box-shadow:0 18px 50px rgba(0,0,0,.55);overflow:hidden}
+  .mp-search{height:34px;flex:0 0 auto;display:flex;align-items:center;gap:7px;margin:9px 9px 0;padding:0 8px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface-2);color:var(--dim-2);font-size:10px}
+  .mp-search kbd{margin-left:auto}
+  .mp-body{flex:1;min-height:0;padding:6px 9px 4px;overflow:hidden}
+  .mp-sec{display:flex;align-items:center;gap:5px;padding:5px 1px 3px;color:var(--dim-2);font-size:8.5px;letter-spacing:.04em}
+  .mp-sec span{margin-left:auto}
+  .mp-row{display:flex;align-items:center;gap:7px;height:44px;padding:0 5px;border-radius:5px}
+  .mp-row.active{background:var(--accent-soft)}
+  .mp-thumb{display:flex;align-items:center;justify-content:center;width:38px;height:34px;border-radius:4px;font-size:16px;flex:0 0 auto}
+  .mp-main{flex:1;min-width:0}
+  .mp-name{font-size:10.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mp-tags{margin-top:1px;color:var(--dim-2);font-size:8.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mp-row kbd{flex:0 0 auto}
+  .mp-foot{height:28px;flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:0 9px;border-top:1px solid var(--line);color:var(--dim-2);font-size:8.5px}
+  .mp-size{margin-left:auto}
+
+  /* ---------- settings preview ---------- */
+  .mini-settings{height:100%;display:flex;flex-direction:column;background:var(--bg);color:var(--fg);padding:13px 14px 11px;overflow:hidden}
+  .ms-head{display:flex;align-items:baseline;gap:10px;font-size:14px;font-weight:600!important;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .ms-tabs{display:flex;gap:12px;font-size:9.5px;font-weight:400;color:var(--dim-2)}
+  .ms-tabs b{color:var(--fg);font-weight:550;position:relative}
+  .ms-tabs b::after{content:"";position:absolute;left:0;right:0;bottom:-9px;height:1.5px;background:var(--accent)}
+  .ms-body{flex:1;min-height:0;padding-top:4px}
+  .ms-row{display:flex;align-items:center;gap:12px;height:46px;border-bottom:1px solid var(--line)}
+  .ms-row:last-child{border-bottom:0}
+  .ms-text{flex:1;min-width:0}
+  .ms-label{font-size:1em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ms-sub{margin-top:1px;color:var(--dim-2);font-size:.78em;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ms-value{flex:0 0 auto;max-width:120px;color:var(--dim);font-size:.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:3px 7px;border:1px solid var(--line-2);border-radius:5px;background:var(--surface-2)}
+  .ms-foot{padding-top:8px;color:var(--dim-2);font-size:8.5px;line-height:1.45;border-top:1px solid var(--line)}
+
+  /* ---------- glyph test ---------- */
+  .glyph-card{height:100%;display:flex;flex-direction:column;padding:13px 13px 10px;overflow:hidden}
+  .glyph-head{display:flex;align-items:center;gap:7px;color:var(--dim-2);font-size:9.5px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .glyph-head b{color:var(--fg);font-weight:550}
+  .glyph-head .spacer{flex:1}
+  .glyph-line{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-bottom:1px solid rgba(42,47,56,.6)}
+  .glyph-line:last-of-type{border-bottom:0}
+  .gl-label{flex:0 0 48px;display:inline-flex;align-items:center;gap:4px;color:var(--dim-2);font-size:8px;letter-spacing:.06em;padding-top:3px}
+  .gl-label::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--dim-2)}
+  .gl-label.blue::before{background:var(--accent)} .gl-label.green::before{background:var(--green)} .gl-label.purple::before{background:var(--purple)} .gl-label.orange::before{background:var(--orange)} .gl-label.gray::before{background:var(--dim-2)}
+  .gl-text{flex:1;min-width:0;font-size:15px;line-height:1.45;word-break:break-word}
+  .gl-text.role-sel{font-family:var(--sel-family);font-size:var(--sel-size);line-height:var(--sel-line);font-weight:var(--sel-weight);letter-spacing:var(--sel-letter);font-feature-settings:var(--sel-feat)}
+  .gl-text.nf{font-size:18px;letter-spacing:2px;color:var(--fg)}
+  .gl-text.nf.off{opacity:.35}
+  .gl-text.nf.missing{color:var(--danger)}
+  .glyph-note{margin-top:auto;padding-top:8px;color:var(--dim-2);font-size:9px;line-height:1.5}
+
+  /* ---------- picker ---------- */
+  .overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(5,7,10,.62);backdrop-filter:blur(3px)}
+  .picker{width:620px;max-width:100%;max-height:calc(100vh - 48px);display:flex;flex-direction:column;border:1px solid #3a4251;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+  .picker-head{display:flex;align-items:flex-start;gap:10px;padding:15px 16px 10px}
+  .picker-title{font-size:14px;font-weight:600}
+  .picker-sub{margin-top:2px;color:var(--dim-2);font-size:10px}
+  .picker-head .icon-btn{margin-left:auto;flex:0 0 auto}
+  .picker-preview{display:flex;align-items:center;gap:10px;margin:0 16px 11px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);min-height:54px}
+  .picker-preview .pp-sample{flex:1;min-width:0;color:var(--fg);font-size:24px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .picker-preview .pp-meta{flex:0 0 auto;color:var(--dim-2);font-size:9.5px;text-align:right;max-width:180px}
+  .search-box{display:flex;align-items:center;gap:8px;margin:0 16px 8px;height:32px;padding:0 9px;border:1px solid var(--line-2);border-radius:7px;background:var(--surface-2);color:var(--dim-2)}
+  .search-box:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(110,168,254,.1)}
+  .search-box input{flex:1;min-width:0;border:0;outline:0;background:none;color:var(--fg);font-size:11.5px}
+  .search-box input::placeholder{color:var(--dim-2)}
+  .search-box .sq-clear{border:0;background:none;color:var(--dim-2);font-size:11px;padding:0 2px}
+  .picker-filters{display:flex;align-items:center;gap:8px;padding:0 16px 7px;color:var(--dim-2);font-size:10px}
+  .picker-filters .picker-count{margin-left:auto;font-variant-numeric:tabular-nums}
+  .font-list{flex:1;min-height:0;overflow:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px 8px;scrollbar-width:thin;scrollbar-color:var(--line-3) transparent}
+  .font-list::-webkit-scrollbar{width:8px}
+  .font-list::-webkit-scrollbar-thumb{background:var(--line-3);border-radius:8px;border:2px solid var(--surface)}
+  .font-row{display:flex;align-items:center;gap:9px;width:100%;padding:6px 8px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--fg);text-align:left}
+  .font-row:hover{background:rgba(255,255,255,.03)}
+  .font-row.selected{background:var(--accent-soft);border-color:rgba(110,168,254,.24)}
+  .font-row.missing .fr-name{color:var(--dim)}
+  .fr-check{flex:0 0 14px;color:var(--accent);font-size:11px;text-align:center}
+  .fr-main{flex:1;min-width:0}
+  .fr-line{display:flex;align-items:center;gap:6px;min-width:0}
+  .fr-name{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fr-family{color:var(--dim-2);font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fr-sample{display:block;margin-top:1px;color:var(--dim);font-size:14px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fr-state{flex:0 0 auto;color:var(--dim-2);font-size:9px;white-space:nowrap}
+  .fr-state.ok{color:var(--green)}
+  .fr-state.no{color:var(--orange)}
+  .badge{display:inline-flex;align-items:center;height:14px;padding:0 4px;border:1px solid var(--line-2);border-radius:3px;color:var(--dim-2);font-size:8px;line-height:1;letter-spacing:.02em;flex:0 0 auto}
+  .badge.cjk{border-color:rgba(122,211,160,.3);color:var(--green)}
+  .badge.mono{border-color:rgba(110,168,254,.3);color:var(--accent)}
+  .badge.nf{border-color:rgba(240,180,90,.32);color:var(--orange)}
+  .badge.sys{border-color:rgba(192,132,252,.3);color:var(--purple)}
+  .picker-empty{padding:26px 12px;text-align:center;color:var(--dim-2);font-size:11px}
+  .picker-empty b{display:block;color:var(--dim);font-weight:500;margin-bottom:4px}
+  .picker-foot{flex:0 0 auto;padding:10px 16px 12px;background:rgba(255,255,255,.008)}
+  .manual-label{color:var(--dim-2);font-size:9.5px;margin-bottom:4px}
+  .manual-row{display:flex;gap:6px}
+  .manual-row input{flex:1;min-width:0;height:28px;border:1px solid var(--line-2);border-radius:6px;background:var(--surface-2);color:var(--fg);font-size:11px;padding:0 8px;outline:none}
+  .manual-row input:focus{border-color:var(--accent)}
+  .picker-foot .link-btn{margin-top:6px}
+
+  /* ---------- notes ---------- */
+  .notes{margin-top:34px;border-top:1px solid var(--line);padding-top:20px}
+  .notes-head{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+  .notes-head h2{margin:0;font-size:15px;font-weight:600}
+  .notes-head span{color:var(--dim-2);font-size:10.5px}
+  .note-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .note-card{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:13px 14px}
+  .note-card h3{margin:0 0 6px;font-size:12px;font-weight:600}
+  .note-card p{margin:0;color:var(--dim);font-size:11px;line-height:1.7}
+  .note-card p + p{margin-top:6px}
+  .note-card code{color:var(--dim);background:var(--surface-3);padding:1px 4px;border-radius:3px;font-size:10px}
+  .note-card pre{margin:7px 0 0;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:#aeb8c8;font-size:9.5px;line-height:1.55;overflow:auto;white-space:pre}
+  .decisions{margin-top:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:14px 16px}
+  .decisions h2{margin:0 0 8px;font-size:13px;font-weight:600}
+  .decisions ol{margin:0;padding-left:18px;color:var(--dim);font-size:11px;line-height:1.8}
+  .decisions li + li{margin-top:2px}
+  .decisions b{color:var(--fg);font-weight:550}
+  .page-foot{margin-top:22px;color:var(--dim-2);font-size:10.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .page-foot .spacer{flex:1}
+  .toast{position:fixed;z-index:200;left:50%;bottom:30px;transform:translateX(-50%);max-width:min(560px,calc(100vw - 32px));padding:8px 13px;border:1px solid var(--line-3);border-radius:8px;background:#242a35;color:var(--fg);font-size:11.5px;box-shadow:0 12px 36px rgba(0,0,0,.45);animation:toast-in .18s ease}
+  @keyframes toast-in{from{opacity:0;transform:translate(-50%,6px)}to{opacity:1;transform:translate(-50%,0)}}
+
+  /* role classes: the heart of the preview */
+  .role-ui,.role-ui-sm,.role-ui-xs{font-family:var(--ui-family);line-height:var(--ui-line);font-weight:var(--ui-weight);letter-spacing:var(--ui-letter);font-feature-settings:var(--ui-feat)}
+  .role-ui{font-size:var(--ui-size)}
+  .role-ui-sm{font-size:calc(var(--ui-size) * .82)}
+  .role-ui-xs{font-size:calc(var(--ui-size) * .72)}
+  .role-list,.role-list-sm,.role-list-xs{font-family:var(--list-family);line-height:var(--list-line);font-weight:var(--list-weight);letter-spacing:var(--list-letter);font-feature-settings:var(--list-feat)}
+  .role-list{font-size:var(--list-size)}
+  .role-list-sm{font-size:calc(var(--list-size) * .82)}
+  .role-list-xs{font-size:calc(var(--list-size) * .72)}
+  .role-panel,.role-panel-sm,.role-panel-xs{font-family:var(--panel-family);line-height:var(--panel-line);font-weight:var(--panel-weight);letter-spacing:var(--panel-letter);font-feature-settings:var(--panel-feat)}
+  .role-panel{font-size:var(--panel-size)}
+  .role-panel-sm{font-size:calc(var(--panel-size) * .82)}
+  .role-panel-xs{font-size:calc(var(--panel-size) * .72)}
+  .role-mono,.role-mono-sm{font-family:var(--mono-family);line-height:var(--mono-line);font-weight:var(--mono-weight);letter-spacing:var(--mono-letter);font-feature-settings:var(--mono-feat)}
+  .role-mono{font-size:var(--mono-size)}
+  .role-mono-sm{font-size:calc(var(--mono-size) * .85)}
+  kbd{display:inline-block;padding:0 4px;border:1px solid var(--line-3);border-bottom-width:2px;border-radius:3px;background:var(--surface-2);color:var(--dim);font-size:9px;line-height:1.5;white-space:nowrap}
+  .role-ui kbd,.role-list kbd,.role-panel kbd,.role-mono kbd,.role-ui-sm kbd,.role-list-sm kbd,.role-panel-sm kbd,.role-mono-sm kbd{font-family:var(--mono-family);line-height:1.4}
+
+  .pv-stage.hl .role-ui,.pv-stage.hl .role-ui-sm,.pv-stage.hl .role-ui-xs{background:rgba(110,168,254,.085);box-shadow:0 0 0 1px rgba(110,168,254,.28) inset;border-radius:3px}
+  .pv-stage.hl .role-list,.pv-stage.hl .role-list-sm,.pv-stage.hl .role-list-xs{background:rgba(122,211,160,.09);box-shadow:0 0 0 1px rgba(122,211,160,.28) inset;border-radius:3px}
+  .pv-stage.hl .role-panel,.pv-stage.hl .role-panel-sm,.pv-stage.hl .role-panel-xs{background:rgba(192,132,252,.09);box-shadow:0 0 0 1px rgba(192,132,252,.26) inset;border-radius:3px}
+  .pv-stage.hl .role-mono,.pv-stage.hl .role-mono-sm{background:rgba(240,180,90,.09);box-shadow:0 0 0 1px rgba(240,180,90,.26) inset;border-radius:3px}
+  .pv-stage.bounds .mini-card,.pv-stage.bounds .mp-row,.pv-stage.bounds .ms-row{outline:1px dashed rgba(255,255,255,.16);outline-offset:-1px}
+  .pv-stage.bounds .mini-card::before{content:"84px";position:absolute;right:3px;bottom:2px;z-index:4;color:rgba(255,255,255,.25);font-size:7px}
+  .pv-stage.bounds .mini-card{position:relative}
+
+  @media (max-width:1220px){
+    .page{padding-left:16px;padding-right:16px}
+    .pc-window,.entry-card{width:100%}
+    .editor{grid-template-columns:196px minmax(0,1fr) 380px}
+    .principles{grid-template-columns:1fr}
+    .note-grid{grid-template-columns:1fr}
+  }
+  @media (max-width:980px){
+    .editor{grid-template-columns:1fr;height:auto}
+    .pc-window{height:auto}
+    .scopes{max-height:none}
+    .preview{min-height:500px}
+    .hero-row{flex-direction:column}
+    .hero-links{align-items:flex-start}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <div class="hero-kicker"><span class="dot"></span> StickerBox · 设置设计稿 · 2026-11-07</div>
+    <div class="hero-row">
+      <div>
+        <h1>界面字体<span class="h1-tag">PC</span></h1>
+        <p class="lede">像 Zed 一样选字体：<b>西文 / 中文分槽</b>、<b>回退链</b>、<b>Nerd Font 图标</b>；界面、列表卡片、快贴面板、等宽可以各自覆写字体和字号。只改文字，不改卡片尺寸。</p>
+      </div>
+      <div class="hero-links">
+        <a class="btn small" href="mobile-font-settings.html">安卓端 mock →</a>
+        <span class="hero-note">只交设计稿，不动 src-tauri</span>
+      </div>
+    </div>
+    <div class="hero-chips">
+      <span class="chip"><i class="c-blue"></i> 可点 / 实时预览</span>
+      <span class="chip"><i class="c-green"></i> 已装字体</span>
+      <span class="chip"><i class="c-orange"></i> 未装 · 会回退</span>
+      <span class="chip"><i class="c-purple"></i> NF 只吃 PUA</span>
+    </div>
+  </header>
+
+  <section class="principles">
+    <div class="principle">
+      <div class="p-no">01</div>
+      <h3>Zed 式字体选择器</h3>
+      <p>列表每行用<b>自身字体</b>渲染，可搜索、可手动输入字体名；选完立即在右侧预览，不需要先保存。</p>
+    </div>
+    <div class="principle">
+      <div class="p-no">02</div>
+      <h3>先西文，再中文，再回退</h3>
+      <p>西文和中文各占一个槽；自定义回退按顺序尝试，最后系统兜底。<b>Nerd Font 只接管图标区</b>，不抢正文。</p>
+    </div>
+    <div class="principle">
+      <div class="p-no">03</div>
+      <h3>按区域覆写</h3>
+      <p>四个作用范围；列表 / 面板默认跟随界面，点一下就能独立。预览会<b>描出当前区域</b>用的是哪一档。</p>
+    </div>
+  </section>
+
+  <div class="callout platform">
+    <div class="callout-icon">!</div>
+    <div><b>平台边界（先看这里）</b>：PC 只列系统已装字体，不内置字体文件；Nerd Font 用 <code>unicode-range</code> 只接管 PUA 图标区。安卓 WebView 不能枚举系统字体，走「系统通用族 + 导入字体文件」，见 <a href="mobile-font-settings.html">安卓稿</a>。</div>
+  </div>
+
+  <section class="block" id="pc">
+    <div class="block-head">
+      <div class="block-no">01</div>
+      <div><h2>PC · 设置 › 外观 › 界面字体</h2><p>入口是一行设置；点「字体…」进入子页。下面这一屏是可点的，改完直接看预览。</p></div>
+      <div class="block-tag">1160 × 760 · 设计尺寸</div>
+    </div>
+
+    <div class="entry-card" id="entry-card">
+      <div class="entry-head">设置 › 外观</div>
+      <div class="entry-row">
+        <div class="entry-icon">Aa</div>
+        <div class="entry-text"><div class="entry-title">界面字体</div><div class="entry-sub" id="entry-summary">…</div></div>
+        <button class="btn small" id="entry-open">字体…</button>
+      </div>
+      <div class="entry-row">
+        <div class="entry-icon nf">N</div>
+        <div class="entry-text"><div class="entry-title">Nerd Font 图标</div><div class="entry-sub" id="entry-nf">…</div></div>
+        <button class="btn small ghost" id="entry-nf-btn">管理</button>
+      </div>
+      <div class="entry-foot">入口行只显示当前生效值；真正的设置在下面的子页里。</div>
+    </div>
+
+    <div class="pc-window" id="pc-window">
+      <div class="pc-titlebar">
+        <div class="pc-brand"><span class="pc-logo">S</span> StickerBox</div>
+        <div class="pc-title">设置</div>
+        <div class="pc-controls"><span>—</span><span>□</span><span>✕</span></div>
+      </div>
+      <div class="settings">
+        <div class="settings-head">
+          <div class="settings-title">设置</div>
+          <div class="settings-sub">外观 › 界面字体</div>
+          <div class="spacer"></div>
+          <button class="icon-btn" id="set-search-btn" title="搜索设置">⌕</button>
+          <button class="btn small" id="set-save">保存并关闭</button>
+        </div>
+        <div class="tabs">
+          <button class="tab" data-tab="general">常规</button>
+          <button class="tab active" data-tab="appearance">外观</button>
+          <button class="tab" data-tab="keys">按键</button>
+          <button class="tab" data-tab="data">数据</button>
+        </div>
+        <div class="subpage">
+          <div class="subhead">
+            <button class="back" id="pc-back">‹ 外观</button>
+            <div class="subhead-title">界面字体</div>
+            <span class="subhead-badge">Zed 式</span>
+            <span class="preset-sep"></span>
+            <span class="preset-label">方案</span>
+            <button class="preset on" data-preset="default">默认</button>
+            <button class="preset" data-preset="compact">紧凑</button>
+            <button class="preset" data-preset="large">大字</button>
+            <span class="preset-custom" id="pc-preset-custom" hidden>自定义</span>
+            <div class="spacer"></div>
+            <button class="link-btn" id="pc-reset-all">恢复默认</button>
+            <button class="btn small" id="pc-cancel">取消</button>
+            <button class="btn small primary" id="pc-apply">应用</button>
+          </div>
+          <div class="editor">
+            <aside class="scopes">
+              <div class="side-label">作用范围</div>
+              <div id="scope-list"></div>
+              <div class="side-div"></div>
+              <div class="nf-card">
+                <div class="nf-card-head"><span>Nerd Font 图标</span><label class="switch small"><input type="checkbox" id="pc-nf-toggle"><span></span></label></div>
+                <button class="nf-font" id="pc-nf-font"><span class="nf-font-name">…</span><span class="nf-arrow">›</span></button>
+                <div class="nf-test" id="pc-nf-test">&#xF07B; &#xF121; &#xF013; &#xE0B0;</div>
+                <div class="nf-hint" id="pc-nf-hint">…</div>
+              </div>
+              <div class="side-note">列表 / 面板默认跟随界面；等宽默认独立。选中范围后，中间只改这一档。</div>
+            </aside>
+
+            <section class="form" id="pc-form">
+              <div class="form-head">
+                <div><span class="form-title" id="pc-form-title">界面</span> <span class="form-tag" id="pc-form-tag">基础</span></div>
+                <button class="link-btn" id="pc-reset-role">重置此区域</button>
+              </div>
+              <div class="follow-bar" id="pc-follow-bar" hidden>
+                <label class="switch small"><input type="checkbox" id="pc-follow"><span></span></label>
+                <span class="follow-main">跟随「界面」</span>
+                <span class="follow-hint">打开后由界面接管；关闭会复制当前值</span>
+              </div>
+              <div class="form-scroll" id="pc-form-scroll">
+                <div class="group">
+                  <div class="group-title">字体</div>
+                  <div class="field">
+                    <div class="field-top"><span class="field-label">西文字体 <span class="en">LATIN</span></span><span class="field-hint" id="pc-latin-state"></span></div>
+                    <button class="font-btn" id="pc-latin-btn"><span class="fb-name">…</span><span class="fb-sample">Aa 0123</span><span class="fb-arrow">›</span></button>
+                  </div>
+                  <div class="field">
+                    <div class="field-top"><span class="field-label">中文字体 <span class="en">CJK</span></span><span class="field-hint" id="pc-cjk-state"></span></div>
+                    <button class="font-btn" id="pc-cjk-btn"><span class="fb-name">…</span><span class="fb-sample">汉字 字体</span><span class="fb-arrow">›</span></button>
+                  </div>
+                  <div class="warn-line" id="pc-font-warn" hidden></div>
+                  <div class="field">
+                    <div class="field-top"><span class="field-label">回退字体</span><span class="field-hint">按顺序尝试，最后系统兜底</span></div>
+                    <div class="chain" id="pc-chain"></div>
+                    <button class="add-btn" id="pc-add-fallback">＋ 添加回退字体</button>
+                  </div>
+                </div>
+
+                <div class="group">
+                  <div class="group-title">字号与度量</div>
+                  <div class="size-line">
+                    <span class="field-label">基准字号</span>
+                    <input type="range" id="pc-size" min="11" max="20" step="0.5">
+                    <input class="num" type="number" id="pc-size-num" min="11" max="20" step="0.5">
+                    <span class="unit">px</span>
+                  </div>
+                  <div class="quick-row" id="pc-size-quick">
+                    <button class="mini-chip" data-size="11.5">小 11.5</button>
+                    <button class="mini-chip" data-size="13">标准 13</button>
+                    <button class="mini-chip" data-size="15">大 15</button>
+                    <span class="quick-note">不改卡片 / 网格尺寸</span>
+                  </div>
+                  <div class="size-line">
+                    <span class="field-label">行高</span>
+                    <input type="range" id="pc-line" min="1.2" max="2" step="0.05">
+                    <span class="num-read" id="pc-line-val">1.55</span>
+                  </div>
+                  <div class="size-line">
+                    <span class="field-label">字重</span>
+                    <div class="seg" id="pc-weight">
+                      <button data-w="300">细</button><button data-w="400">常规</button><button data-w="500">中等</button><button data-w="600">半粗</button>
+                    </div>
+                  </div>
+                  <div class="size-line">
+                    <span class="field-label">字距</span>
+                    <input type="range" id="pc-letter" min="-0.5" max="1" step="0.1">
+                    <span class="num-read" id="pc-letter-val">0</span>
+                    <span class="unit">px</span>
+                  </div>
+                </div>
+
+                <details class="advanced">
+                  <summary>高级 · OpenType 特性</summary>
+                  <div class="adv-body">
+                    <input class="text-input" id="pc-features" placeholder="calt, liga, ss01, cv05" spellcheck="false">
+                    <div class="adv-hint">逗号分隔；连字用 <code>calt, liga</code>，样式集用 <code>ss01</code>。留空 = 默认。</div>
+                  </div>
+                </details>
+              </div>
+            </section>
+
+            <aside class="preview">
+              <div class="preview-head"><span>实时预览</span><span class="preview-live"><i></i> 实时</span></div>
+              <div class="pv-tabs" id="pc-pv-tabs">
+                <button class="pv-tab active" data-pv="main">主界面</button>
+                <button class="pv-tab" data-pv="panel">快贴面板</button>
+                <button class="pv-tab" data-pv="settings">设置页</button>
+                <button class="pv-tab" data-pv="glyph">回退测试</button>
+              </div>
+              <div class="pv-stage" id="pc-pv-stage">
+                <div class="pv-pane active" data-pane="main">
+                  <div class="mini-app">
+                    <div class="mini-titlebar"><span class="mini-logo">S</span> StickerBox <span class="mini-titlebar-sub">全部</span></div>
+                    <div class="mini-searchrow">
+                      <span class="mini-search role-ui"><span class="ms-ico">⌕</span><span class="ms-ph">搜索表情包…</span><kbd class="role-mono-sm">Ctrl K</kbd></span>
+                      <span class="mini-add">＋</span>
+                    </div>
+                    <div class="mini-layout">
+                      <aside class="mini-side">
+                        <div class="mini-nav role-ui active">全部 <span class="role-ui-xs">128</span></div>
+                        <div class="mini-nav role-ui">最近使用 <span class="role-ui-xs">24</span></div>
+                        <div class="mini-nav role-ui">收藏 <span class="role-ui-xs">8</span></div>
+                        <div class="mini-nav role-ui">未分组 <span class="role-ui-xs">12</span></div>
+                        <div class="mini-side-sec role-ui-xs">标签</div>
+                        <div class="mini-tag role-list-xs"><i>#</i> 设计</div>
+                        <div class="mini-tag role-list-xs"><i>#</i> 猫猫</div>
+                        <div class="mini-tag role-list-xs"><i>#</i> 表情</div>
+                        <div class="mini-tag role-list-xs"><i>#</i> 工作</div>
+                      </aside>
+                      <main class="mini-main">
+                        <div class="mini-toolbar">
+                          <span class="mini-h role-ui">全部</span>
+                          <span class="mini-meta role-ui-sm">128 张 · 按最近使用</span>
+                          <span class="mini-kbd role-mono-sm">Ctrl V 粘贴</span>
+                        </div>
+                        <div class="mini-grid">
+                          <div class="mini-card"><div class="mini-thumb t1"><span>🌊</span><b class="mini-star">★</b></div><div class="mini-name role-list-sm">海边日落.png</div><div class="mini-tags role-list-xs"><span># 风景</span><span># 设计</span></div></div>
+                          <div class="mini-card"><div class="mini-thumb t2"><span>🐱</span></div><div class="mini-name role-list-sm">猫猫贴贴.gif</div><div class="mini-tags role-list-xs"><span># 猫猫</span><span># 表情</span></div></div>
+                          <div class="mini-card"><div class="mini-thumb t3"><span>🍜</span></div><div class="mini-name role-list-sm">今日菜单.png</div><div class="mini-tags role-list-xs"><span># 食物</span><span># 备忘</span></div></div>
+                          <div class="mini-card"><div class="mini-thumb t4"><span>🖥️</span></div><div class="mini-name role-list-sm">screenshot-2026-11-07.png</div><div class="mini-tags role-list-xs"><span># 截图</span><span># 工作</span></div></div>
+                        </div>
+                        <div class="mini-status role-ui-xs"><span>已选 2 张</span><span class="role-mono-sm">Ctrl C 复制 · Ctrl ↵ 粘贴</span></div>
+                      </main>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pv-pane" data-pane="panel">
+                  <div class="panel-bg">
+                    <div class="mini-panel">
+                      <div class="mp-search role-panel"><span>⌕</span> 搜索最近使用… <kbd class="role-mono-sm">Esc</kbd></div>
+                      <div class="mp-body">
+                        <div class="mp-sec role-panel-xs">最近使用 <span class="role-mono-sm">24</span></div>
+                        <div class="mp-row active"><div class="mp-thumb t1"><span>🌊</span></div><div class="mp-main"><div class="mp-name role-panel">海边日落.png</div><div class="mp-tags role-panel-xs"># 风景 · # 设计</div></div><kbd class="role-mono-sm">↵</kbd></div>
+                        <div class="mp-row"><div class="mp-thumb t4"><span>🖥️</span></div><div class="mp-main"><div class="mp-name role-panel">screenshot-2026-11-07.png</div><div class="mp-tags role-panel-xs"># 截图 · # 工作</div></div></div>
+                        <div class="mp-sec role-panel-xs">收藏 <span class="role-mono-sm">8</span></div>
+                        <div class="mp-row"><div class="mp-thumb t2"><span>🐱</span></div><div class="mp-main"><div class="mp-name role-panel">猫猫贴贴.gif</div><div class="mp-tags role-panel-xs"># 猫猫 · # 表情</div></div></div>
+                        <div class="mp-row"><div class="mp-thumb t5"><span>🎮</span></div><div class="mp-main"><div class="mp-name role-panel">Hollow Knight.png</div><div class="mp-tags role-panel-xs"># 游戏</div></div></div>
+                      </div>
+                      <div class="mp-foot role-panel-xs"><span>↑↓ 选择</span><span>↵ 复制</span><span>Esc 关闭</span><span class="mp-size role-mono-sm">120 × 96</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pv-pane" data-pane="settings">
+                  <div class="mini-settings">
+                    <div class="ms-head role-ui">设置 <span class="ms-tabs role-ui-xs">常规 <b>外观</b> 按键 数据</span></div>
+                    <div class="ms-body">
+                      <div class="ms-row"><div class="ms-text"><div class="ms-label role-ui">主题</div><div class="ms-sub role-ui-xs">深色 / 浅色 / Catppuccin</div></div><span class="ms-value role-ui-xs">深色</span></div>
+                      <div class="ms-row"><div class="ms-text"><div class="ms-label role-ui">界面字体</div><div class="ms-sub role-ui-xs" id="ms-font-sub">…</div></div><span class="ms-value role-ui-xs">字体…</span></div>
+                      <div class="ms-row"><div class="ms-text"><div class="ms-label role-ui">网格大小</div><div class="ms-sub role-ui-xs">一屏显示多少张</div></div><span class="ms-value role-ui-xs">标准</span></div>
+                      <div class="ms-row"><div class="ms-text"><div class="ms-label role-ui">回收站保留</div><div class="ms-sub role-ui-xs">到期后下次启动清理</div></div><span class="ms-value role-ui-xs">30 天</span></div>
+                    </div>
+                    <div class="ms-foot role-ui-xs">设置页自身也跟随「界面」；行高固定，字号只影响文字，不会把控件撑高。</div>
+                  </div>
+                </div>
+
+                <div class="pv-pane" data-pane="glyph">
+                  <div class="glyph-card">
+                    <div class="glyph-head"><span>当前角色</span><b id="pc-glyph-role">界面</b><span class="spacer"></span><span id="pc-glyph-size">13px</span></div>
+                    <div class="glyph-line"><span class="gl-label blue">LATIN</span><div class="gl-text role-sel">The quick brown fox jumps over the lazy dog. 0123456789</div></div>
+                    <div class="glyph-line"><span class="gl-label green">CJK</span><div class="gl-text role-sel">字体设置 · 表情包 · 快贴面板 · 标签管理</div></div>
+                    <div class="glyph-line"><span class="gl-label purple">SYMBOL</span><div class="gl-text role-sel">→ ← ↑ ↓ ⏎ ⌘ ⌥ ⇧ · © ® ™</div></div>
+                    <div class="glyph-line"><span class="gl-label orange">NERD</span><div class="gl-text nf" id="pc-glyph-nf">&#xF07B; &#xF121; &#xF013; &#xE0B0; &#xF07C; &#xF015;</div></div>
+                    <div class="glyph-line"><span class="gl-label gray">EMOJI</span><div class="gl-text">🌊 🐱 🍜 🎨 ✨</div></div>
+                    <div class="glyph-note" id="pc-glyph-note">…</div>
+                  </div>
+                </div>
+
+                <div class="hl-badge" id="pc-hl-badge" hidden>高亮：界面</div>
+                <div class="bounds-badge" id="pc-bounds-badge" hidden>卡片 84px 固定</div>
+              </div>
+              <div class="pv-foot">
+                <label class="chk"><input type="checkbox" id="pc-hl"> 高亮当前区域</label>
+                <label class="chk"><input type="checkbox" id="pc-bounds"> 布局边界</label>
+                <span class="pv-current" id="pc-pv-current">界面 · 13px</span>
+              </div>
+              <div class="pv-note">预览按本机字体渲染；未装字体自动走回退链。</div>
+            </aside>
+          </div>
+          <div class="subfoot">
+            <span>只影响文字：卡片、网格、控件高度不变；标题层级按比例保留。</span>
+            <span class="subfoot-right" id="pc-preset-note">当前：默认</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="notes">
+    <div class="notes-head"><h2>实现备注</h2><span>给确认后的实现批，不是 mock 表面</span></div>
+    <div class="note-grid">
+      <div class="note-card">
+        <h3>CSS 变量：按角色，不按元素</h3>
+        <p>每个角色一组变量，主窗、快贴面板、手机端都从这里取；具体元素用 <code>em</code> 保留层级，不逐个改 <code>font-size</code>。</p>
+        <pre>--ui-font / --ui-size / --ui-line
+--ui-weight / --ui-letter / --ui-feat
+--list-*  列表卡片
+--panel-* 快贴面板
+--mono-*  快捷键 / 路径</pre>
+      </div>
+      <div class="note-card">
+        <h3>Nerd Font：只接管 PUA</h3>
+        <p>用 <code>@font-face</code> + <code>unicode-range</code> 生成一个符号槽，插在字体栈末尾；NF 的等宽 Latin 不会抢走正文。字体不内置，PC 用 <code>local()</code> 读已装字体。</p>
+        <pre>@font-face {
+  font-family: "SB Nerd Symbols";
+  src: local("JetBrainsMono Nerd Font Mono"),
+       local("JetBrainsMono NFM");
+  unicode-range: U+E000-F8FF,
+    U+F0000-FFFFD, U+100000-10FFFD;
+}</pre>
+      </div>
+      <div class="note-card">
+        <h3>持久化：一份 settings，两个窗口</h3>
+        <p>主窗和 <code>panel.html</code> 读同一份 `settings.json` 的 `fonts` 段；面板入口早于主窗时也要能拿到。未知字段忽略，缺字段补默认。</p>
+        <pre>"fonts": {
+  "version": 1,
+  "roles": {
+    "ui": { "latin": "...", "cjk": "...",
+      "fallbacks": [], "size": 13,
+      "line": 1.55, "weight": 400 },
+    "list": { "follow": "ui" },
+    "panel": { "follow": "ui" },
+    "mono": { ... }
+  },
+  "nerd": { "enabled": true, "family": "..." }
+}</pre>
+      </div>
+      <div class="note-card">
+        <h3>枚举、导入与验收边界</h3>
+        <p>PC 用 DirectWrite / font-kit 列家族，并用 cmap 判断是否含中文 / 等宽 / PUA；安卓 WebView 不枚举，只列通用族和导入列表（导入后用 <code>ttf-parser</code> 读 family/cmap）。</p>
+        <p>验收要在 <b>11 / 13 / 15 / 18</b> 四档、长英文、中文、NF 图标下看：卡片标题省略、设置行不撑高、kbd 不换行、无横向溢出。</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="decisions">
+    <h2>需要你拍板</h2>
+    <ol>
+      <li>作用范围够不够？现在是 <b>界面 / 列表与卡片 / 快贴面板 / 等宽</b>。输入框、标签编辑器要不要再单独一档？</li>
+      <li>安卓字体来源选 <b>A. 系统通用族 + 用户导入</b>（推荐，0 包体）、<b>B. 内置 1–2 款开源字体</b>（+1–3MB，开箱即用）、还是 <b>C. 只跟系统</b>？本稿画的是 A。</li>
+      <li>Nerd Font 默认开还是关？本稿 PC 默认开；安卓稿也是开（演示字体）。</li>
+      <li>字号上限 18 还是 20？本稿滑杆到 20，备注建议 18 以内防止裁切。</li>
+      <li>PC 要不要也支持「导入字体文件」？本稿 PC 只列系统字体（Zed 式），安卓才导入。</li>
+    </ol>
+  </section>
+
+  <div class="page-foot">
+    <span>设计稿 · 2026-11-07 · 没有改 src-tauri</span>
+    <span class="spacer"></span>
+    <a href="mobile-font-settings.html">安卓端 mock →</a>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<div class="overlay" id="pc-picker" hidden>
+  <div class="picker" role="dialog" aria-modal="true" aria-labelledby="pc-picker-title">
+    <div class="picker-head">
+      <div><div class="picker-title" id="pc-picker-title">选择西文字体</div><div class="picker-sub" id="pc-picker-sub">系统已装字体 · 可搜索 / 手动输入</div></div>
+      <button class="icon-btn" id="pc-picker-close" aria-label="关闭">✕</button>
+    </div>
+    <div class="picker-preview"><span class="pp-sample" id="pc-pp-sample">Aa 汉字 0123</span><span class="pp-meta" id="pc-pp-meta">选择字体<br>看预览</span></div>
+    <label class="search-box"><span>⌕</span><input id="pc-font-q" placeholder="搜索字体名…" autocomplete="off" spellcheck="false"><button class="sq-clear" id="pc-font-q-clear" type="button" aria-label="清空">✕</button></label>
+    <div class="picker-filters"><label class="chk" id="pc-filter-wrap"><input type="checkbox" id="pc-only-fitting" checked> <span id="pc-filter-label">只看适合的字体</span></label><span class="picker-count" id="pc-font-count">…</span></div>
+    <div class="font-list" id="pc-font-list"></div>
+    <div class="picker-foot">
+      <div class="manual-label">找不到？手动输入系统字体名（未装会回退）</div>
+      <div class="manual-row"><input id="pc-font-manual" placeholder="例如：霞鹜文楷" autocomplete="off" spellcheck="false"><button class="btn small" id="pc-font-manual-ok">使用</button></div>
+      <button class="link-btn" id="pc-font-refresh">刷新系统字体（演示）</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const $ = (s, root = document) => root.querySelector(s);
+  const $$ = (s, root = document) => Array.from(root.querySelectorAll(s));
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
+
+  const FONT_LIST = [
+    {id:'system', label:'系统默认', family:'system-ui', cjkFamily:'sans-serif', sub:'Segoe UI / 微软雅黑', cjk:true, mono:false, nf:false, installed:true, sys:true},
+    {id:'segoe', label:'Segoe UI', family:'Segoe UI', sub:'Windows 界面', cjk:false, mono:false, nf:false, installed:true},
+    {id:'yahei', label:'微软雅黑 UI', family:'Microsoft YaHei UI', sub:'Windows 中文 UI', cjk:true, mono:false, nf:false, installed:true},
+    {id:'yahei2', label:'微软雅黑', family:'Microsoft YaHei', sub:'Windows 中文', cjk:true, mono:false, nf:false, installed:true},
+    {id:'noto-sans', label:'Noto Sans SC', family:'Noto Sans SC', sub:'思源黑体', cjk:true, mono:false, nf:false, installed:true},
+    {id:'noto-serif', label:'Noto Serif SC', family:'Noto Serif SC', sub:'思源宋体', cjk:true, mono:false, nf:false, installed:true},
+    {id:'dengxian', label:'等线', family:'DengXian', sub:'DengXian', cjk:true, mono:false, nf:false, installed:true},
+    {id:'simsun', label:'宋体', family:'SimSun', sub:'SimSun', cjk:true, mono:false, nf:false, installed:true},
+    {id:'kaiti', label:'楷体', family:'KaiTi', sub:'KaiTi', cjk:true, mono:false, nf:false, installed:true},
+    {id:'fangsong', label:'仿宋', family:'FangSong', sub:'FangSong', cjk:true, mono:false, nf:false, installed:true},
+    {id:'stkaiti', label:'华文楷体', family:'STKaiti', sub:'STKaiti', cjk:true, mono:false, nf:false, installed:true},
+    {id:'inter', label:'Inter', family:'Inter', sub:'未安装示例', cjk:false, mono:false, nf:false, installed:false},
+    {id:'lxgw', label:'霞鹜文楷', family:'LXGW WenKai', sub:'未安装示例', cjk:true, mono:false, nf:false, installed:false},
+    {id:'sarasa', label:'更纱黑体 Mono', family:'Sarasa Mono SC', sub:'未安装示例', cjk:true, mono:true, nf:false, installed:false},
+    {id:'pingfang', label:'苹方', family:'PingFang SC', sub:'macOS 字体', cjk:true, mono:false, nf:false, installed:false},
+    {id:'cascadia', label:'Cascadia Code', family:'Cascadia Code', sub:'等宽', cjk:false, mono:true, nf:false, installed:true},
+    {id:'cascadia-mono', label:'Cascadia Mono', family:'Cascadia Mono', sub:'等宽', cjk:false, mono:true, nf:false, installed:true},
+    {id:'consolas', label:'Consolas', family:'Consolas', sub:'等宽', cjk:false, mono:true, nf:false, installed:true},
+    {id:'source-code', label:'Source Code Pro', family:'Source Code Pro', sub:'等宽', cjk:false, mono:true, nf:false, installed:true},
+    {id:'jetbrains', label:'JetBrains Mono', family:'JetBrains Mono', sub:'未安装（NF 版已装）', cjk:false, mono:true, nf:false, installed:false},
+    {id:'fira', label:'Fira Code', family:'Fira Code', sub:'未安装（NF 版已装）', cjk:false, mono:true, nf:false, installed:false},
+    {id:'nf-jetbrains', label:'JetBrainsMono NFM', family:'JetBrainsMono Nerd Font Mono', aliases:['JetBrainsMono NFM'], sub:'Nerd Font · 等宽', cjk:false, mono:true, nf:true, installed:true},
+    {id:'nf-jetbrains-prop', label:'JetBrainsMono NF', family:'JetBrainsMono Nerd Font', aliases:['JetBrainsMono NF'], sub:'Nerd Font · 比例', cjk:false, mono:true, nf:true, installed:true},
+    {id:'nf-jetbrains-nl', label:'JetBrainsMonoNL NF', family:'JetBrainsMonoNL Nerd Font', aliases:['JetBrainsMonoNL NF'], sub:'Nerd Font · 无连字', cjk:false, mono:true, nf:true, installed:true},
+    {id:'nf-fira', label:'FiraCode NF', family:'FiraCode Nerd Font', sub:'Nerd Font · 连字', cjk:false, mono:true, nf:true, installed:true},
+    {id:'nf-0xproto', label:'0xProto NFM', family:'0xProto Nerd Font Mono', sub:'Nerd Font', cjk:false, mono:true, nf:true, installed:true},
+    {id:'nf-3270', label:'3270 NF', family:'3270 Nerd Font', sub:'Nerd Font', cjk:false, mono:true, nf:true, installed:true},
+  ];
+
+  const ROLES = [
+    {id:'ui', name:'界面', tag:'基础', desc:'侧栏 / 按钮 / 设置 / 搜索框'},
+    {id:'list', name:'列表与卡片', tag:'跟随', desc:'卡片标题 / 标签 / 计数'},
+    {id:'panel', name:'快贴面板', tag:'跟随', desc:'面板搜索 / 分组 / 行'},
+    {id:'mono', name:'等宽', tag:'独立', desc:'快捷键 / 路径 / 尺寸'},
+  ];
+  const ROLE_BY_ID = Object.fromEntries(ROLES.map(r => [r.id, r]));
+
+  const DEFAULT_ROLES = {
+    ui:    {follow:null, latin:'segoe', cjk:'yahei', fallbacks:['noto-sans'], size:13, line:1.55, weight:400, letter:0, features:''},
+    list:  {follow:'ui'},
+    panel: {follow:'ui'},
+    mono:  {follow:null, latin:'cascadia', cjk:'yahei', fallbacks:['noto-sans'], size:12, line:1.4, weight:400, letter:0, features:'calt, liga'},
+  };
+  const DEFAULT_NF = {enabled:true, fontId:'nf-jetbrains'};
+
+  let state = {
+    roles: clone(DEFAULT_ROLES),
+    nf: clone(DEFAULT_NF),
+    selected: 'ui',
+    pv: 'main',
+    hl: false,
+    bounds: false,
+  };
+  let applied = {roles: clone(DEFAULT_ROLES), nf: clone(DEFAULT_NF)};
+  let customFonts = [];
+  let picker = {open:false, kind:'latin', role:'ui', q:'', onlyFitting:true};
+
+  const Q = (fam) => '"' + String(fam).replace(/["\\]/g, '') + '"';
+  const getFont = (id) => [...FONT_LIST, ...customFonts].find(f => f.id === id) || FONT_LIST[0];
+  const eff = (roleId) => {
+    const r = state.roles[roleId];
+    return r && r.follow ? state.roles[r.follow] : r;
+  };
+  const isFollowing = (roleId) => !!(state.roles[roleId] && state.roles[roleId].follow);
+
+  function familyOf(font, opts) {
+    const cjk = !!(opts && opts.cjk);
+    if (!font) return cjk ? 'sans-serif' : 'system-ui';
+    if (font.sys) return cjk ? (font.cjkFamily || 'sans-serif') : 'system-ui';
+    return Q(font.family);
+  }
+  function sampleStack(font) {
+    if (!font) return 'var(--page-font)';
+    if (font.sys) return '"Segoe UI","Microsoft YaHei UI",sans-serif';
+    return [font.family, ...(font.aliases || [])].filter(Boolean).map(Q).join(', ');
+  }
+  function roleStack(role) {
+    const parts = [];
+    const latin = getFont(role.latin);
+    const cjk = getFont(role.cjk);
+    parts.push(familyOf(latin));
+    if (cjk.id !== latin.id) parts.push(familyOf(cjk, {cjk:true}));
+    for (const id of role.fallbacks) {
+      const f = getFont(id);
+      if (!f) continue;
+      parts.push(f.sys ? 'sans-serif' : familyOf(f, {cjk:f.cjk}));
+    }
+    if (state.nf.enabled) parts.push('"SB Nerd Symbols"');
+    parts.push('"Segoe UI Symbol"', '"Segoe UI Emoji"', 'sans-serif');
+    const seen = new Set();
+    return parts.filter(p => p && !seen.has(p) && seen.add(p)).join(', ');
+  }
+
+  function presetData(name) {
+    const roles = clone(DEFAULT_ROLES);
+    if (name === 'compact') {
+      roles.ui.size = 12; roles.ui.line = 1.38;
+      roles.mono.size = 11.5; roles.mono.line = 1.35;
+    } else if (name === 'large') {
+      roles.ui.size = 15; roles.ui.line = 1.65;
+      roles.mono.size = 13; roles.mono.line = 1.5;
+    }
+    return {roles, nf: clone(DEFAULT_NF)};
+  }
+  function detectPreset() {
+    const sig = JSON.stringify({roles:state.roles, nf:state.nf});
+    for (const name of ['default', 'compact', 'large']) {
+      if (JSON.stringify(presetData(name)) === sig) return name;
+    }
+    return null;
+  }
+
+  function toast(msg) {
+    const el = $('#toast');
+    el.textContent = msg;
+    el.hidden = false;
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { el.hidden = true; }, 2800);
+  }
+  function flashEl(el) {
+    if (!el) return;
+    el.scrollIntoView({behavior:'smooth', block:'center'});
+    el.animate([
+      {boxShadow:'0 0 0 0 rgba(110,168,254,0)'},
+      {boxShadow:'0 0 0 3px rgba(110,168,254,.5)'},
+      {boxShadow:'0 0 0 0 rgba(110,168,254,0)'}
+    ], {duration:1000, easing:'ease-out'});
+  }
+
+  /* ---------- font face for Nerd Font icons ---------- */
+  const nfFace = document.createElement('style');
+  nfFace.id = 'pc-nf-face';
+  document.head.appendChild(nfFace);
+  function updateNfFace() {
+    const f = getFont(state.nf.fontId);
+    if (!f) { nfFace.textContent = ''; return; }
+    const src = [f.family, ...(f.aliases || [])].filter(Boolean).map(n => 'local(' + Q(n) + ')').join(', ');
+    nfFace.textContent = '@font-face{font-family:"SB Nerd Symbols";src:' + src + ';unicode-range:U+E000-F8FF,U+F0000-FFFFD,U+100000-10FFFD;}';
+  }
+
+  /* ---------- render ---------- */
+  function render() {
+    updateNfFace();
+    renderScopes();
+    renderForm();
+    renderNfCard();
+    renderEntry();
+    renderPreview();
+    renderPreset();
+  }
+
+  function renderScopes() {
+    $('#scope-list').innerHTML = ROLES.map(r => {
+      const role = state.roles[r.id];
+      const e = eff(r.id);
+      const following = !!role.follow;
+      let tag = '覆盖', cls = 'own';
+      if (r.id === 'ui') { tag = '基础'; cls = 'base'; }
+      else if (following) { tag = '跟随'; cls = 'follow'; }
+      else if (r.id === 'mono') { tag = '独立'; cls = 'own'; }
+      const latin = getFont(e.latin), cjk = getFont(e.cjk);
+      return `<button type="button" class="scope-item${state.selected === r.id ? ' active' : ''}" data-role="${r.id}">
+        <div class="scope-top"><span class="scope-name">${r.name}</span><span class="scope-tag ${cls}">${tag}</span></div>
+        <div class="scope-sum">${esc(latin.label)} / ${esc(cjk.label)} · ${e.size}px</div>
+      </button>`;
+    }).join('');
+  }
+
+  function paintFontBtn(btn, font, sampleText) {
+    btn.classList.toggle('missing', !font.installed);
+    btn.querySelector('.fb-name').textContent = font.label + (font.installed ? '' : ' · 未装');
+    const sample = btn.querySelector('.fb-sample');
+    sample.textContent = sampleText;
+    sample.style.fontFamily = sampleStack(font);
+  }
+
+  function renderForm() {
+    const role = state.roles[state.selected];
+    const e = eff(state.selected);
+    const meta = ROLE_BY_ID[state.selected];
+    const following = !!role.follow;
+    const latin = getFont(e.latin), cjk = getFont(e.cjk);
+
+    $('#pc-form-title').textContent = meta.name;
+    $('#pc-form-tag').textContent = state.selected === 'ui' ? '基础' : following ? '跟随' : state.selected === 'mono' ? '独立' : '覆盖';
+    $('#pc-follow-bar').hidden = state.selected === 'ui';
+    $('#pc-follow').checked = following;
+    $('#pc-form-scroll').classList.toggle('is-following', following);
+
+    paintFontBtn($('#pc-latin-btn'), latin, 'Aa 0123 →');
+    paintFontBtn($('#pc-cjk-btn'), cjk, '汉字 字体 0123');
+    $('#pc-latin-state').textContent = latin.installed ? (latin.sys ? '系统' : '已装') : '未装 · 会回退';
+    $('#pc-cjk-state').textContent = cjk.installed ? (cjk.sys ? '系统' : (cjk.cjk ? '已装 · 含中文' : '已装 · 不含中文')) : '未装 · 会回退';
+
+    const warns = [];
+    if (!latin.installed) warns.push('未检测到西文字体「' + latin.label + '」，会按回退链显示。');
+    if (!cjk.installed) warns.push('未检测到中文字体「' + cjk.label + '」，中文会继续回退。');
+    if (latin.cjk && cjk.id !== latin.id) warns.push('西文字体「' + latin.label + '」也含中文，中文会优先用它。');
+    if (!cjk.cjk) warns.push('中文字体「' + cjk.label + '」不含中文，中文会继续走回退链。');
+    const warnEl = $('#pc-font-warn');
+    warnEl.hidden = warns.length === 0;
+    warnEl.textContent = warns.join(' ');
+
+    const chain = $('#pc-chain');
+    const items = e.fallbacks.map((id, i) => {
+      const f = getFont(id);
+      return `<span class="chain-item"><span class="cn">${3 + i}</span>${esc(f.label)}<button type="button" class="cx" data-act="rm" data-i="${i}" title="移除">✕</button><span class="cm"><button type="button" data-act="up" data-i="${i}" title="上移" ${i === 0 ? 'disabled' : ''}>▲</button><button type="button" data-act="down" data-i="${i}" title="下移" ${i === e.fallbacks.length - 1 ? 'disabled' : ''}>▼</button></span></span>`;
+    }).join('');
+    const nfChip = state.nf.enabled ? '<span class="chain-item nf" title="Nerd Font 只接管图标区">NF 图标</span>' : '';
+    chain.innerHTML = (items || '<span class="chain-empty">没有额外回退，系统兜底</span>') + '<span class="chain-item locked">系统默认</span>' + nfChip;
+    $('#pc-add-fallback').disabled = following;
+
+    $('#pc-size').value = e.size;
+    $('#pc-size-num').value = e.size;
+    $('#pc-line').value = e.line;
+    $('#pc-line-val').textContent = Number(e.line).toFixed(2);
+    $('#pc-letter').value = e.letter;
+    $('#pc-letter-val').textContent = Number(e.letter).toFixed(1).replace(/\.0$/, '');
+    $('#pc-features').value = e.features || '';
+    $$('#pc-size-quick .mini-chip').forEach(b => b.classList.toggle('on', Math.abs(Number(b.dataset.size) - Number(e.size)) < 0.01));
+    $$('#pc-weight button').forEach(b => b.classList.toggle('on', Number(b.dataset.w) === Number(e.weight)));
+
+    $('#pc-reset-role').textContent = following ? '恢复跟随' : state.selected === 'ui' ? '重置界面' : state.selected === 'mono' ? '重置等宽' : '重置此区域';
+
+    $$('#pc-form-scroll button, #pc-form-scroll input, #pc-form-scroll select').forEach(el => { el.disabled = following; });
+  }
+
+  function renderNfCard() {
+    const f = getFont(state.nf.fontId);
+    $('#pc-nf-toggle').checked = state.nf.enabled;
+    const btn = $('#pc-nf-font');
+    btn.classList.toggle('missing', !f.installed);
+    btn.querySelector('.nf-font-name').textContent = f.label + (f.installed ? '' : ' · 未装');
+    const test = $('#pc-nf-test');
+    test.style.fontFamily = sampleStack(f);
+    test.textContent = '\u{f07b} \u{f121} \u{f013} \u{e0b0}';
+    test.classList.toggle('off', !state.nf.enabled);
+    test.classList.toggle('missing', !f.installed || !f.nf || !state.nf.enabled);
+    let hint;
+    if (!state.nf.enabled) hint = '已关闭：PUA 图标会按系统符号回退。';
+    else if (!f.installed) hint = '未检测到字体；图标会显示为方框。';
+    else if (!f.nf) hint = '这个字体不含 Nerd Font 图标区，PUA 仍会回退。';
+    else hint = '已启用：只接管图标区，不抢正文。';
+    $('#pc-nf-hint').textContent = hint;
+  }
+
+  function renderEntry() {
+    const e = eff('ui');
+    const latin = getFont(e.latin), cjk = getFont(e.cjk);
+    $('#entry-summary').textContent = `${latin.label} / ${cjk.label} · ${e.size}px · ${e.fallbacks.length ? e.fallbacks.length + ' 级回退' : '系统兜底'}`;
+    const nf = getFont(state.nf.fontId);
+    $('#entry-nf').textContent = `${nf.label} · ${state.nf.enabled ? '已启用' : '已关闭'}${nf.installed ? '' : ' · 未装'}`;
+  }
+
+  function renderPreview() {
+    const stage = $('#pc-pv-stage');
+    for (const id of ['ui', 'list', 'panel', 'mono']) {
+      const e = eff(id);
+      stage.style.setProperty('--' + id + '-family', roleStack(e));
+      stage.style.setProperty('--' + id + '-size', e.size + 'px');
+      stage.style.setProperty('--' + id + '-line', String(e.line));
+      stage.style.setProperty('--' + id + '-weight', String(e.weight));
+      stage.style.setProperty('--' + id + '-letter', e.letter + 'px');
+      stage.style.setProperty('--' + id + '-feat', e.features || 'normal');
+    }
+    const sel = eff(state.selected);
+    stage.style.setProperty('--sel-family', roleStack(sel));
+    stage.style.setProperty('--sel-size', sel.size + 'px');
+    stage.style.setProperty('--sel-line', String(sel.line));
+    stage.style.setProperty('--sel-weight', String(sel.weight));
+    stage.style.setProperty('--sel-letter', sel.letter + 'px');
+    stage.style.setProperty('--sel-feat', sel.features || 'normal');
+
+    $('#pc-pv-tabs').querySelectorAll('.pv-tab').forEach(b => b.classList.toggle('active', b.dataset.pv === state.pv));
+    stage.querySelectorAll('.pv-pane').forEach(p => p.classList.toggle('active', p.dataset.pane === state.pv));
+    stage.classList.toggle('hl', state.hl);
+    stage.classList.toggle('bounds', state.bounds);
+
+    const meta = ROLE_BY_ID[state.selected];
+    const following = isFollowing(state.selected);
+    $('#pc-pv-current').textContent = `${meta.name} · ${sel.size}px${following ? ' · 跟随界面' : ''}`;
+    $('#pc-hl-badge').hidden = !state.hl;
+    $('#pc-hl-badge').textContent = '高亮：' + meta.name;
+    $('#pc-bounds-badge').hidden = !state.bounds;
+    $('#pc-bounds-badge').textContent = `卡片 84px 固定 · ${sel.size}px 文字`;
+    $('#pc-glyph-role').textContent = meta.name;
+    $('#pc-glyph-size').textContent = sel.size + 'px';
+
+    const ui = eff('ui');
+    const uiLatin = getFont(ui.latin), uiCjk = getFont(ui.cjk);
+    $('#ms-font-sub').textContent = `${uiLatin.label} · ${uiCjk.label} · ${ui.size}px`;
+
+    const nf = getFont(state.nf.fontId);
+    const nfLine = $('#pc-glyph-nf');
+    nfLine.style.fontFamily = sampleStack(nf);
+    nfLine.classList.toggle('off', !state.nf.enabled);
+    nfLine.classList.toggle('missing', !nf.installed || !nf.nf || !state.nf.enabled);
+    let note;
+    if (!state.nf.enabled) note = 'Nerd Font 已关闭；正文和图标都不引用它。';
+    else if (!nf.installed) note = '未检测到「' + nf.label + '」；PUA 图标会显示为方框。';
+    else if (!nf.nf) note = '「' + nf.label + '」不含 Nerd Font 图标区；PUA 仍会回退。';
+    else note = 'NF 只接管 U+E000–F8FF 等图标区；正文的 Latin / CJK 不会被它抢走。';
+    $('#pc-glyph-note').textContent = note;
+  }
+
+  function renderPreset() {
+    const current = detectPreset();
+    $$('.preset').forEach(b => b.classList.toggle('on', b.dataset.preset === current));
+    $('#pc-preset-custom').hidden = !!current;
+    const names = {default:'默认', compact:'紧凑', large:'大字'};
+    $('#pc-preset-note').textContent = '当前：' + (current ? names[current] : '自定义');
+  }
+
+  /* ---------- interactions ---------- */
+  function selectRole(id) {
+    if (!state.roles[id]) return;
+    state.selected = id;
+    if (id === 'panel') state.pv = 'panel';
+    else if (id === 'mono') state.pv = 'glyph';
+    else state.pv = 'main';
+    render();
+  }
+
+  function applyPreset(name) {
+    const data = presetData(name);
+    state.roles = data.roles;
+    state.nf = data.nf;
+    const names = {default:'默认', compact:'紧凑', large:'大字'};
+    toast('已应用「' + names[name] + '」；列表 / 面板恢复为跟随界面。');
+    render();
+  }
+
+  function resetRole() {
+    const id = state.selected;
+    if (id === 'ui') {
+      state.roles.ui = clone(DEFAULT_ROLES.ui);
+      toast('界面已重置；跟随它的区域会一起变。');
+    } else if (id === 'mono') {
+      state.roles.mono = clone(DEFAULT_ROLES.mono);
+      toast('等宽已重置。');
+    } else if (isFollowing(id)) {
+      toast('这个区域已经在跟随界面。');
+      return;
+    } else {
+      state.roles[id] = {follow:'ui'};
+      toast('已恢复跟随「界面」。');
+    }
+    render();
+  }
+
+  function openPicker(kind) {
+    if (kind !== 'nf' && isFollowing(state.selected)) {
+      toast('这个区域跟随「界面」，先在中间关掉跟随再单独设置。');
+      return;
+    }
+    picker = {open:true, kind, role:state.selected, q:'', onlyFitting: (kind === 'cjk' || kind === 'nf')};
+    const titles = {latin:'选择西文字体', cjk:'选择中文字体', fallback:'添加回退字体', nf:'选择 Nerd Font 图标字体'};
+    $('#pc-picker').hidden = false;
+    document.body.style.overflow = 'hidden';
+    $('#pc-picker-title').textContent = titles[kind] || '选择字体';
+    $('#pc-picker-sub').textContent = kind === 'nf' ? '只显示 PUA 图标区；选完会启用图标槽' : '系统已装字体 · 可搜索 / 手动输入';
+    $('#pc-filter-wrap').hidden = !(kind === 'cjk' || kind === 'nf');
+    $('#pc-filter-label').textContent = kind === 'cjk' ? '只看含中文的字体' : '只看 Nerd Font 字体';
+    $('#pc-only-fitting').checked = picker.onlyFitting;
+    $('#pc-font-q').value = '';
+    $('#pc-font-q-clear').hidden = true;
+    $('#pc-font-manual').value = '';
+    const current = kind === 'nf' ? getFont(state.nf.fontId) : kind === 'fallback' ? null : getFont(eff(state.selected)[kind]);
+    setPickerPreview(current);
+    renderPickerList();
+    setTimeout(() => $('#pc-font-q').focus(), 40);
+  }
+
+  function closePicker() {
+    $('#pc-picker').hidden = true;
+    document.body.style.overflow = '';
+    picker.open = false;
+  }
+
+  function setPickerPreview(font) {
+    const pp = $('#pc-pp-sample');
+    const meta = $('#pc-pp-meta');
+    if (!font) {
+      pp.style.fontFamily = 'var(--page-font)';
+      pp.textContent = 'Aa 汉字 0123';
+      meta.innerHTML = '选择一个字体<br>看实际字形';
+      return;
+    }
+    pp.style.fontFamily = sampleStack(font);
+    pp.textContent = font.nf ? 'Aa 汉字 0123 \u{f07b} \u{f121}' : font.cjk ? 'Aa 汉字 0123' : 'Aa 0123 → ←';
+    const stateText = font.installed ? (font.cjk ? '含中文' : font.mono ? '等宽' : '西文') : '未装 · 会回退';
+    meta.innerHTML = `<b>${esc(font.label)}</b><br>${esc(stateText)}`;
+  }
+
+  function fitting(font) {
+    if (!picker.onlyFitting) return true;
+    if (picker.kind === 'cjk') return !!font.cjk;
+    if (picker.kind === 'nf') return !!font.nf;
+    return true;
+  }
+
+  function visibleFonts() {
+    const q = picker.q.trim().toLowerCase();
+    return [...FONT_LIST, ...customFonts].filter(f => {
+      if (!fitting(f)) return false;
+      if (!q) return true;
+      const hay = [f.label, f.family, f.sub, ...(f.aliases || [])].join(' ').toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  function badges(font) {
+    const out = [];
+    if (font.sys) out.push('<span class="badge sys">系统</span>');
+    if (font.cjk) out.push('<span class="badge cjk">中文</span>');
+    if (font.mono) out.push('<span class="badge mono">等宽</span>');
+    if (font.nf) out.push('<span class="badge nf">NF</span>');
+    return out.join('');
+  }
+
+  function renderPickerList() {
+    const list = visibleFonts();
+    const selectedId = picker.kind === 'nf' ? state.nf.fontId : picker.kind === 'fallback' ? null : eff(state.selected)[picker.kind];
+    $('#pc-font-count').textContent = `${list.length} 个字体`;
+    const box = $('#pc-font-list');
+    if (!list.length) {
+      box.innerHTML = `<div class="picker-empty"><b>没有找到「${esc(picker.q || '')}」</b>换个名字，或在下方手动输入系统字体名。</div>`;
+      return;
+    }
+    box.innerHTML = list.map(f => {
+      const sel = f.id === selectedId;
+      const sample = f.nf ? 'Aa 汉字 0123 \u{f07b}' : f.cjk ? 'Aa 汉字 0123' : 'Aa 0123 →';
+      return `<button type="button" class="font-row${sel ? ' selected' : ''}${f.installed ? '' : ' missing'}" data-id="${f.id}">
+        <span class="fr-check">${sel ? '✓' : ''}</span>
+        <span class="fr-main">
+          <span class="fr-line"><span class="fr-name">${esc(f.label)}</span>${badges(f)}</span>
+          <span class="fr-family">${esc(f.family)}${f.sub ? ' · ' + esc(f.sub) : ''}</span>
+          <span class="fr-sample" style='font-family:${sampleStack(f)}'>${sample}</span>
+        </span>
+        <span class="fr-state ${f.installed ? 'ok' : 'no'}">${f.installed ? '已装' : '未装'}</span>
+      </button>`;
+    }).join('');
+  }
+
+  function chooseFont(id) {
+    const f = getFont(id);
+    if (!f) return;
+    const role = eff(state.selected);
+    let warn = '';
+    if (picker.kind === 'nf') {
+      state.nf.fontId = f.id;
+      state.nf.enabled = true;
+      if (!f.installed) warn = `已选「${f.label}」；未装，图标会显示为方框。`;
+      else if (!f.nf) warn = `已选「${f.label}」；它不含 NF 图标区，PUA 仍会回退。`;
+      else warn = `Nerd Font 已切换为「${f.label}」，只接管图标区。`;
+    } else if (picker.kind === 'fallback') {
+      if (isFollowing(state.selected)) { toast('先关掉跟随，再单独加回退。'); return; }
+      if (role.fallbacks.includes(f.id)) { toast('这个字体已经在回退链里。'); return; }
+      if (role.fallbacks.length >= 5) { toast('最多 5 个回退字体；先移除一个再加。'); return; }
+      role.fallbacks.push(f.id);
+      warn = `已加入回退链：${f.label}。`;
+    } else {
+      if (isFollowing(state.selected)) { toast('先关掉跟随，再单独改字体。'); return; }
+      role[picker.kind] = f.id;
+      if (!f.installed) warn = `已切换为「${f.label}」；未装，会按回退链显示。`;
+      else if (picker.kind === 'cjk' && !f.cjk) warn = `已切换为「${f.label}」；它不含中文，中文会继续回退。`;
+      else if (picker.kind === 'latin' && f.cjk) warn = `已切换为「${f.label}」；它也含中文，中文会优先用它。`;
+      else warn = `已切换为「${f.label}」。`;
+    }
+    toast(warn);
+    closePicker();
+    render();
+  }
+
+  function commitManual() {
+    const name = $('#pc-font-manual').value.trim();
+    if (!name) { toast('先输入一个字体名。'); return; }
+    const id = 'custom-' + (customFonts.length + 1) + '-' + name.replace(/[^\w\u4e00-\u9fa5-]+/g, '-').slice(0, 24);
+    if (!getFont(id).id || getFont(id).id === 'system' || ![...FONT_LIST, ...customFonts].some(f => f.id === id)) {
+      customFonts.push({id, label:name, family:name, sub:'手动输入', cjk:false, mono:false, nf:false, installed:false, custom:true});
+    }
+    chooseFont(id);
+  }
+
+  function paint() {
+    render();
+  }
+
+  /* ---------- init / events ---------- */
+  function init() {
+    render();
+
+    $('#scope-list').addEventListener('click', (ev) => {
+      const b = ev.target.closest('.scope-item');
+      if (b) selectRole(b.dataset.role);
+    });
+
+    $('#pc-follow').addEventListener('change', (ev) => {
+      const id = state.selected;
+      if (id === 'ui') return;
+      if (ev.target.checked) {
+        state.roles[id] = {follow:'ui'};
+        toast('已恢复跟随「界面」；改界面会同步到这一档。');
+      } else {
+        state.roles[id] = Object.assign(clone(eff(id)), {follow:null});
+        toast('已独立设置；这一档之后不再跟界面联动。');
+      }
+      render();
+    });
+
+    $('#pc-latin-btn').addEventListener('click', () => openPicker('latin'));
+    $('#pc-cjk-btn').addEventListener('click', () => openPicker('cjk'));
+    $('#pc-add-fallback').addEventListener('click', () => openPicker('fallback'));
+    $('#pc-nf-font').addEventListener('click', () => openPicker('nf'));
+
+    $('#pc-chain').addEventListener('click', (ev) => {
+      if (isFollowing(state.selected)) return;
+      const b = ev.target.closest('button');
+      if (!b) return;
+      const i = Number(b.dataset.i);
+      const role = eff(state.selected);
+      if (b.dataset.act === 'rm') role.fallbacks.splice(i, 1);
+      else if (b.dataset.act === 'up' && i > 0) [role.fallbacks[i - 1], role.fallbacks[i]] = [role.fallbacks[i], role.fallbacks[i - 1]];
+      else if (b.dataset.act === 'down' && i < role.fallbacks.length - 1) [role.fallbacks[i + 1], role.fallbacks[i]] = [role.fallbacks[i], role.fallbacks[i + 1]];
+      else return;
+      render();
+    });
+
+    const editEffective = (fn) => {
+      if (isFollowing(state.selected)) return;
+      fn(eff(state.selected));
+      render();
+    };
+    $('#pc-size').addEventListener('input', (ev) => editEffective(e => { e.size = clamp(parseFloat(ev.target.value) || 13, 11, 20); }));
+    $('#pc-size-num').addEventListener('input', (ev) => editEffective(e => { e.size = clamp(parseFloat(ev.target.value) || 13, 11, 20); }));
+    $('#pc-line').addEventListener('input', (ev) => editEffective(e => { e.line = clamp(parseFloat(ev.target.value) || 1.55, 1.2, 2); }));
+    $('#pc-letter').addEventListener('input', (ev) => editEffective(e => { e.letter = clamp(parseFloat(ev.target.value) || 0, -0.5, 1); }));
+    $('#pc-features').addEventListener('input', (ev) => editEffective(e => { e.features = ev.target.value; }));
+    $('#pc-weight').addEventListener('click', (ev) => {
+      const b = ev.target.closest('button[data-w]');
+      if (b) editEffective(e => { e.weight = Number(b.dataset.w); });
+    });
+    $('#pc-size-quick').addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-size]');
+      if (b) editEffective(e => { e.size = Number(b.dataset.size); });
+    });
+
+    $('#pc-nf-toggle').addEventListener('change', (ev) => {
+      state.nf.enabled = ev.target.checked;
+      toast(state.nf.enabled ? 'Nerd Font 已启用：只接管图标区。' : 'Nerd Font 已关闭：图标回退到系统符号。');
+      render();
+    });
+
+    $$('.preset').forEach(b => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+    $('#pc-reset-all').addEventListener('click', () => { applyPreset('default'); toast('已恢复默认字体方案。'); });
+    $('#pc-reset-role').addEventListener('click', resetRole);
+
+    $('#pc-cancel').addEventListener('click', () => {
+      state.roles = clone(applied.roles);
+      state.nf = clone(applied.nf);
+      render();
+      toast('已恢复到上次「应用」的状态。');
+    });
+    $('#pc-apply').addEventListener('click', () => {
+      applied = {roles: clone(state.roles), nf: clone(state.nf)};
+      toast('已应用（设计稿）；实现时写入 settings.json。');
+    });
+
+    $('#pc-pv-tabs').addEventListener('click', (ev) => {
+      const b = ev.target.closest('.pv-tab');
+      if (!b) return;
+      state.pv = b.dataset.pv;
+      renderPreview();
+    });
+    $('#pc-hl').addEventListener('change', (ev) => { state.hl = ev.target.checked; renderPreview(); });
+    $('#pc-bounds').addEventListener('change', (ev) => { state.bounds = ev.target.checked; renderPreview(); });
+
+    $('#entry-open').addEventListener('click', () => { flashEl($('#pc-form')); $('#pc-window').scrollIntoView({behavior:'smooth', block:'center'}); });
+    $('#entry-nf-btn').addEventListener('click', () => { flashEl($('.nf-card')); $('#pc-window').scrollIntoView({behavior:'smooth', block:'center'}); });
+    $('#pc-back').addEventListener('click', () => { flashEl($('#entry-card')); $('#entry-card').scrollIntoView({behavior:'smooth', block:'center'}); toast('返回外观（设计稿停在字体页）。'); });
+
+    $$('.tab').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.tab !== 'appearance') toast('本稿只做「外观 › 界面字体」子页；其他页签不在范围。');
+    }));
+    $('#set-save').addEventListener('click', () => toast('设计稿：这里不会真的保存。'));
+    $('#set-search-btn').addEventListener('click', () => toast('设置搜索已在 0.3.0 实现；本稿不重复。'));
+
+    /* picker */
+    $('#pc-picker-close').addEventListener('click', closePicker);
+    $('#pc-picker').addEventListener('click', (ev) => { if (ev.target === $('#pc-picker')) closePicker(); });
+    $('#pc-font-q').addEventListener('input', (ev) => {
+      picker.q = ev.target.value;
+      $('#pc-font-q-clear').hidden = !picker.q;
+      renderPickerList();
+    });
+    $('#pc-font-q').addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        const first = $('#pc-font-list .font-row');
+        if (first) chooseFont(first.dataset.id);
+      }
+    });
+    $('#pc-font-q-clear').addEventListener('click', () => {
+      $('#pc-font-q').value = '';
+      picker.q = '';
+      $('#pc-font-q-clear').hidden = true;
+      renderPickerList();
+      $('#pc-font-q').focus();
+    });
+    $('#pc-only-fitting').addEventListener('change', (ev) => { picker.onlyFitting = ev.target.checked; renderPickerList(); });
+    $('#pc-font-list').addEventListener('click', (ev) => {
+      const row = ev.target.closest('.font-row');
+      if (row) chooseFont(row.dataset.id);
+    });
+    $('#pc-font-list').addEventListener('mouseover', (ev) => {
+      const row = ev.target.closest('.font-row');
+      if (row) setPickerPreview(getFont(row.dataset.id));
+    });
+    $('#pc-font-list').addEventListener('mouseleave', () => {
+      const current = picker.kind === 'nf' ? getFont(state.nf.fontId) : picker.kind === 'fallback' ? null : getFont(eff(state.selected)[picker.kind]);
+      setPickerPreview(current);
+    });
+    $('#pc-font-manual-ok').addEventListener('click', commitManual);
+    $('#pc-font-manual').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') commitManual(); });
+    $('#pc-font-refresh').addEventListener('click', () => toast('演示稿不重新枚举；实现时用系统 API 刷新字体列表。'));
+
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && !$('#pc-picker').hidden) closePicker();
+    });
+  }
+
+  window.__fontMock = {get state(){ return state; }, get picker(){ return picker; }, getFont, eff, render, openPicker, chooseFont};
+  init();
+})();
+</script>
+</body>
+</html>

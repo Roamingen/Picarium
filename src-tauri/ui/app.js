@@ -8,6 +8,8 @@ const toastEl = $('toast');
 const tip = $('tip');
 const qInput = $('q');
 
+let fonts = SBFonts.normalize(null);
+
 let toastTimer = null;
 let editing = null;
 let currentGroup = '__all__';
@@ -285,6 +287,29 @@ function applyStarColor() {
   document.documentElement.style.setProperty('--star', starColor);
 }
 
+/* 把 settings.fonts 变成 CSS 变量；字体窗口改完会发 fonts-changed 重跑这里 */
+function applyFontSettings(raw) {
+  fonts = SBFonts.normalize(raw);
+  const root = document.documentElement;
+  for (const id of SBFonts.ROLE_IDS) {
+    const e = SBFonts.effective(fonts, id);
+    root.style.setProperty(`--font-${id}`, SBFonts.stack(fonts, id));
+    root.style.setProperty(`--font-${id}-size`, `${e.size}px`);
+    root.style.setProperty(`--font-${id}-line`, String(e.line));
+    root.style.setProperty(`--font-${id}-weight`, String(e.weight));
+    root.style.setProperty(`--font-${id}-letter`, `${e.letter}px`);
+    root.style.setProperty(`--font-${id}-features`, e.features || 'normal');
+  }
+  const ui = fonts.ui;
+  const follow = fonts.list.follow ? '列表跟随' : '列表独立';
+  const el = $('set-fonts-summary');
+  if (el) el.textContent = `${ui.latin} / ${ui.cjk} · ${ui.size}px · ${follow}`;
+}
+
+function openFontSettings() {
+  invoke('show_font_settings').catch((err) => toast('打开字体设置失败：' + err));
+}
+
 function saveSettings(patch) {
   invoke('patch_settings', { patch }).catch(() => {});
 }
@@ -486,6 +511,7 @@ async function syncSettings() {
   applyGridSize();
   if (typeof s.hoverDelay === 'number') hoverDelay = s.hoverDelay;
   applyStarColor();
+  applyFontSettings(s.fonts);
 
   if (s.deleteMode) deleteMode = s.deleteMode;
   else if (localStorage.getItem('stickerbox-delete-mode')) seed.deleteMode = localStorage.getItem('stickerbox-delete-mode');
@@ -2961,6 +2987,14 @@ window.__TAURI__.event.listen('import-progress', (e) => {
   $('import-text').textContent = `导入中 ${done} / ${total}`;
 });
 
+// 字体窗口保存后，主窗无需重启即可换字体
+window.__TAURI__.event.listen('fonts-changed', async () => {
+  try {
+    const s = await invoke('get_settings');
+    applyFontSettings(s.fonts);
+  } catch (_) {}
+});
+
 // 剪贴板捕获入库后，界面实时更新
 window.__TAURI__.event.listen('library-changed', async () => {
   await Promise.all([refresh(), loadGroups(), showStats()]);
@@ -3138,6 +3172,7 @@ async function openSettings() {
   $('set-clip').checked = s.clipboardEnabled;
   $('set-auto').checked = s.autostart;
   $('set-theme').value = theme;
+  applyFontSettings(s.fonts);
   $('set-glyph').value = starStyle;
   $('set-grid-size').value = gridSize;
   $('set-virtualize').checked = virtualize;
@@ -3184,6 +3219,7 @@ async function openSettings() {
 
 $('settings-btn').addEventListener('click', openSettings);
 $('set-close').addEventListener('click', () => ($('settings').hidden = true));
+$('set-fonts-open').addEventListener('click', openFontSettings);
 $('settings').addEventListener('click', (e) => {
   if (e.target === $('settings')) $('settings').hidden = true;
 });
@@ -3287,6 +3323,7 @@ $('panel-pos-apply').addEventListener('click', async () => {
 // 设置分页
 const SETTING_TAB_BY_LABEL = {
   主题: 'appearance',
+  界面字体: 'appearance',
   网格大小: 'appearance',
   收藏标记: 'appearance',
   标记颜色: 'appearance',
@@ -6388,6 +6425,10 @@ window.addEventListener('unhandledrejection', (e) => {
   if (ui.startsWith('settings')) {
     await openSettings();
     applySettingsTab(ui.split(':')[1] || 'general');
+  }
+  if (ui === 'fonts') {
+    await new Promise((r) => setTimeout(r, 600));
+    openFontSettings();
   }
   if (ui === 'whichkey') {
     keyBuffer = 'g';

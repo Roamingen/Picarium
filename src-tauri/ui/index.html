@@ -10,7 +10,7 @@
   <header>
     <div class="brand">StickerBox</div>
     <div class="search-wrap">
-      <input id="q" class="search" placeholder="筛选：名字 / 拼音 / 首字母…" autocomplete="off" spellcheck="false" />
+      <input id="q" class="search" placeholder="筛选：名字 / 拼音 / 首字母" autocomplete="off" spellcheck="false" />
       <button id="q-clear" class="search-clear" title="清空" hidden>✕</button>
     </div>
     <div class="spacer"></div>
@@ -276,6 +276,13 @@
           <option value="dark">深色</option>
           <option value="light">浅色</option>
         </select>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">界面字体</div>
+          <div id="set-fonts-summary" class="dim set-value">Segoe UI / Microsoft YaHei UI · 13px</div>
+        </div>
+        <button id="set-fonts-open" class="btn" type="button">字体…</button>
       </div>
       <div class="set-row">
         <div class="set-text">
@@ -623,6 +630,7 @@
   </div>
 
   <div id="toast" class="toast"></div>
+  <script src="font-config.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

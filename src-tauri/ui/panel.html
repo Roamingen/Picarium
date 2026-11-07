@@ -27,6 +27,7 @@
     </div>
   </div>
 
+  <script src="font-config.js"></script>
   <script>
     document.documentElement.dataset.theme = localStorage.getItem('stickerbox-theme') || 'dark';
     const { invoke, convertFileSrc } = window.__TAURI__.core;
@@ -350,9 +351,24 @@
       if (e.key === 'Escape') invoke('hide_panel');
     });
 
+    function applyPanelFonts(raw) {
+      const fonts = SBFonts.normalize(raw);
+      const root = document.documentElement;
+      for (const id of SBFonts.ROLE_IDS) {
+        const e = SBFonts.effective(fonts, id);
+        root.style.setProperty(`--font-${id}`, SBFonts.stack(fonts, id));
+        root.style.setProperty(`--font-${id}-size`, `${e.size}px`);
+        root.style.setProperty(`--font-${id}-line`, String(e.line));
+        root.style.setProperty(`--font-${id}-weight`, String(e.weight));
+        root.style.setProperty(`--font-${id}-letter`, `${e.letter}px`);
+        root.style.setProperty(`--font-${id}-features`, e.features || 'normal');
+      }
+    }
+
     async function applySettings() {
       try {
         const st = await invoke('get_settings');
+        applyPanelFonts(st.fonts);
         if (st.panelSort) panelSort = st.panelSort;
         if (typeof st.recentLimit === 'number') recentLimit = st.recentLimit;
         if (typeof st.hoverDelay === 'number') hoverDelay = st.hoverDelay;
@@ -376,6 +392,10 @@
       } catch (_) {}
       paintFooter();
     }
+
+    window.__TAURI__.event.listen('fonts-changed', async () => {
+      await applySettings();
+    });
 
     window.__TAURI__.event.listen('panel-open', async () => {
       input.value = '';

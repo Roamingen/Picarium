@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"StickerBox 默认权限：主窗口与快贴面板","local":true,"windows":["main","panel"],"permissions":["core:default","dialog:default"]}}
+{"default":{"identifier":"default","description":"StickerBox 默认权限：主窗口、快贴面板与字体设置窗","local":true,"windows":["main","panel","font"],"permissions":["core:default","dialog:default"]}}

@@ -638,6 +638,78 @@ fn hide_panel(window: tauri::WebviewWindow) -> Result<(), String> {
     window.hide().map_err(|e| e.to_string())
 }
 
+/// 打开字体设置窗口；已经存在就前置，不重复创建。
+#[tauri::command]
+async fn show_font_settings(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("font") {
+        let _ = win.show();
+        let _ = win.set_focus();
+        return Ok(());
+    }
+    let win = tauri::WebviewWindowBuilder::new(
+        &app,
+        "font",
+        tauri::WebviewUrl::App("font-settings.html".into()),
+    )
+    .title("界面字体")
+    .inner_size(980.0, 720.0)
+    .min_inner_size(860.0, 600.0)
+    .resizable(true)
+    .build()
+    .map_err(|e| format!("打开字体设置失败：{e}"))?;
+    let _ = win.show();
+    let _ = win.set_focus();
+    Ok(())
+}
+
+#[tauri::command]
+fn hide_font_settings(window: tauri::WebviewWindow) -> Result<(), String> {
+    window.hide().map_err(|e| e.to_string())
+}
+
+/// 列出本机字体家族。Windows 用 fontdb 扫描系统字体；其他平台先返回空。
+#[tauri::command]
+fn list_system_fonts() -> Vec<serde_json::Value> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut db = fontdb::Database::new();
+        db.load_system_fonts();
+        let mut seen = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for face in db.faces() {
+            let Some((family, _)) = face.families.first() else {
+                continue;
+            };
+            if family.trim().is_empty() || !seen.insert(family.to_lowercase()) {
+                continue;
+            }
+            let cjk = db
+                .with_face_data(face.id, |data, index| {
+                    ttf_parser::Face::parse(data, index)
+                        .ok()
+                        .and_then(|face| face.glyph_index('\u{6c49}'))
+                        .is_some()
+                })
+                .unwrap_or(false);
+            out.push(serde_json::json!({
+                "family": family,
+                "mono": face.monospaced,
+                "cjk": cjk,
+            }));
+        }
+        out.sort_by(|a, b| {
+            let an = a["family"].as_str().unwrap_or("").to_lowercase();
+            let bn = b["family"].as_str().unwrap_or("").to_lowercase();
+            an.cmp(&bn)
+        });
+        out
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Vec::new()
+    }
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -818,7 +890,10 @@ fn main() {
             set_clipboard_enabled,
             set_autostart,
             open_library_folder,
-            hide_panel
+            hide_panel,
+            show_font_settings,
+            hide_font_settings,
+            list_system_fonts
         ])
         .setup(move |app| {
             // 热键被别的软件占用是常态，注册失败不应该让整个应用起不来

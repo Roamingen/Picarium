@@ -110,12 +110,45 @@
 
 * { box-sizing: border-box; }
 
+/* 字体角色：默认值与 font-config.js 保持一致；运行时由 app.js 覆盖 */
+:root {
+  --font-ui: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-ui-size: 13px;
+  --font-ui-line: 1.5;
+  --font-ui-weight: 400;
+  --font-ui-letter: 0px;
+  --font-ui-features: normal;
+  --font-list: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-list-size: 13px;
+  --font-list-line: 1.5;
+  --font-list-weight: 400;
+  --font-list-letter: 0px;
+  --font-list-features: normal;
+  --font-panel: "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --font-panel-size: 13px;
+  --font-panel-line: 1.5;
+  --font-panel-weight: 400;
+  --font-panel-letter: 0px;
+  --font-panel-features: normal;
+  --font-mono: "Cascadia Code", "Microsoft YaHei UI", monospace, system-ui, sans-serif;
+  --font-mono-size: 12px;
+  --font-mono-line: 1.4;
+  --font-mono-weight: 400;
+  --font-mono-letter: 0px;
+  --font-mono-features: "calt" 1, "liga" 1;
+}
+
 html, body {
   margin: 0;
   height: 100%;
   background: var(--bg);
   color: var(--fg);
-  font: 13px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  font-family: var(--font-ui);
+  font-size: var(--font-ui-size);
+  line-height: var(--font-ui-line);
+  font-weight: var(--font-ui-weight);
+  letter-spacing: var(--font-ui-letter);
+  font-feature-settings: var(--font-ui-features);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -157,7 +190,7 @@ input {
 
 input:focus { border-color: var(--accent); }
 
-.search { width: 260px; min-width: 140px; flex: 0 1 auto; }
+.search { width: 300px; min-width: 140px; flex: 0 1 auto; }
 
 .toolbar {
   display: flex;
@@ -169,6 +202,21 @@ input:focus { border-color: var(--accent); }
 
 .path { flex: 1; min-width: 0; color: var(--dim); }
 .path:focus { color: var(--fg); }
+
+/* 路径 / 数量 / 尺寸这类数据走等宽角色，不跟界面字号一起放大。 */
+#stats,
+.path,
+.batch-count,
+#e-path,
+#set-root,
+#set-version {
+  font-family: var(--font-mono);
+  font-size: calc(var(--font-mono-size) * 0.92);
+  line-height: var(--font-mono-line);
+  font-weight: var(--font-mono-weight);
+  letter-spacing: var(--font-mono-letter);
+  font-feature-settings: var(--font-mono-features);
+}
 
 .btn {
   background: var(--surface-2);
@@ -306,8 +354,12 @@ footer {
   border-radius: 0;
   background: transparent;
   padding: 3px 0;
-  font-size: 15px;
-  line-height: 1.45;
+  font-family: var(--font-panel);
+  font-size: calc(var(--font-panel-size) * 1.15);
+  line-height: var(--font-panel-line);
+  font-weight: var(--font-panel-weight);
+  letter-spacing: var(--font-panel-letter);
+  font-feature-settings: var(--font-panel-features);
   color: var(--fg);
 }
 
@@ -317,7 +369,11 @@ footer {
 
 .panel-count {
   flex: none;
-  font-size: 12px;
+  font-family: var(--font-panel);
+  font-size: calc(var(--font-panel-size) * 0.92);
+  line-height: var(--font-panel-line);
+  font-weight: var(--font-panel-weight);
+  letter-spacing: var(--font-panel-letter);
   color: var(--dim);
 }
 
@@ -368,7 +424,12 @@ footer {
   padding: 8px 18px 10px;
   border-top: 1px solid var(--line);
   color: var(--dim);
-  font-size: 11px;
+  font-family: var(--font-panel);
+  font-size: calc(var(--font-panel-size) * 0.85);
+  line-height: var(--font-panel-line);
+  font-weight: var(--font-panel-weight);
+  letter-spacing: var(--font-panel-letter);
+  font-feature-settings: var(--font-panel-features);
 }
 
 kbd {
@@ -380,8 +441,11 @@ kbd {
   border-radius: 4px;
   background: var(--btn);
   color: var(--kbd-fg);
-  font: inherit;
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: calc(var(--font-mono-size) * 0.84);
+  line-height: var(--font-mono-line);
+  font-weight: var(--font-mono-weight);
+  font-feature-settings: var(--font-mono-features);
 }
 
 /* ---------- 悬浮信息 ---------- */
@@ -401,26 +465,32 @@ kbd {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.12s ease;
+  font-family: var(--font-list);
+  font-size: var(--font-list-size);
+  line-height: var(--font-list-line);
+  font-weight: var(--font-list-weight);
+  letter-spacing: var(--font-list-letter);
+  font-feature-settings: var(--font-list-features);
 }
 
 .tip.show { opacity: 1; }
 
 .tip-name {
-  font-size: 13px;
+  font-size: var(--font-list-size);
   font-weight: 600;
   margin-bottom: 4px;
   word-break: break-all;
 }
 
 .tip-row {
-  font-size: 11px;
+  font-size: calc(var(--font-list-size) * 0.85);
   color: var(--dim);
-  line-height: 1.7;
+  line-height: var(--font-list-line);
 }
 
 .tip-tags {
   margin-top: 4px;
-  font-size: 11px;
+  font-size: calc(var(--font-list-size) * 0.85);
   color: var(--accent);
 }
 
@@ -456,7 +526,7 @@ kbd {
   margin-bottom: 14px;
 }
 
-.modal-title { font-size: 15px; font-weight: 600; }
+.modal-title { font-size: calc(var(--font-ui-size) * 1.15); font-weight: 600; }
 
 .field {
   display: block;
@@ -1145,6 +1215,9 @@ main {
 
 .modal.wide { width: 520px; }
 
+/* 设置里的字号会跟着「界面」变化，20px 时仍要容纳主题等长说明。 */
+#settings .modal.wide { width: 620px; max-width: calc(100vw - 48px); }
+
 .set-row {
   display: flex;
   align-items: center;
@@ -1156,9 +1229,11 @@ main {
 
 .set-row:last-of-type { border-bottom: none; }
 
+#set-fonts-open { flex: none; white-space: nowrap; }
+
 .set-text { min-width: 0; }
-.set-label { font-size: 13px; }
-.set-value { font-size: 11px; margin-top: 3px; word-break: break-all; }
+.set-label { font-size: var(--font-ui-size); }
+.set-value { font-size: calc(var(--font-ui-size) * 0.85); margin-top: 3px; word-break: break-all; }
 
 .select {
   min-width: 96px;
@@ -1997,6 +2072,7 @@ body.drag-active {
   background: var(--surface);
   color: var(--fg);
   font: inherit;
+  font-family: var(--font-mono);
 }
 
 /* 拖拽期间隐藏选中描边，避免虚影透视出蓝框 */
@@ -2440,12 +2516,12 @@ input[type='number']::-webkit-outer-spin-button {
 .km-row.capturing { background: var(--active-2); outline: 1px dashed var(--accent); outline-offset: -1px; }
 .km-name { font-size: 13px; min-width: 0; }
 .km-keys { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
-.km-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 2px 0 6px; border: 1px solid var(--line-2); border-radius: 5px; background: var(--surface-2); font: 12px/1.8 ui-monospace, Consolas, monospace; }
+.km-chip { display: inline-flex; align-items: center; gap: 2px; padding: 0 2px 0 6px; border: 1px solid var(--line-2); border-radius: 5px; background: var(--surface-2); font-family: var(--font-mono); font-size: calc(var(--font-mono-size) * 0.92); line-height: var(--font-mono-line); }
 .km-del { border: 0; background: transparent; color: var(--dim); cursor: pointer; padding: 0 3px; font-size: 11px; line-height: 1; }
 .km-del:hover { color: var(--danger); }
 .whichkey { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); min-width: 190px; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface-3); box-shadow: 0 10px 30px var(--shadow); z-index: 70; }
 .whichkey[hidden] { display: none; }
-.wk-head { margin-bottom: 6px; font: 12px ui-monospace, Consolas, monospace; color: var(--dim); }
+.wk-head { margin-bottom: 6px; font-family: var(--font-mono); font-size: calc(var(--font-mono-size) * 0.92); line-height: var(--font-mono-line); color: var(--dim); }
 .wk-list { display: flex; flex-direction: column; gap: 2px; }
 .wk-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
 .help-mask { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: var(--mask); }
@@ -2455,7 +2531,7 @@ input[type='number']::-webkit-outer-spin-button {
 .help-group { margin: 10px 0 4px; color: var(--dim); font-size: 12px; }
 .help-line { display: flex; gap: 12px; padding: 3px 0; font-size: 13px; }
 .help-keys { min-width: 190px; display: flex; flex-wrap: wrap; gap: 4px; }
-kbd { font: 11px/1.6 ui-monospace, Consolas, monospace; padding: 0 5px; border: 1px solid var(--kbd-border); border-radius: 4px; background: var(--kbd-bg); color: var(--kbd-fg); }
+kbd { font-family: var(--font-mono); font-size: calc(var(--font-mono-size) * 0.92); line-height: var(--font-mono-line); font-weight: var(--font-mono-weight); font-feature-settings: var(--font-mono-features); padding: 0 5px; border: 1px solid var(--kbd-border); border-radius: 4px; background: var(--kbd-bg); color: var(--kbd-fg); }
 
 /* hidden 属性要能压过 .set-row 的 display:flex */
 .set-row[hidden],
@@ -3024,7 +3100,7 @@ header .clip-toggle { padding: 4px 10px; font-size: 12px; }
 
 
 /* 顶栏不换行：统计信息可截断，按钮保持一行 */
-header { white-space: nowrap; }
+header { flex-wrap: nowrap; white-space: nowrap; }
 header #stats {
   flex: 1 1 auto;
   min-width: 0;
