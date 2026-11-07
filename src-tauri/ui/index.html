@@ -228,6 +228,14 @@
     <div class="modal wide">
       <div class="modal-head">
         <span class="modal-title">设置</span>
+        <button id="set-search-open" class="set-search-btn" type="button" title="搜索设置（/）" aria-label="搜索设置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+        </button>
+        <label id="set-search" class="set-search" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+          <input id="set-q" type="text" placeholder="搜索设置…" autocomplete="off" spellcheck="false" />
+          <button id="set-q-clear" class="set-q-clear" type="button" title="清空（Esc）">✕</button>
+        </label>
         <button id="set-close" class="btn small">保存并关闭</button>
       </div>
       <div class="set-tabs">
@@ -236,6 +244,7 @@
         <button class="set-tab" data-tab="keys">按键</button>
         <button class="set-tab" data-tab="data">数据</button>
       </div>
+      <div id="set-results" class="set-results" hidden></div>
       <div id="tab-general">
       <div class="set-row">
         <div class="set-text">

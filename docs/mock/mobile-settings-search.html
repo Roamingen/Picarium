@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>手机端设置搜索（预览）</title>
+<style>
+  :root{
+    --bg:#17191f; --surface:#1c1f26; --surface-2:#22262f; --hover:#262b35; --active:#2b3140;
+    --fg:#e6e8ee; --dim:#9aa3b2; --dim-2:#6d7789; --line:#2a2f3a; --line-2:#333a47; --line-3:#3c4453;
+    --accent:#4c9aff; --accent-fg:#0f1522; --danger:#ff6b6b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:26px 24px 48px;background:#101218;color:var(--fg);font:13px/1.6 "Segoe UI","Microsoft YaHei UI",sans-serif;display:flex;flex-direction:column;align-items:center;gap:18px}
+  .head{width:880px;color:var(--dim);font-size:12.5px}
+  .head b{display:block;color:var(--fg);font-size:15px;font-weight:600;margin-bottom:6px}
+  .head code{color:var(--dim);background:var(--surface-2);padding:1px 5px;border-radius:4px}
+
+  .stage{display:flex;gap:64px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+  .device{width:390px}
+  .dlabel{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:12px;margin:0 4px 10px}
+  .dlabel b{color:var(--fg);font-weight:500}
+  .dlabel .tag{margin-left:auto;font-size:10.5px;color:var(--dim-2);border:1px solid var(--line-3);border-radius:999px;padding:1px 8px}
+
+  .phone{width:390px;height:812px;background:var(--bg);border:9px solid #2b3140;border-radius:40px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 22px 60px rgba(0,0,0,.5)}
+  .status{height:34px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 24px;color:var(--dim);font-size:11px;letter-spacing:.02em}
+  .status .r{display:flex;align-items:center;gap:6px}
+  .status .bar{width:18px;height:9px;border:1px solid var(--dim);border-radius:3px;position:relative}
+  .status .bar::after{content:"";position:absolute;inset:1px 4px 1px 1px;background:var(--dim);border-radius:1px}
+
+  .home{flex:1;min-height:0;display:flex;flex-direction:column}
+  .mhead{flex:0 0 auto;padding:0 16px 10px;background:var(--bg);border-bottom:1px solid var(--line);position:relative;z-index:2}
+  .mtop{display:flex;align-items:center;gap:10px;margin:2px 0 0;min-height:32px}
+  .mtitle{font-size:20px;font-weight:650;letter-spacing:.01em;margin:0}
+  .icon-btn{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border-radius:9px;border:1px solid var(--line-3);background:var(--surface-2);color:var(--dim);cursor:pointer}
+  .icon-btn svg{width:16px;height:16px}
+  .mhead.open .icon-btn{display:none}
+  .srow{display:none;align-items:center;gap:8px;margin-top:9px}
+  .mhead.open .srow{display:flex}
+  .srow .msearch{flex:1;min-width:0}
+  .cancel{flex:0 0 auto;border:0;background:none;color:var(--accent);font:inherit;font-size:12.5px;padding:4px 2px;cursor:pointer}
+  .msearch{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--line-3);border-radius:11px;padding:7px 10px;transition:border-color .15s}
+  .msearch:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,154,255,.14)}
+  .msearch svg{width:15px;height:15px;color:var(--dim-2);flex:0 0 auto}
+  .msearch input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--fg);font:inherit;font-size:13px}
+  .msearch input::placeholder{color:var(--dim-2)}
+  .msearch .cnt{display:none;flex:0 0 auto;font-size:10.5px;color:var(--dim-2);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 7px}
+  .msearch.hasq .cnt{display:block}
+  .msearch .clr{display:none;border:0;background:none;color:var(--dim-2);font-size:13px;line-height:1;padding:0 2px;cursor:pointer}
+  .msearch.hasq .clr{display:block}
+
+  .mbody{flex:1;min-height:0;overflow:auto;padding:4px 16px 28px}
+  .mbody::-webkit-scrollbar{width:0}
+  .msect{display:flex;align-items:center;gap:8px;padding:15px 3px 6px;color:var(--dim);font-size:11px;letter-spacing:.04em}
+  .msect .n{margin-left:auto;color:var(--dim-2);font-size:10.5px;letter-spacing:0}
+  .mcard{background:var(--surface);border:1px solid var(--line);border-radius:13px;overflow:hidden}
+  .merow{display:flex;align-items:center;gap:12px;min-height:44px;padding:9px 13px;border-top:1px solid var(--line)}
+  .merow:first-child{border-top:0}
+  .merow.hit{background:linear-gradient(90deg,rgba(76,154,255,.10),rgba(76,154,255,0) 70%)}
+  .merow .n{flex:1;min-width:0;font-size:13.5px}
+  .merow .v{flex:0 0 auto;color:var(--dim);font-size:12px;max-width:158px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .merow .chev{color:var(--dim-2);font-size:12px;flex:0 0 auto}
+  .seg{display:flex;flex:0 0 auto;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:1px}
+  .seg span{padding:2px 7px;font-size:11px;color:var(--dim);border-radius:6px;white-space:nowrap}
+  .seg span.on{background:var(--active);color:var(--fg);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+  mark{background:rgba(76,154,255,.28);color:#fff;border-radius:3px;padding:0 1px}
+
+  .empty{padding:56px 18px 30px;text-align:center;color:var(--dim-2)}
+  .empty .ico{font-size:22px;opacity:.6;margin-bottom:8px}
+  .empty b{display:block;color:var(--fg);font-size:13.5px;font-weight:500;margin-bottom:5px}
+  .sugs{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:14px}
+  .sug{padding:3px 10px;border-radius:999px;border:1px solid var(--line-3);background:var(--surface-2);color:var(--dim);font:inherit;font-size:11.5px;cursor:pointer}
+  .sug:hover{color:var(--fg)}
+  .footspace{height:10px}
+
+  .note{width:880px;color:var(--dim-2);font-size:11.5px;line-height:1.75}
+  .note b{color:var(--dim);font-weight:500}
+  .note ul{margin:6px 0 0;padding-left:18px}
+  .note code{color:var(--dim);background:var(--surface-2);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+  <div class="head">
+    <b>手机端「我的」› 设置搜索（预览）</b>
+    标题右侧一个放大镜，点开才展开搜索框；输入即过滤，命中的分组保留、其余折叠；右框可以直接打字试（现在预填「导入」）。
+  </div>
+
+  <div class="stage">
+    <div class="device">
+      <div class="dlabel"><b>常态</b><span>标题右侧一个放大镜</span><span class="tag">默认</span></div>
+      <div class="phone">
+        <div class="status"><span>14:20</span><span class="r">5G<i class="bar"></i>78%</span></div>
+        <div class="home">
+          <div class="mhead">
+            <div class="mtop">
+              <div class="mtitle">我的</div>
+              <button class="icon-btn" title="搜索设置" aria-label="搜索设置">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="mbody" id="body-a"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="device">
+      <div class="dlabel"><b>搜索中</b><span>点放大镜后展开，预填「导入」</span><span class="tag">可交互</span></div>
+      <div class="phone">
+        <div class="status"><span>14:20</span><span class="r">5G<i class="bar"></i>78%</span></div>
+        <div class="home">
+          <div class="mhead open" id="mhead-b">
+            <div class="mtop">
+              <div class="mtitle">我的</div>
+              <button class="icon-btn" title="搜索设置" aria-label="搜索设置">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+              </button>
+            </div>
+            <div class="srow">
+              <label class="msearch hasq" id="sbox">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+                <input id="q" value="导入" autocomplete="off" spellcheck="false" />
+                <span class="cnt" id="cnt"></span>
+                <button class="clr" id="clr" title="清空">✕</button>
+              </label>
+              <button class="cancel" id="cancel">取消</button>
+            </div>
+          </div>
+          <div class="mbody" id="body-b"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>设计决定</b>
+    <ul>
+      <li>入口：<b>标题右侧一个放大镜，点开才展开搜索框</b>（已定，替代常驻搜索框）；展开后右侧给「取消」收起。</li>
+      <li>结果：就地折叠（本稿，保留分组结构、只隐藏不匹配的行），还是切换成平铺的搜索结果页？就地折叠不会让人丢失位置感。</li>
+      <li>搜不到时：给常用词建议（本稿），还是只显示一行「没有找到」？</li>
+    </ul>
+  </div>
+
+<script>
+const SECTIONS = [
+  {name:'外观', rows:[
+    {label:'主题', kw:'配色 深色 浅色 跟随系统 皮肤', seg:['跟随','深色','浅色'], on:'跟随'},
+    {label:'回收站保留', kw:'天数 保留 过期 清理 回收站', seg:['7 天','30 天','90 天','自定义'], on:'7 天'},
+    {label:'网格列数', kw:'列 每行 数量 网格 大小', seg:['3','4','5'], on:'3'},
+    {label:'收藏标记', kw:'收藏 心 星 标记', seg:['红心','黄星'], on:'红心'},
+  ]},
+  {name:'拖拽', rows:[
+    {label:'入组等待', kw:'拖拽 等待 秒 入组', seg:['1 秒','2 秒','3 秒'], on:'2 秒'},
+    {label:'拖到其他分组', kw:'拖拽 剪切 复制 分组', seg:['剪切','复制'], on:'复制'},
+  ]},
+  {name:'分组', rows:[
+    {label:'分组列数', kw:'分组 列 数量 网格', seg:['2','3','4'], on:'3'},
+    {label:'新图入组位置', kw:'新图 入组 最前 最后 顺序', seg:['最前','最后'], on:'最前'},
+  ]},
+  {name:'置顶分组', rows:[
+    {label:'每行显示', kw:'置顶 每行 数量 显示', seg:['4 个','5 个','6 个'], on:'4 个'},
+    {label:'最多显示', kw:'置顶 最多 行数 显示', seg:['1 行','2 行','3 行'], on:'2 行'},
+  ]},
+  {name:'标签', rows:[
+    {label:'标签管理', kw:'标签 重命名 合并 删除 管理', value:'12 个', tap:true},
+  ]},
+  {name:'导入', rows:[
+    {label:'从手机相册导入', kw:'导入 相册 照片 图片', value:'最多 100 张', tap:true},
+    {label:'从系统文件选择器导入', kw:'导入 文件 选择器 文件名', value:'保留原文件名', tap:true},
+    {label:'分享收件箱', kw:'分享 收件箱 待整理 微信 qq', value:'3 个待整理', tap:true},
+  ]},
+  {name:'关于', rows:[
+    {label:'版本', kw:'版本号 关于 更新', value:'0.2.0' },
+    {label:'存储位置', kw:'存储 位置 库 文件夹 路径', value:'/storage/emulated/0/StickerBox', ell:true},
+  ]},
+];
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const terms = (q) => q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+const hit = (r, t) => t.length === 0 || t.every((x) => (r.label + ' ' + r.kw + ' ' + (r.value || '')).toLowerCase().includes(x));
+
+function highlight(text, t) {
+  let out = esc(text);
+  for (const x of t) {
+    const re = new RegExp('(' + x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    out = out.replace(re, '<mark>$1</mark>');
+  }
+  return out;
+}
+
+function rowHtml(r, t) {
+  const right = r.seg
+    ? `<div class="seg">${r.seg.map((s) => `<span class="${s === r.on ? 'on' : ''}">${esc(s)}</span>`).join('')}</div>`
+    : `<span class="v ${r.ell ? 'ell' : ''}">${esc(r.value)}</span>${r.tap ? '<span class="chev">›</span>' : ''}`;
+  return `<div class="merow ${t.length ? 'hit' : ''}" data-label="${esc(r.label)}">
+    <span class="n">${highlight(r.label, t)}</span>${right}
+  </div>`;
+}
+
+function render(el, q) {
+  const t = terms(q);
+  let html = '';
+  let total = 0;
+  for (const sec of SECTIONS) {
+    const rows = sec.rows.filter((r) => hit(r, t));
+    if (!rows.length) continue;
+    total += rows.length;
+    html += `<div class="msect">${esc(sec.name)}<span class="n">${t.length ? rows.length + ' 项' : ''}</span></div>
+      <div class="mcard">${rows.map((r) => rowHtml(r, t)).join('')}</div>`;
+  }
+  if (!total) {
+    html = `<div class="empty"><div class="ico">🔍</div>
+      <b>没有找到「${esc(q)}」</b>换个词试试，或者直接往下翻
+      <div class="sugs">${['主题','回收站','导入','列'].map((s) => `<button class="sug" data-sug="${s}">${s}</button>`).join('')}</div>
+    </div>`;
+  }
+  el.innerHTML = html + '<div class="footspace"></div>';
+  return total;
+}
+
+const bodyA = document.getElementById('body-a');
+render(bodyA, '');
+
+const bodyB = document.getElementById('body-b');
+const q = document.getElementById('q');
+const cnt = document.getElementById('cnt');
+const sbox = document.getElementById('sbox');
+const mheadB = document.getElementById('mhead-b');
+
+function refresh() {
+  const n = render(bodyB, q.value);
+  cnt.textContent = n ? n + ' 项' : '0 项';
+  sbox.classList.toggle('hasq', !!q.value.trim());
+}
+
+function setOpen(open) {
+  mheadB.classList.toggle('open', open);
+  if (open) q.focus();
+  else { q.value = ''; refresh(); }
+}
+
+q.addEventListener('input', refresh);
+document.getElementById('clr').addEventListener('click', () => { q.value = ''; refresh(); q.focus(); });
+document.getElementById('cancel').addEventListener('click', () => setOpen(false));
+mheadB.querySelector('.icon-btn').addEventListener('click', () => setOpen(true));
+q.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+const initQ = new URLSearchParams(location.search).get('q');
+if (initQ) { mheadB.classList.add('open'); q.value = initQ; }
+refresh();
+bodyB.addEventListener('click', (e) => {
+  const s = e.target.closest('[data-sug]');
+  if (!s) return;
+  q.value = s.dataset.sug;
+  refresh();
+  q.focus();
+});
+refresh();
+</script>
+</body>
+</html>

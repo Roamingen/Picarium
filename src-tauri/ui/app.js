@@ -3174,6 +3174,7 @@ async function openSettings() {
   $('clip-hotkey-value').textContent = s.clipHotkey || '未设置';
   renderKeymapEditor();
   applySettingsTab('general');
+  closeSettingsSearch();
   renderBlacklist();
   enhanceSelects();
   $('settings').hidden = false;
@@ -3298,7 +3299,10 @@ const SETTING_TAB_BY_LABEL = {
   设置备份: 'data',
 };
 
+let settingsTab = 'general';
+
 function applySettingsTab(name) {
+  settingsTab = name;
   document.querySelectorAll('.set-tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.tab === name);
   });
@@ -3318,7 +3322,231 @@ function applySettingsTab(name) {
 }
 
 document.querySelectorAll('.set-tab').forEach((tab) => {
-  tab.addEventListener('click', () => applySettingsTab(tab.dataset.tab));
+  tab.addEventListener('click', () => {
+    if (settingsSearchOpen()) closeSettingsSearch();
+    applySettingsTab(tab.dataset.tab);
+  });
+});
+
+// ---------- 设置搜索（放大镜入口） ----------
+const SETTINGS_TAB_NAMES = { general: '常规', appearance: '外观', keys: '按键', data: '数据' };
+const SETTINGS_TAB_ORDER = ['general', 'appearance', 'keys', 'data'];
+const SETTINGS_SEARCH_SUGS = ['面板', '回收站', '主题', '按键', '复制'];
+const SETTINGS_KEY_ITEMS = [
+  { label: '呼出快贴面板', desc: '系统快捷键：按一下弹出 / 收起快贴面板', tab: 'keys', sel: '#hotkey-value' },
+  { label: '剪贴板捕获开关', desc: '系统快捷键：开关剪贴板自动捕获', tab: 'keys', sel: '#clip-hotkey-value' },
+  { label: '内部快捷键', desc: '主界面的键盘操作，按 ? 看完整速查', tab: 'keys', sel: '#keymap-list' },
+  { label: '快贴面板按键设置', desc: '面板方向键可绑多个键，Ctrl+HJKL 已作为第二绑定', tab: 'keys', sel: '#panel-keys-list' },
+];
+
+let settingsItems = [];
+let settingsResults = [];
+let settingsSel = 0;
+
+function settingsSearchOpen() {
+  return !$('set-search').hidden;
+}
+
+function settingsModalEl() {
+  return $('settings').querySelector('.modal');
+}
+
+function buildSettingsIndex() {
+  settingsItems = [];
+  document.querySelectorAll('#tab-general .set-row').forEach((row) => {
+    const labelEl = row.querySelector('.set-label');
+    const label = labelEl ? labelEl.textContent.trim() : '';
+    if (!label) return;
+    const descEl = row.querySelector('.set-value');
+    settingsItems.push({
+      label,
+      desc: descEl ? descEl.textContent.trim() : '',
+      tab: SETTING_TAB_BY_LABEL[label] || 'general',
+      el: row,
+      sel: '',
+    });
+  });
+  for (const it of SETTINGS_KEY_ITEMS) settingsItems.push({ ...it, el: null });
+}
+
+function settingsTerms() {
+  return $('set-q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+function settingsMatch(it, terms) {
+  if (!terms.length) return true;
+  const hay = `${it.label} ${it.desc} ${SETTINGS_TAB_NAMES[it.tab]}`.toLowerCase();
+  return terms.every((t) => hay.includes(t));
+}
+
+function settingsHighlight(text, terms) {
+  let out = escapeHtml(text);
+  for (const t of terms) {
+    const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    out = out.replace(re, '<mark>$1</mark>');
+  }
+  return out;
+}
+
+function paintSettingsSelection() {
+  const nodes = $('set-results').querySelectorAll('.set-res');
+  nodes.forEach((n) => n.classList.toggle('active', Number(n.dataset.i) === settingsSel));
+  const cur = nodes[settingsSel];
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+}
+
+function paintSettingsTabCounts() {
+  const counts = { general: 0, appearance: 0, keys: 0, data: 0 };
+  const terms = settingsTerms();
+  for (const it of settingsItems) if (settingsMatch(it, terms)) counts[it.tab] = (counts[it.tab] || 0) + 1;
+  document.querySelectorAll('.set-tab').forEach((tab) => {
+    let n = tab.querySelector('.n');
+    if (!settingsSearchOpen()) {
+      if (n) n.remove();
+      return;
+    }
+    const c = counts[tab.dataset.tab] || 0;
+    if (!n) {
+      n = document.createElement('span');
+      n.className = 'n';
+      tab.appendChild(n);
+    }
+    n.textContent = c;
+    n.classList.toggle('zero', c === 0);
+  });
+}
+
+function renderSettingsResults() {
+  const terms = settingsTerms();
+  settingsResults = settingsItems
+    .filter((it) => settingsMatch(it, terms))
+    .sort((a, b) => SETTINGS_TAB_ORDER.indexOf(a.tab) - SETTINGS_TAB_ORDER.indexOf(b.tab));
+  settingsSel = Math.min(settingsSel, Math.max(0, settingsResults.length - 1));
+  paintSettingsTabCounts();
+  const box = $('set-results');
+  if (!settingsResults.length) {
+    box.innerHTML = `<div class="set-empty"><b>没有找到「${escapeHtml($('set-q').value.trim())}」相关的设置</b>换个说法试试，或者直接去页签里翻
+      <div class="set-sugs">${SETTINGS_SEARCH_SUGS.map((s) => `<button type="button" class="set-sug" data-sug="${s}">${s}</button>`).join('')}</div></div>`;
+    return;
+  }
+  let html = '';
+  let lastTab = '';
+  settingsResults.forEach((it, i) => {
+    if (it.tab !== lastTab) {
+      lastTab = it.tab;
+      const n = settingsResults.filter((x) => x.tab === it.tab).length;
+      html += `<div class="set-res-group">${SETTINGS_TAB_NAMES[it.tab]}<span class="n">${n} 项</span></div>`;
+    }
+    html += `<button type="button" class="set-res${i === settingsSel ? ' active' : ''}" data-i="${i}">
+      <span class="set-res-main"><span class="set-res-label">${settingsHighlight(it.label, terms)}</span><span class="set-res-desc">${settingsHighlight(it.desc, terms)}</span></span>
+      <span class="set-res-go">↵ 跳到${SETTINGS_TAB_NAMES[it.tab]}</span>
+    </button>`;
+  });
+  box.innerHTML = html;
+  const cur = box.querySelector('.set-res.active');
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+}
+
+function openSettingsSearch() {
+  buildSettingsIndex();
+  $('set-search-open').hidden = true;
+  $('set-search').hidden = false;
+  settingsModalEl().classList.add('searching');
+  $('set-results').hidden = false;
+  $('set-q').value = '';
+  settingsSel = 0;
+  renderSettingsResults();
+  $('set-q').focus();
+}
+
+function closeSettingsSearch() {
+  $('set-search').hidden = true;
+  $('set-search-open').hidden = false;
+  settingsModalEl().classList.remove('searching');
+  $('set-results').hidden = true;
+  $('set-q').value = '';
+  settingsResults = [];
+  settingsSel = 0;
+  paintSettingsTabCounts();
+}
+
+function jumpSettingsResult(it) {
+  if (!it) return;
+  closeSettingsSearch();
+  applySettingsTab(it.tab);
+  let el = it.el;
+  if (!el && it.sel) {
+    const target = document.querySelector(it.sel);
+    el = target ? (target.closest('.km-row') || target) : null;
+  }
+  if (!el) return;
+  el.scrollIntoView({ block: 'center' });
+  el.classList.remove('set-hit');
+  void el.offsetWidth;
+  el.classList.add('set-hit');
+  setTimeout(() => el.classList.remove('set-hit'), 1300);
+}
+
+function settingsTypingIn(el) {
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!el.isContentEditable;
+}
+
+$('set-search-open').addEventListener('click', openSettingsSearch);
+$('set-q').addEventListener('input', () => { settingsSel = 0; renderSettingsResults(); });
+$('set-q-clear').addEventListener('click', () => {
+  $('set-q').value = '';
+  settingsSel = 0;
+  renderSettingsResults();
+  $('set-q').focus();
+});
+$('set-results').addEventListener('click', (e) => {
+  const sug = e.target.closest('[data-sug]');
+  if (sug) {
+    $('set-q').value = sug.dataset.sug;
+    settingsSel = 0;
+    renderSettingsResults();
+    $('set-q').focus();
+    return;
+  }
+  const res = e.target.closest('.set-res');
+  if (res) jumpSettingsResult(settingsResults[Number(res.dataset.i)]);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (!$('settings') || $('settings').hidden) return;
+  if (!settingsSearchOpen()) {
+    if (e.key === '/' && !settingsTypingIn(e.target) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      openSettingsSearch();
+    }
+    return;
+  }
+  if (e.isComposing) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    if ($('set-q').value) {
+      $('set-q').value = '';
+      settingsSel = 0;
+      renderSettingsResults();
+    } else {
+      closeSettingsSearch();
+    }
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    settingsSel = Math.min(settingsSel + 1, Math.max(0, settingsResults.length - 1));
+    paintSettingsSelection();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    settingsSel = Math.max(settingsSel - 1, 0);
+    paintSettingsSelection();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    jumpSettingsResult(settingsResults[settingsSel]);
+  }
 });
 
 $('filter-btn').addEventListener('click', () => (filterPanelOpen() ? closeFilterPanel() : openFilterPanel()));
@@ -5767,6 +5995,49 @@ async function runAcceptSuite() {
     await saveSettings({ panelKeys: { ...panelKeys } });
     await sleep(40);
     applySettingsTab('general');
+
+    // 设置搜索：放大镜入口 / 结果分组 / 跳转 / Esc 两级退出
+    $('set-search-open').click();
+    await sleep(60);
+    check(
+      '放大镜展开设置搜索',
+      !$('set-search').hidden && $('set-search-open').hidden && !$('set-results').hidden,
+      `input=${$('set-search').hidden} btn=${$('set-search-open').hidden}`
+    );
+    $('set-q').value = '回收站';
+    $('set-q').dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(60);
+    const sHits = [...document.querySelectorAll('#set-results .set-res')];
+    check('设置搜索命中「回收站」', sHits.length >= 2, `n=${sHits.length}`);
+    check(
+      '设置搜索结果按页签分组并高亮',
+      !!document.querySelector('#set-results .set-res-group') && !!document.querySelector('#set-results .set-res mark'),
+      'group+mark'
+    );
+    check('搜索时页签显示匹配数', document.querySelectorAll('.set-tab .n').length === 4, `n=${document.querySelectorAll('.set-tab .n').length}`);
+    sHits[0].click();
+    await sleep(80);
+    check(
+      '点设置搜索结果跳页签并收起搜索',
+      $('set-search').hidden && !$('tab-general').hidden && !!document.querySelector('#tab-general .set-row.set-hit'),
+      `hidden=${$('set-search').hidden}`
+    );
+    $('set-search-open').click();
+    $('set-q').value = '不存在的设置xyz';
+    $('set-q').dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(60);
+    check(
+      '设置搜索空态给建议词',
+      !!document.querySelector('#set-results .set-empty') && document.querySelectorAll('#set-results .set-sug').length >= 3,
+      `sug=${document.querySelectorAll('#set-results .set-sug').length}`
+    );
+    send('Escape');
+    await sleep(40);
+    check('Esc 先清空设置关键词', !$('set-search').hidden && $('set-q').value === '', `q=${$('set-q').value}`);
+    send('Escape');
+    await sleep(40);
+    check('再按 Esc 收起设置搜索', $('set-search').hidden && !$('set-search-open').hidden, 'closed');
+
     $('settings').hidden = true;
 
     buildKeymap({ down: ['n'] });

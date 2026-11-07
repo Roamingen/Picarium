@@ -2155,6 +2155,191 @@ input[type='number']::-webkit-outer-spin-button {
 .set-tab:hover { color: var(--fg); }
 .set-tab.active { background: var(--surface-2); color: var(--fg); }
 
+/* ---------- 设置搜索 ---------- */
+#settings .modal-head {
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.set-search-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--dim);
+  cursor: pointer;
+}
+
+.set-search-btn:hover { color: var(--fg); border-color: var(--line-2); }
+.set-search-btn[hidden] { display: none; }
+.set-search-btn svg { width: 14px; height: 14px; }
+
+.set-search {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  max-width: 280px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.set-search[hidden] { display: none; }
+.set-search:focus-within { border-color: var(--accent); }
+.set-search svg { width: 13px; height: 13px; flex: none; color: var(--dim); }
+
+.set-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.set-search input::placeholder { color: var(--dim-2); }
+
+.set-q-clear {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--dim);
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.set-q-clear:hover { color: var(--fg); }
+
+.set-tab .n {
+  margin-left: 5px;
+  font-size: 11px;
+  color: var(--dim-2);
+  font-variant-numeric: tabular-nums;
+}
+.set-tab .n.zero { opacity: 0.45; }
+.set-tab.active .n { color: var(--dim); }
+
+.modal.searching #tab-general,
+.modal.searching #tab-keys { display: none; }
+.modal.searching .set-tab:hover { color: var(--dim); }
+.modal.searching .set-tab:hover .n { color: var(--dim); }
+
+.set-results { padding: 4px 0 8px; }
+.set-results[hidden] { display: none; }
+
+.set-res-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 2px 4px;
+  color: var(--dim);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.set-res-group .n { color: var(--dim-2); }
+
+.set-res {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 1px 0;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.set-res:hover { background: var(--surface-2); }
+
+.set-res.active {
+  background: var(--surface-2);
+  outline: 1px solid var(--line-2);
+  outline-offset: -1px;
+}
+
+.set-res-main { flex: 1; min-width: 0; }
+.set-res-label { display: block; font-size: 13px; }
+
+.set-res-desc {
+  display: block;
+  margin-top: 2px;
+  color: var(--dim);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.set-res-go { flex: none; color: var(--dim-2); font-size: 11px; }
+
+.set-res mark,
+.set-empty mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: var(--sel-tint);
+  color: inherit;
+}
+
+.set-empty {
+  padding: 32px 10px 22px;
+  color: var(--dim);
+  font-size: 12px;
+  text-align: center;
+}
+
+.set-empty b { display: block; margin-bottom: 4px; color: var(--fg); font-weight: 500; }
+
+.set-sugs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.set-sug {
+  padding: 3px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.set-sug:hover { color: var(--fg); }
+
+.set-hit { animation: set-hit 1.1s ease-out; }
+
+@keyframes set-hit {
+  0%, 30% { background: var(--sel-tint); }
+  100% { background: transparent; }
+}
+
 /* ---------- 键盘光标 ---------- */
 
 .card.cursor {

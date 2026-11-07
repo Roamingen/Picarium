@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>设置搜索（PC 预览）</title>
+<style>
+  :root{
+    --bg:#17191f; --surface:#1c1f26; --surface-2:#22262f; --hover:#262b35; --active:#2b3140;
+    --fg:#e6e8ee; --dim:#9aa3b2; --dim-2:#6d7789; --line:#2a2f3a; --line-2:#333a47; --line-3:#3c4453;
+    --accent:#4c9aff; --accent-fg:#0f1522; --danger:#ff6b6b; --kbd-bg:#242a35; --kbd-border:#3a4252; --kbd-fg:#cfd6e4;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:26px 24px 44px;background:var(--bg);color:var(--fg);font:13px/1.6 "Segoe UI","Microsoft YaHei UI",sans-serif;display:flex;flex-direction:column;align-items:center;gap:16px}
+  .head{width:880px;color:var(--dim);font-size:12.5px}
+  .head b{display:block;color:var(--fg);font-size:15px;font-weight:600;margin-bottom:6px}
+  .head code{color:var(--dim);background:var(--surface-2);padding:1px 5px;border-radius:4px}
+
+  .modal{width:880px;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,.45)}
+  .mhead{display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid var(--line)}
+  .mtitle{font-size:15px;font-weight:600;flex:0 0 auto}
+  .icon-btn{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border-radius:8px;border:1px solid var(--line-3);background:var(--surface-2);color:var(--dim);cursor:pointer}
+  .icon-btn:hover{color:var(--fg);border-color:var(--dim)}
+  .icon-btn svg{width:15px;height:15px}
+  .mhead.open .icon-btn{display:none}
+  .search{display:none;margin-left:auto;align-items:center;gap:7px;width:336px;background:var(--surface-2);border:1px solid var(--line-3);border-radius:9px;padding:6px 8px}
+  .mhead.open .search{display:flex}
+  .search:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,154,255,.14)}
+  .search svg{width:14px;height:14px;color:var(--dim-2);flex:0 0 auto}
+  .search input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--fg);font:inherit;font-size:12.5px}
+  .search input::placeholder{color:var(--dim-2)}
+  .search kbd{font-size:10px;flex:0 0 auto}
+  .search .clr{display:none;border:0;background:none;color:var(--dim-2);cursor:pointer;font-size:12px;padding:0 2px;line-height:1}
+  .search .clr:hover{color:var(--fg)}
+  .search.hasq .clr{display:block}
+  .btn{padding:5px 12px;border-radius:7px;border:1px solid var(--line-3);background:var(--surface-2);color:var(--dim);font:inherit;font-size:12px;cursor:pointer;flex:0 0 auto}
+  .btn:hover{color:var(--fg);border-color:var(--dim)}
+
+  .tabs{display:flex;align-items:center;gap:2px;padding:7px 10px;border-bottom:1px solid var(--line);background:var(--surface)}
+  .set-tab{display:flex;align-items:center;gap:6px;padding:5px 12px;border:0;border-radius:7px;background:none;color:var(--dim);font:inherit;font-size:12.5px;cursor:pointer}
+  .set-tab:hover{color:var(--fg);background:var(--hover)}
+  .set-tab.active{background:var(--active);color:var(--fg)}
+  .tabn{display:none;min-width:16px;padding:0 4px;border-radius:8px;background:rgba(76,154,255,.16);color:var(--accent);font-size:10.5px;line-height:16px;text-align:center}
+  .searching .tabn{display:inline-block}
+  .tabn.zero{background:transparent;color:var(--dim-2)}
+
+  .meta{display:none;align-items:center;gap:8px;padding:7px 18px;color:var(--dim-2);font-size:11.5px;border-bottom:1px solid var(--line)}
+  .searching .meta{display:flex}
+  .meta b{color:var(--dim);font-weight:500}
+  .meta .sp{flex:1}
+  .meta kbd{font-size:10px}
+
+  .body{max-height:556px;overflow:auto;padding:6px 8px 16px}
+  .body::-webkit-scrollbar{width:10px}
+  .body::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:6px;border:3px solid var(--surface)}
+
+  .sect{display:flex;align-items:center;gap:8px;padding:12px 12px 4px;color:var(--dim);font-size:11px;letter-spacing:.03em}
+  .set-row{display:flex;align-items:center;gap:14px;padding:10px 12px;border-radius:9px}
+  .set-row:hover{background:var(--hover)}
+  .set-text{flex:1;min-width:0}
+  .set-label{font-size:13px;font-weight:500}
+  .set-value{color:var(--dim-2);font-size:11.5px;margin-top:2px}
+  .set-ctl{flex:0 0 auto}
+  .chip-value{display:inline-block;padding:3px 9px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line-3);color:var(--dim);font-size:11.5px;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .switch{width:30px;height:18px;border-radius:9px;background:var(--line-3);position:relative;display:inline-block;vertical-align:middle}
+  .switch i{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#8b93a3;transition:.15s}
+  .switch.on{background:var(--accent)}
+  .switch.on i{left:14px;background:var(--accent-fg)}
+
+  .grp{display:flex;align-items:center;gap:8px;padding:14px 12px 5px;color:var(--dim);font-size:11.5px}
+  .grp::after{content:"";flex:1;height:1px;background:var(--line)}
+  .grp .n{color:var(--dim-2);font-size:10.5px}
+  .res{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;border-radius:8px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+  .res:hover,.res.active{background:var(--hover)}
+  .res.active{outline:1px solid rgba(76,154,255,.35)}
+  .res .t{flex:1;min-width:0}
+  .res .lbl{font-size:13px}
+  .res .d{color:var(--dim-2);font-size:11.5px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .res .go{color:var(--dim-2);font-size:11px;opacity:0;flex:0 0 auto}
+  .res:hover .go,.res.active .go{opacity:1}
+  mark{background:rgba(76,154,255,.26);color:#fff;border-radius:3px;padding:0 1px}
+
+  .empty{padding:46px 20px 40px;text-align:center;color:var(--dim-2)}
+  .empty b{display:block;color:var(--fg);font-size:13.5px;font-weight:500;margin-bottom:6px}
+  .sugs{display:flex;justify-content:center;flex-wrap:wrap;gap:6px;margin-top:14px}
+  .sug{padding:3px 10px;border-radius:999px;border:1px solid var(--line-3);background:var(--surface-2);color:var(--dim);font:inherit;font-size:11.5px;cursor:pointer}
+  .sug:hover{color:var(--fg);border-color:var(--dim)}
+  .flash{animation:flash 1.4s ease-out}
+  @keyframes flash{0%,35%{background:rgba(76,154,255,.22)}100%{background:transparent}}
+
+  .note{width:880px;color:var(--dim-2);font-size:11.5px;line-height:1.75}
+  .note b{color:var(--dim);font-weight:500}
+  .note ul{margin:6px 0 0;padding-left:18px}
+  .note code{color:var(--dim);background:var(--surface-2);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+  <div class="head">
+    <b>设置 › 搜索（PC 预览）</b>
+    右上角放大镜（或按 <code>/</code>）展开搜索框，输入即过滤全部 4 个页签；结果按页签分组，点一行跳到那个页签并把该行闪一下。<code>Esc</code> 先清空再收起，<code>↑</code>/<code>↓</code> 选择，<code>Enter</code> 跳转。
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="mhead" id="mhead">
+      <span class="mtitle">设置</span>
+      <button class="icon-btn" id="openSearch" title="搜索设置（/）" aria-label="搜索设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      </button>
+      <label class="search" id="searchbox">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+        <input id="q" placeholder="搜索设置…试试「面板」「回收站」「主题」" autocomplete="off" spellcheck="false" />
+        <button class="clr" id="clr" title="清空（Esc）">✕</button>
+        <kbd>/</kbd>
+      </label>
+      <button class="btn">保存并关闭</button>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="meta" id="meta"></div>
+    <div class="body" id="body"></div>
+  </div>
+
+  <div class="note">
+    <b>设计决定</b>
+    <ul>
+      <li>入口：<b>右上角放大镜，按 <code>/</code> 也能展开</b>（已定，替代常驻搜索框）。</li>
+      <li>结果样式：按页签分组（本稿）还是平铺成一个列表按相关度排？分组更稳，用户知道东西原来在哪。</li>
+      <li>命中后：清空搜索并收起、跳到目标行（本稿）还是保留搜索词只切页签？清空更符合「找完就走」。</li>
+    </ul>
+  </div>
+
+<script>
+const TABS = [['general','常规'],['appearance','外观'],['keys','按键'],['data','数据']];
+const ROWS = [
+  {tab:'general', label:'表情库位置', desc:'当前库文件夹，打开后可见 index.json / blobs / thumbs', kw:'路径 文件夹 库 存储 位置', value:'C:\\Users\\13066\\StickerBox'},
+  {tab:'general', label:'剪贴板捕获', desc:'复制图片后自动入库（从资源管理器复制除外）', kw:'粘贴 截图 自动 捕获', on:true},
+  {tab:'general', label:'开机自启', desc:'静默启动到托盘，不弹主窗口', kw:'启动 托盘 登录 自启', on:true},
+  {tab:'general', label:'主题', desc:'深色 / 浅色 / Catppuccin / 自定义 JSON', kw:'配色 皮肤 暗色 亮色 主题', value:'深色'},
+  {tab:'general', label:'彻底删除时', desc:'「彻底删除 / 清空回收站」如何处理文件', kw:'清空 删除 回收站 文件', value:'移入系统回收站'},
+  {tab:'general', label:'回收站保留', desc:'到期后下次启动清理；改小时先告诉你有几张要清', kw:'天数 保留 过期 清理 回收站', value:'30 天'},
+
+  {tab:'appearance', label:'网格大小', desc:'主界面卡片大小与每行数量', kw:'卡片 密度 缩放 列数 网格', value:'中等'},
+  {tab:'appearance', label:'悬停预览', desc:'鼠标停在卡片上时放大预览', kw:'放大 预览 悬停 鼠标', on:true},
+  {tab:'appearance', label:'收藏标记', desc:'收藏角标的形状与颜色', kw:'收藏 心 星 标记 颜色', value:'红心'},
+  {tab:'appearance', label:'单击复制为', desc:'单击卡片时复制成什么', kw:'复制 粘贴 格式 文件 路径', value:'图片'},
+  {tab:'appearance', label:'主界面尺寸', desc:'打开时的窗口大小', kw:'窗口 尺寸 大小 主界面', value:'1040 × 700'},
+  {tab:'appearance', label:'快贴面板尺寸', desc:'快贴面板的宽高', kw:'面板 尺寸 宽 高 快贴', value:'720 × 520'},
+  {tab:'appearance', label:'快贴排序', desc:'面板内图片的排序方式', kw:'排序 面板 最近 使用 快贴', value:'最近使用'},
+  {tab:'appearance', label:'滚动留白', desc:'列表滚动时的上下留白', kw:'滚动 留白 间距 空白', value:'标准'},
+  {tab:'appearance', label:'光标环速度', desc:'选中卡片时光标环动画快慢', kw:'动画 光标 速度 选中', value:'标准'},
+  {tab:'appearance', label:'拖拽虚影位置', desc:'拖拽时缩略图跟随鼠标的偏移', kw:'拖拽 虚影 位置 缩略图', value:'右下'},
+
+  {tab:'keys', label:'快贴面板按键设置', desc:'上 / 下 / 左 / 右 / 查看信息 各可挂多个键', kw:'按键 快捷键 面板 方向键 上 下 左 右', value:'↑ / Ctrl+K …'},
+  {tab:'keys', label:'全局热键', desc:'唤起快贴面板 / 剪贴板开关', kw:'热键 全局 唤醒 快捷键', value:'Ctrl+Shift+V'},
+  {tab:'keys', label:'冲突检测', desc:'改键时提示与系统或其他软件冲突', kw:'冲突 按键 检测 重复', on:true},
+
+  {tab:'data', label:'剪贴板黑名单', desc:'这些程序复制的图片不自动入库', kw:'黑名单 剪贴板 屏蔽 程序', value:'Snipaste'},
+  {tab:'data', label:'设置备份', desc:'导出 / 导入设置 JSON', kw:'备份 导出 导入 设置 json', value:'settings-export.json'},
+  {tab:'data', label:'最近使用上限', desc:'面板里最多保留多少张最近使用', kw:'最近 使用 上限 数量 面板', value:'50 张'},
+  {tab:'data', label:'虚拟滚动', desc:'大库只渲染可见卡片', kw:'虚拟 滚动 性能 卡顿', on:true},
+];
+
+const $ = (s) => document.querySelector(s);
+const modal = $('#modal'), mhead = $('#mhead'), openBtn = $('#openSearch'), tabsEl = $('#tabs'), bodyEl = $('#body'), metaEl = $('#meta'), qEl = $('#q'), searchbox = $('#searchbox');
+let tab = 'general';
+let query = '';
+let results = [];
+let sel = 0;
+
+const tabName = (id) => (TABS.find(([t]) => t === id) || [, id])[1];
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function terms() {
+  return query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+}
+function matches(r) {
+  const t = terms();
+  if (!t.length) return true;
+  const hay = (r.label + ' ' + r.desc + ' ' + (r.kw || '') + ' ' + tabName(r.tab)).toLowerCase();
+  return t.every((x) => hay.includes(x));
+}
+function highlight(text) {
+  let out = esc(text);
+  for (const t of terms()) {
+    const re = new RegExp('(' + t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    out = out.replace(re, '<mark>$1</mark>');
+  }
+  return out;
+}
+
+function ctl(r) {
+  return r.on === undefined
+    ? `<span class="chip-value">${esc(r.value)}</span>`
+    : `<span class="switch ${r.on ? 'on' : ''}"><i></i></span>`;
+}
+
+function rowHtml(r) {
+  return `<div class="set-row" data-label="${esc(r.label)}">
+    <div class="set-text"><div class="set-label">${highlight(r.label)}</div><div class="set-value">${highlight(r.desc)}</div></div>
+    <div class="set-ctl">${ctl(r)}</div>
+  </div>`;
+}
+
+function resHtml(r, i) {
+  return `<button class="res ${i === sel ? 'active' : ''}" data-i="${i}">
+    <div class="t"><div class="lbl">${highlight(r.label)}</div><div class="d">${highlight(r.desc)}</div></div>
+    <span class="go">↵ 跳到${tabName(r.tab)}</span>
+  </button>`;
+}
+
+function renderTabs() {
+  const counts = {};
+  if (query) for (const r of ROWS.filter(matches)) counts[r.tab] = (counts[r.tab] || 0) + 1;
+  tabsEl.innerHTML = TABS.map(([id, name]) => {
+    const n = counts[id] || 0;
+    return `<button class="set-tab ${!query && id === tab ? 'active' : ''}" data-tab="${id}">${name}<span class="tabn ${n ? '' : 'zero'}">${n}</span></button>`;
+  }).join('');
+}
+
+function render() {
+  modal.classList.toggle('searching', !!query);
+  searchbox.classList.toggle('hasq', !!query);
+  renderTabs();
+
+  if (!query) {
+    bodyEl.innerHTML = `<div class="sect">${tabName(tab)}</div>` + ROWS.filter((r) => r.tab === tab).map(rowHtml).join('');
+    return;
+  }
+
+  results = ROWS.filter(matches);
+  sel = Math.min(sel, Math.max(0, results.length - 1));
+  metaEl.innerHTML = `在 4 个页签里搜「<b>${esc(query)}</b>」· <b>${results.length}</b> 项匹配
+    <span class="sp"></span><kbd>↑↓</kbd> 选择 <kbd>↵</kbd> 跳转 <kbd>Esc</kbd> 清空`;
+
+  if (!results.length) {
+    bodyEl.innerHTML = `<div class="empty"><b>没有找到「${esc(query)}」相关的设置</b>
+      换个说法试试，或者直接去对应页签翻
+      <div class="sugs">${['面板','回收站','主题','按键','复制'].map((s) => `<button class="sug" data-sug="${s}">${s}</button>`).join('')}</div>
+    </div>`;
+    return;
+  }
+
+  let i = 0, html = '';
+  for (const [id, name] of TABS) {
+    const rs = results.filter((r) => r.tab === id);
+    if (!rs.length) continue;
+    html += `<div class="grp">${name}<span class="n">${rs.length} 项</span></div>`;
+    html += rs.map((r) => resHtml(r, i++)).join('');
+  }
+  bodyEl.innerHTML = html;
+}
+
+function jump(r) {
+  tab = r.tab;
+  query = '';
+  qEl.value = '';
+  sel = 0;
+  mhead.classList.remove('open');
+  render();
+  const el = bodyEl.querySelector(`.set-row[data-label="${CSS.escape(r.label)}"]`);
+  if (el) {
+    el.scrollIntoView({ block: 'center' });
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 1500);
+  }
+}
+
+qEl.addEventListener('input', () => { query = qEl.value; sel = 0; render(); });
+function openSearch() { mhead.classList.add('open'); qEl.focus(); }
+function closeSearch() { mhead.classList.remove('open'); qEl.value = ''; query = ''; sel = 0; render(); openBtn.focus(); }
+openBtn.addEventListener('click', openSearch);
+document.addEventListener('keydown', (e) => {
+  const open = mhead.classList.contains('open');
+  if (e.key === '/' && !open && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); openSearch(); return; }
+  if (e.key === 'Escape') {
+    if (query) { qEl.value = ''; query = ''; sel = 0; render(); return; }
+    if (open) closeSearch();
+    return;
+  }
+  if (!query) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, results.length - 1); render(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(sel - 1, 0); render(); }
+  else if (e.key === 'Enter' && results[sel]) { e.preventDefault(); jump(results[sel]); }
+});
+
+tabsEl.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tab]');
+  if (!b) return;
+  tab = b.dataset.tab;
+  query = ''; qEl.value = ''; sel = 0;
+  render();
+});
+bodyEl.addEventListener('click', (e) => {
+  const sug = e.target.closest('[data-sug]');
+  if (sug) { qEl.value = sug.dataset.sug; query = sug.dataset.sug; sel = 0; render(); return; }
+  const res = e.target.closest('.res');
+  if (res) jump(results[+res.dataset.i]);
+});
+$('#clr').addEventListener('click', () => { qEl.value = ''; query = ''; sel = 0; render(); qEl.focus(); });
+
+const initQ = new URLSearchParams(location.search).get('q');
+if (initQ) { mhead.classList.add('open'); qEl.value = initQ; query = initQ; }
+render();
+</script>
+</body>
+</html>
