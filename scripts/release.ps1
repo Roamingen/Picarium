@@ -142,10 +142,26 @@ if ($doAndroid) {
 
     $apkDir = Join-Path $root 'src-tauri/gen/android/app/build/outputs/apk'
     $apk = Get-ChildItem -Path $apkDir -Recurse -Filter '*.apk' -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -match 'release' -and $_.Name -match 'arm64' } |
+        Where-Object { $_.FullName -match 'release' } |
         Sort-Object LastWriteTime -Descending |
         Select-Object -First 1
-    if (-not $apk) { throw "找不到 arm64 release APK：$apkDir" }
+    if (-not $apk) { throw "找不到 release APK：$apkDir" }
+
+    # Tauri 的 aarch64 release 目前产在 universal/ 下，但只含 arm64-v8a；必须核对 ABI，避免把 universal 包当 arm64 发出去。
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($apk.FullName)
+    try {
+        $abis = @()
+        foreach ($entry in $zip.Entries) {
+            if ($entry.FullName -match '^lib/([^/]+)/') { $abis += $matches[1] }
+        }
+        $abis = @($abis | Sort-Object -Unique)
+    } finally {
+        $zip.Dispose()
+    }
+    if ($abis.Count -ne 1 -or $abis[0] -ne 'arm64-v8a') {
+        throw "release APK 必须只含 arm64-v8a，实际：$($abis -join ', ')"
+    }
 
     $andOut = Join-Path $releaseRoot 'android'
     New-Item -ItemType Directory -Force -Path $andOut | Out-Null
