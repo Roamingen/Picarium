@@ -2596,6 +2596,87 @@ function renderMe() {
   for (const b of document.querySelectorAll("#seg-pinrow button")) b.classList.toggle("on", +b.dataset.pinrow === S.pinsPerRow);
   for (const b of document.querySelectorAll("#seg-pinrows button")) b.classList.toggle("on", +b.dataset.pinrows === S.pinRows);
   $("me-tags-n").textContent = `${(S.tags || []).length} 个`;
+  if (meSearchOpen) renderMeSearch();
+}
+
+/* ---------- 我的：设置搜索 ----------
+   入口是标题右侧放大镜（与 PC 端一致）：展开后才出现输入框，
+   输入即过滤「我的」所有行；命中的分区留下、其余折叠；没命中给建议词。 */
+let meSearchOpen = false;
+const meLabelOrig = new WeakMap();
+
+function meSearchRows() {
+  const out = [];
+  for (const sect of document.querySelectorAll("#meview .sect")) {
+    const card = sect.nextElementSibling;
+    if (!card || !card.classList.contains("mcard")) continue;
+    for (const row of card.querySelectorAll(".merow")) {
+      const label = row.querySelector("span");
+      if (label && !meLabelOrig.has(label)) meLabelOrig.set(label, label.textContent);
+      out.push({ sect, card, row, label });
+    }
+  }
+  return out;
+}
+
+function meMarkLabel(label, q) {
+  const orig = meLabelOrig.get(label) || label.textContent;
+  const at = q ? orig.toLowerCase().indexOf(q) : -1;
+  if (at < 0) {
+    if (label.textContent !== orig || label.querySelector("mark")) label.textContent = orig;
+    return false;
+  }
+  label.innerHTML =
+    escapeHtml(orig.slice(0, at)) +
+    "<mark>" + escapeHtml(orig.slice(at, at + q.length)) + "</mark>" +
+    escapeHtml(orig.slice(at + q.length));
+  return true;
+}
+
+function renderMeSearch() {
+  const raw = $("me-q").value;
+  const q = raw.trim().toLowerCase();
+  $("me-q-clear").hidden = !raw;
+  const rows = meSearchRows();
+  const hitsPerCard = new Map();
+  const sectHit = new Set();
+  for (const it of rows) {
+    const labelHit = meMarkLabel(it.label, q);
+    const sectText = it.sect.textContent.toLowerCase();
+    if (q && sectText.includes(q)) sectHit.add(it.sect);
+    const textHit = q ? it.row.textContent.toLowerCase().includes(q) : false;
+    const show = !q || sectHit.has(it.sect) || labelHit || textHit;
+    it.row.hidden = !show;
+    if (show) hitsPerCard.set(it.card, (hitsPerCard.get(it.card) || 0) + 1);
+  }
+  for (const it of rows) {
+    const show = (hitsPerCard.get(it.card) || 0) > 0;
+    it.sect.hidden = !show;
+    it.card.hidden = !show;
+  }
+  const shown = rows.reduce((n, it) => n + (it.row.hidden ? 0 : 1), 0);
+  $("me-search-n").hidden = !q || !shown;
+  $("me-search-n").textContent = `${shown} 项`;
+  $("me-empty").hidden = !(q && !shown);
+  $("me-empty-q").textContent = raw.trim();
+}
+
+function openMeSearch() {
+  if (meSearchOpen) { $("me-q").focus(); return; }
+  meSearchOpen = true;
+  $("me-search-open").hidden = true;
+  $("me-search-row").hidden = false;
+  renderMeSearch();
+  $("me-q").focus();
+}
+
+function closeMeSearch() {
+  if (!meSearchOpen) return;
+  meSearchOpen = false;
+  $("me-search-open").hidden = false;
+  $("me-search-row").hidden = true;
+  $("me-q").value = "";
+  renderMeSearch();
 }
 
 /* 同一个筛选组件，三种宿主：图库 / 分组详情 / 回收站 */
@@ -2671,6 +2752,7 @@ function setTab(tab) {
   if (tab !== "groups") S.gview = null;
   S.tab = tab;
   window.scrollTo(0, 0);
+  if (tab !== "me") closeMeSearch();
   for (const b of document.querySelectorAll("#nav button")) b.classList.toggle("on", b.dataset.tab === tab);
 
   if (tab !== "groups" || !S.gview) {
@@ -3258,6 +3340,26 @@ function openImportSheet() {
   };
 }
 
+$("me-search-open").addEventListener("click", openMeSearch);
+$("me-search-cancel").addEventListener("click", closeMeSearch);
+$("me-q").addEventListener("input", renderMeSearch);
+$("me-q").addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if ($("me-q").value) { $("me-q").value = ""; renderMeSearch(); }
+  else { closeMeSearch(); $("me-q").blur(); }
+});
+$("me-q-clear").addEventListener("click", () => {
+  $("me-q").value = "";
+  renderMeSearch();
+  $("me-q").focus();
+});
+$("me-sugs").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-sug]");
+  if (!b) return;
+  $("me-q").value = b.dataset.sug;
+  renderMeSearch();
+  $("me-q").focus();
+});
 $("me-gallery").addEventListener("click", importFromGallery);
 $("me-files").addEventListener("click", importFromFiles);
 $("me-inbox").addEventListener("click", () => {

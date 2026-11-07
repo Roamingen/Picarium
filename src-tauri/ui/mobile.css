@@ -549,6 +549,20 @@ body { overflow-x: hidden; overflow-y: auto; }
 
 .gsearch { margin: 2px 16px 10px; }
 
+/* 我的：设置搜索 */
+.msearchrow { display: flex; align-items: center; gap: 8px; margin: 2px 16px 10px; }
+.msearchrow[hidden] { display: none; }
+.msearchrow .search { margin: 0; flex: 1 1 auto; height: 42px; }
+.msearch-n { flex: 0 0 auto; font-size: 11.5px; color: var(--dim); padding-right: 2px; }
+.msearch-cancel { border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 13.5px; padding: 8px 2px; flex: 0 0 auto; }
+.msearch-cancel:active { opacity: .6; }
+.mempty { padding: 30px 20px 10px; text-align: center; font-size: 13px; color: var(--dim); }
+.mempty b { color: var(--fg); font-weight: 600; }
+.msugs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
+.msugs button { border: 1px solid var(--line); background: var(--surface3); color: var(--fg); border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 12.5px; }
+.msugs button:active { background: var(--surface2); }
+.merow mark, .sect mark { background: color-mix(in srgb, var(--accent) 28%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+
 .gmeta { padding: 0 16px 8px; font-size: 11.5px; color: var(--dim2); }
 
 .folders {

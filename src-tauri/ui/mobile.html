@@ -369,7 +369,29 @@
 
     <!-- 我的 -->
     <section class="gview" id="meview" hidden>
-      <header class="ghead"><div class="gtitle">我的</div></header>
+      <header class="ghead">
+        <div class="gtitle">我的</div>
+        <button class="iconbtn" id="me-search-open" aria-label="搜索设置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        </button>
+      </header>
+      <div class="msearchrow" id="me-search-row" hidden>
+        <div class="search msearch">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="me-q" placeholder="搜设置项" autocomplete="off" spellcheck="false" enterkeyhint="search" />
+          <span class="msearch-n" id="me-search-n" hidden></span>
+          <button class="clr" id="me-q-clear" hidden aria-label="清空搜索">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <button class="msearch-cancel" id="me-search-cancel">取消</button>
+      </div>
+      <div class="mempty" id="me-empty" hidden>
+        <div>没找到「<b id="me-empty-q"></b>」</div>
+        <div class="msugs" id="me-sugs">
+          <button data-sug="主题">主题</button><button data-sug="回收站">回收站</button><button data-sug="导入">导入</button><button data-sug="存储位置">存储位置</button>
+        </div>
+      </div>
       <div class="sect">外观</div>
       <div class="mcard">
       <div class="merow"><span>主题</span><div class="seg" id="seg-theme">
