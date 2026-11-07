@@ -43,6 +43,9 @@
     let panelSort = 'recent';
     let recentLimit = 60;
     let hoverDelay = 350;
+    let cursorSpeed = 2.4;
+    let cursorColors = ['#6ea8fe', '#f5b301'];
+    let animTimer = null;
     let panelKeys = {
       up: ['ArrowUp', 'Ctrl+K'],
       down: ['ArrowDown', 'Ctrl+J'],
@@ -102,7 +105,28 @@
       try { return convertFileSrc(sha, 'thumb'); } catch (_) { return `http://thumb.localhost/${sha}`; }
     }
 
+    // 与主界面键盘光标同一套：颜色和速度来自设置，规则写在伪元素自己身上才会转
+    function applyCursorRing() {
+      const cols = cursorColors.length ? cursorColors : ['#6ea8fe', '#f5b301'];
+      // 末尾补回第一个颜色，让 0° 和 360° 接得上，否则会出现一条硬接缝
+      const stops = cols.length === 1 ? [cols[0], cols[0]] : [...cols, cols[0]];
+      let el = document.getElementById('cursor-style');
+      if (!el) {
+        el = document.createElement('style');
+        el.id = 'cursor-style';
+        document.head.appendChild(el);
+      }
+      el.textContent = `
+.panel-card.active::before {
+  background: conic-gradient(from var(--cursor-angle), ${stops.join(', ')});
+  animation: cursor-spin ${cursorSpeed}s linear infinite;
+  animation-delay: calc(-1 * var(--cursor-phase, 0s));
+}`;
+    }
+
     function render() {
+      clearTimeout(animTimer);
+      animTimer = null;
       grid.innerHTML = '';
       if (!items.length) {
         hint.style.display = 'block';
@@ -122,33 +146,20 @@
         img.src = thumbUrl(a.sha);
         img.onerror = () => { img.onerror = null; img.src = convertFileSrc(a.path); };
         el.appendChild(img);
-        let hoverTimer = null;
         el.addEventListener('mouseenter', (e) => {
           cursor = i;
           paint();
           showTip(a, e);
-          if (a.animated && hoverDelay > 0) {
-            hoverTimer = setTimeout(() => {
-              img.src = convertFileSrc(a.path);
-              el.dataset.anim = '1';
-            }, hoverDelay);
-          }
         });
         el.addEventListener('mousemove', moveTip);
         el.addEventListener('mouseleave', () => {
           tipEl.classList.remove('show');
-          clearTimeout(hoverTimer);
-          if (el.dataset.anim) {
-            img.src = thumbUrl(a.sha);
-            delete el.dataset.anim;
-          }
         });
         el.addEventListener('click', () => { cursor = i; copy(); });
         frag.appendChild(el);
       });
       grid.appendChild(frag);
-      const active = grid.children[cursor];
-      if (active) active.scrollIntoView({ block: 'nearest' });
+      paint();
     }
 
     // 与主界面悬浮信息保持同一条款：名称 / 尺寸体积 / 格式与导入时间 / 来源 / 分组 / 标签
@@ -207,9 +218,36 @@
     }
 
     function paint() {
-      [...grid.children].forEach((el, i) => el.classList.toggle('active', i === cursor));
+      clearTimeout(animTimer);
+      animTimer = null;
+      [...grid.children].forEach((el, i) => {
+        const on = i === cursor;
+        el.classList.toggle('active', on);
+        // 光标所在的卡片始终播放；移走才退回静态缩略图
+        if (el.dataset.anim && !on) {
+          const img = el.querySelector('img');
+          const a = items[i];
+          if (img && a) img.src = thumbUrl(a.sha);
+          delete el.dataset.anim;
+        }
+      });
       const active = grid.children[cursor];
-      if (active) active.scrollIntoView({ block: 'nearest' });
+      if (active) {
+        active.scrollIntoView({ block: 'nearest' });
+        const a = items[cursor];
+        // 预览跟着光标走：打开面板/方向键移动/悬停都从当前光标开始播
+        if (a && a.animated && hoverDelay > 0 && !active.dataset.anim) {
+          animTimer = setTimeout(() => {
+            if (grid.children[cursor] !== active) return; // 等待期间光标已经移走
+            const img = active.querySelector('img');
+            if (!img) return;
+            img.src = convertFileSrc(a.path);
+            active.dataset.anim = '1';
+          }, hoverDelay);
+        }
+      }
+      const phase = (performance.now() / 1000) % Math.max(0.4, cursorSpeed);
+      document.documentElement.style.setProperty('--cursor-phase', phase + 's');
     }
 
     function toggleInfo() {
@@ -230,6 +268,7 @@
       let next = cursor + dx + dy * columns();
       if (next < 0) next = 0;
       if (next >= items.length) next = items.length - 1;
+      if (next === cursor) return; // 到边界后继续按同一方向，不要把等待中的动图计时器重置
       cursor = next;
       paint();
     }
@@ -372,6 +411,8 @@
         if (st.panelSort) panelSort = st.panelSort;
         if (typeof st.recentLimit === 'number') recentLimit = st.recentLimit;
         if (typeof st.hoverDelay === 'number') hoverDelay = st.hoverDelay;
+        if (typeof st.cursorSpeed === 'number' && Number.isFinite(st.cursorSpeed)) cursorSpeed = st.cursorSpeed;
+        if (Array.isArray(st.cursorColors) && st.cursorColors.length) cursorColors = st.cursorColors.slice(0, 8);
         if (st.panelKeys && typeof st.panelKeys === 'object') {
           for (const slot of PANEL_SLOTS) {
             if (!Array.isArray(st.panelKeys[slot])) continue;
@@ -390,6 +431,7 @@
         }
         if (st.theme) document.documentElement.dataset.theme = st.theme;
       } catch (_) {}
+      applyCursorRing();
       paintFooter();
     }
 

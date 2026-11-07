@@ -66,6 +66,8 @@ let virtualize = true;
 let clipboardBlacklist = [];
 let virtStart = -1;
 let virtEnd = -1;
+let cursorAnimTimer = null;
+let cursorAnimCard = null;
 const VIRTUAL_MIN = 120;
 let deleteMode = localStorage.getItem('stickerbox-delete-mode') || 'recycle';
 let ghostX = Number(localStorage.getItem('stickerbox-ghost-x') || 0);
@@ -1011,6 +1013,7 @@ function buildCard(a, idx, m) {
     showTip(a, e);
     if (a.animated && hoverDelay > 0) {
       hoverTimer = setTimeout(() => {
+        if (el.dataset.anim) return;
         img.src = convertFileSrc(a.path);
         el.dataset.anim = '1';
       }, hoverDelay);
@@ -1020,9 +1023,10 @@ function buildCard(a, idx, m) {
   el.addEventListener('mouseleave', () => {
     hideTip();
     clearTimeout(hoverTimer);
-    if (el.dataset.anim) {
+    // 光标还停在这张上时，鼠标移开也不能把动图收掉
+    if (el.dataset.anim && el !== cursorAnimCard) {
       img.src = thumbSrc(a.sha);
-  if (img.complete && img.naturalWidth) el.classList.remove('loading');
+      if (img.complete && img.naturalWidth) el.classList.remove('loading');
       delete el.dataset.anim;
     }
   });
@@ -4093,12 +4097,43 @@ function gridCols() {
   return n || 1;
 }
 
+function restoreCursorAnim(el) {
+  if (!el || !el.dataset.anim) return;
+  const a = shownItems[Number(el.dataset.index)];
+  const img = el.querySelector('img');
+  if (img && a) img.src = thumbSrc(a.sha);
+  delete el.dataset.anim;
+}
+
 function paintCursor() {
   const phase = (performance.now() / 1000) % Math.max(0.4, cursorSpeed);
   document.documentElement.style.setProperty('--cursor-phase', `${phase}s`);
   grid.querySelectorAll('.card').forEach((el) => {
     el.classList.toggle('cursor', Number(el.dataset.index) === cursor);
   });
+
+  // 光标所在的动图也要播：键盘移动、点击、重渲染都走这里。
+  // 鼠标还悬停的旧卡片留给 mouseleave 收，避免和悬停预览互相打架。
+  const active = grid.querySelector('.card.cursor');
+  if (active !== cursorAnimCard) {
+    clearTimeout(cursorAnimTimer);
+    cursorAnimTimer = null;
+    if (cursorAnimCard && !cursorAnimCard.matches(':hover')) restoreCursorAnim(cursorAnimCard);
+    cursorAnimCard = active;
+  }
+  if (active && !active.dataset.anim && !cursorAnimTimer) {
+    const a = shownItems[Number(active.dataset.index)];
+    if (a && a.animated && hoverDelay > 0) {
+      cursorAnimTimer = setTimeout(() => {
+        cursorAnimTimer = null;
+        if (cursorAnimCard !== active || !active.isConnected) return;
+        const img = active.querySelector('img');
+        if (!img || active.dataset.anim) return;
+        img.src = convertFileSrc(a.path);
+        active.dataset.anim = '1';
+      }, hoverDelay);
+    }
+  }
   updateBatchDock();
 }
 

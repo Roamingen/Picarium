@@ -1,6 +1,6 @@
 [package]
 name = "stickerbox"
-version = "0.4.0"
+version = "0.4.2"
 edition = "2021"
 description = "StickerBox desktop shell (Tauri 2)"
 

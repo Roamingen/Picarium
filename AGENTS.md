@@ -22,7 +22,7 @@
 
 | 改动 | 最低验证 |
 |---|---|
-| 只改 JS/CSS | `node --check src-tauri/ui/app.js` + 打开应用截图/单点检查 |
+| 只改 JS/CSS | `node --check src-tauri/ui/app.js` + 隐藏 CDP 单点检查（见 2.1） |
 | 改 Rust | `cargo build -p stickerbox`（必要时 `cargo test -p stickerbox-core`） |
 | UI 行为/键盘/筛选 | 跑 `pwsh -NoProfile -File scripts/accept.ps1` |
 | 性能/虚拟滚动 | `pwsh -NoProfile -File scripts/perf.ps1` |
@@ -31,6 +31,15 @@
 - 完整验收一天最多 1–2 次；不要每批都跑 3 分钟的 accept。
 - 截图只在需要看视觉时跑，别每批都 `-Shots`。
 - 长日志不要整段 `cat`，用 `grep`/`tail` 定位。
+
+### 2.1 测试窗口纪律（硬规则）
+
+- 自动化验证默认**不显示、不聚焦任何窗口**：不按全局热键、不调用 show/focus/bringToFront、不启动可见窗口。
+- 优先用 `startHidden`（或 `Start-Process -WindowStyle Hidden`）+ WebView2 CDP，在**隐藏页面**里断言。实测隐藏窗口的 WebView2 页面仍可 `Runtime.evaluate`，两个 StickerBox 窗口 `IsWindowVisible=false`。
+- 起隐藏应用的固定做法：`STICKERBOX_HOME=临时库`，设置 `startHidden: true`，加 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9333 --remote-allow-origins=*"`，**不要按 Ctrl+Alt+Space**；直接对 `panel.html` / `tauri.localhost` 页面 eval。
+- 面板隐藏时页面没冻结：直接调 `search('')` / `render()` / `paint()` 验证，不需要先弹出来。**禁止**用“Escape + 全局热键”的 ensure 逻辑抢前台。
+- 截图只用 CDP `Page.captureScreenshot` 或 `.tools/shot_main.ps1`（纯截图）；不要为了截图把窗口弹出来。
+- 确实需要用户看见窗口时，先问一句；测完立即隐藏。
 
 ## 3. 不要做
 
@@ -146,7 +155,7 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
 - 版本真源（脚本只读这里，别散记）：
   - PC：`src-tauri/tauri.conf.json` 的 `version`；`src-tauri/Cargo.toml` 的 `version` 由脚本同步成同一个数（设置页显示的是 Cargo 版本）
   - 安卓：`src-tauri/tauri.android.conf.json` 的 `version`；`bundle.android.versionCode` 显式给码，公式 `major*1000000 + minor*1000 + patch`
-- **当前版本：PC `0.4.0` / 安卓 `0.4.1`（2026-11-07）**——升完版本号要同步改这一行。
+- **当前版本：PC `0.4.2` / 安卓 `0.4.1`（2026-11-07）**——升完版本号要同步改这一行。
 - 固定产物目录（本机，已 gitignore，不入库）：
   - `release/pc/StickerBox-<ver>.exe`
   - `release/android/StickerBox-<ver>-arm64-v8a.apk`

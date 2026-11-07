@@ -388,10 +388,11 @@ footer {
 }
 
 .panel-card {
+  position: relative;
   aspect-ratio: 1;
   min-width: 0;
-  padding: 3px;
-  border: 2px solid transparent;
+  padding: 5px;
+  border: 0;
   border-radius: 10px;
   background: var(--surface);
   cursor: pointer;
@@ -406,8 +407,24 @@ footer {
 }
 
 .panel-card.active {
-  border-color: var(--accent);
   background: var(--active-2);
+}
+
+/* 快贴面板的键盘光标：环的颜色/速度由 panel.html 按设置注入，这里只放几何与兜底 */
+.panel-card.active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from var(--cursor-angle), #6ea8fe, #f5b301, #6ea8fe);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: cursor-spin var(--cursor-speed, 2.4s) linear infinite;
+  animation-delay: calc(-1 * var(--cursor-phase, 0s));
+  pointer-events: none;
+  z-index: 3;
 }
 
 .panel-empty {
