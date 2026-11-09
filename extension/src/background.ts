@@ -17,6 +17,8 @@ chrome.runtime.onInstalled.addListener(() => {
       id: MENU_ID,
       title: "存入 StickerBox",
       contexts: ["image"],
+      // 只在 B 站页面出现：其他站点的图既没有 host 权限、也没有存的语义
+      documentUrlPatterns: ["https://*.bilibili.com/*"],
     });
   });
 });

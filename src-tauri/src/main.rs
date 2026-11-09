@@ -981,6 +981,7 @@ fn main() {
                         lib.clone(),
                         root,
                         stickerbox_lib::bridge::token(),
+                        app.handle().clone(),
                     );
                 }
             }

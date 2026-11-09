@@ -6,6 +6,9 @@
 //! 契约见 `docs/28-浏览器插件方案.md` 第 6 节：
 //! - `GET /ping` → `200 {"ok":true,"version":"..."}`
 //! - `POST /import` → `200 {"ok":true,"sha":"...","added":true}`
+//!
+//! 入库成功后向主窗发事件：新图发 `library-changed`（沿用剪贴板捕获的刷新
+//! 通道），另外无论新旧都发 `bridge-imported`，让前端弹一句提示。
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -13,6 +16,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
 use stickerbox_core::Library;
+use tauri::{AppHandle, Emitter};
 use tiny_http::{Header, Method, Request, Response, Server};
 
 /// 固定端口，改这里要同步改扩展的 host_permissions。
@@ -33,7 +37,7 @@ pub fn token() -> String {
 }
 
 /// 起一个后台线程跑桥。端口被占只告警，不影响 App 本体。
-pub fn spawn(lib: Arc<Mutex<Library>>, root: PathBuf, token: String) {
+pub fn spawn(lib: Arc<Mutex<Library>>, root: PathBuf, token: String, app: AppHandle) {
     std::thread::spawn(move || {
         let server = match Server::http(("127.0.0.1", PORT)) {
             Ok(server) => server,
@@ -44,7 +48,7 @@ pub fn spawn(lib: Arc<Mutex<Library>>, root: PathBuf, token: String) {
         };
         eprintln!("[bridge] listening on http://127.0.0.1:{PORT}");
         for request in server.incoming_requests() {
-            if let Err(e) = handle(&lib, &root, &token, request) {
+            if let Err(e) = handle(&lib, &root, &token, &app, request) {
                 eprintln!("[bridge] 请求处理失败: {e}");
             }
         }
@@ -55,6 +59,7 @@ fn handle(
     lib: &Arc<Mutex<Library>>,
     root: &Path,
     token: &str,
+    app: &AppHandle,
     mut request: Request,
 ) -> std::io::Result<()> {
     let url = request.url().to_string();
@@ -107,6 +112,20 @@ fn handle(
                 );
             }
             let (status, json) = import_payload(lib, root, &body);
+            if status == 200 {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json) {
+                    let added = v["added"].as_bool().unwrap_or(false);
+                    let sha = v["sha"].as_str().unwrap_or("").to_string();
+                    // 新图才需要重拉列表；重复图只弹提示
+                    if added {
+                        let _ = app.emit("library-changed", ());
+                    }
+                    let _ = app.emit(
+                        "bridge-imported",
+                        serde_json::json!({ "sha": sha, "added": added }),
+                    );
+                }
+            }
             respond_json(request, status, &json)
         }
         _ => respond_json(request, 404, r#"{"ok":false,"error":"not found"}"#),

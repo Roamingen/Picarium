@@ -3524,6 +3524,12 @@ window.__TAURI__.event.listen('library-changed', async () => {
   await Promise.all([refresh(), loadGroups(), showStats()]);
 });
 
+// 浏览器扩展导入完成：新图刷新走 library-changed，这里只负责给个明确反馈
+window.__TAURI__.event.listen('bridge-imported', (e) => {
+  const { added } = e.payload || {};
+  toast(added ? '已存入 StickerBox' : '这张已经在库里了');
+});
+
 // 置顶窗口
 let pinned = false;
 $('pin').addEventListener('click', async () => {

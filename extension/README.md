@@ -23,10 +23,10 @@ npm test           # 可选：URL 归一化/格式嗅探/base64 单测
 
 ## 工作原理
 
-- `background.ts` 创建右键菜单；点击后取 `info.srcUrl`。
+- `background.ts` 创建右键菜单（`documentUrlPatterns` 限定 `https://*.bilibili.com/*`，别的网站不显示）；点击后取 `info.srcUrl`。
 - `lib/media.ts` 剥掉 B 站 CDN 的 `@320w_200h.webp` 后缀拿原图 URL，抓字节后按文件头嗅探 gif/webp/png/jpg。
 - `lib/bridge.ts` 把 base64 POST 到 `http://127.0.0.1:17800/import`，带 `X-StickerBox-Token`。
-- 桥校验 token → core `import_media_bytes` 入库（自动标动图）→ `ensure_thumb` 生成缩略图。
+- 桥校验 token → core `import_media_bytes` 入库（自动标动图）→ `ensure_thumb` 生成缩略图 → 发事件让桌面端实时刷新并弹「已存入」提示（重复导入提示「已经在库里了」）。
 
 ## 约定与调试
 
