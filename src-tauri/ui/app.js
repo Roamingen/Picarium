@@ -34,7 +34,7 @@ let anchorMode = 'add';
 let trashSelected = new Set();
 let trashItems = [];
 let groupSorts = new Map(); // 组内排序：纯视图状态，不写 orders
-const GROUP_SORT_LABELS = { default: '默认', manual: '手动', added: '最新入库', oldest: '最旧入库', size: '大小', name: '名称' };
+const GROUP_SORT_LABELS = { default: '默认', manual: '手动', added: '最新入库', oldest: '最旧入库', size: '大小', name: '名称', expire: '即将过期' };
 let starStyle = localStorage.getItem('stickerbox-star-style') || 'heart';
 let starColor = localStorage.getItem('stickerbox-star-color') || '#f5b301';
 let hoverDelay = Number(localStorage.getItem('stickerbox-hover-delay') || 350);
@@ -1467,12 +1467,26 @@ $('set-trash-custom').addEventListener('change', async (e) => {
   if (!ok) syncTrashDaysUI();
 });
 
+// 回收站排序在本地做：删除时间、剩余天数、名称、体积，都不写回磁盘
+function sortTrashItems(items) {
+  const mode = currentGroupSort();
+  const arr = items.slice();
+  if (mode === 'expire') {
+    arr.sort((a, b) => (new Date(a.deleted_at) - new Date(b.deleted_at)) || String(a.name || '').localeCompare(String(b.name || '')));
+  } else if (mode === 'name') {
+    arr.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hans-CN'));
+  } else if (mode === 'size') {
+    arr.sort((a, b) => (b.bytes || 0) - (a.bytes || 0));
+  }
+  return arr;
+}
+
 async function loadTrash() {
   hideTip();
-  const items = await invoke('trash_list', {
+  const items = sortTrashItems(await invoke('trash_list', {
     q: qInput.value.trim(),
     filters: filtersActive() ? JSON.stringify(assetFilters) : null,
-  });
+  }));
   updateFilterChip();
   trashItems = items;
   shownItems = items;
@@ -2263,10 +2277,10 @@ function isRealGroup(name = currentGroup) {
 }
 
 // 全部 / 未分组 / 最近使用 没有可写的成员顺序，只支持非手动排序
-const SORT_MANUAL_BLOCKED = new Set(['__all__', '__none__', '__recent__']);
+const SORT_MANUAL_BLOCKED = new Set(['__all__', '__none__', '__recent__', '__trash__']);
 
 function sortableView(name = currentGroup) {
-  if (!name || name === '__trash__') return false;
+  if (!name) return false;
   return isRealGroup(name) || SORT_MANUAL_BLOCKED.has(name) || name === '__star__';
 }
 
@@ -2316,9 +2330,15 @@ function paintGroupSort() {
   banner.hidden = mode === 'manual' || isDefault;
   if (!banner.hidden) $('sort-banner-mode').textContent = GROUP_SORT_LABELS[mode] || mode;
   const allowManual = manualSortAllowed();
+  const isTrash = currentGroup === '__trash__';
   menu.querySelector('[data-sort="manual"]').hidden = !allowManual;
   menu.querySelector('[data-sort="default"]').hidden = allowManual;
-  $('sort-menu-note').hidden = allowManual;
+  menu.querySelector('[data-sort="expire"]').hidden = !isTrash;
+  menu.querySelector('[data-sort="added"]').hidden = isTrash;
+  menu.querySelector('[data-sort="oldest"]').hidden = isTrash;
+  const note = $('sort-menu-note');
+  note.hidden = allowManual;
+  note.textContent = isTrash ? '回收站不支持手动排序' : '全部 / 未分组 / 最近使用不支持手动排序';
   $('sort-back-manual').textContent = allowManual ? '切回手动' : '恢复默认';
   for (const b of menu.querySelectorAll('[data-sort]')) {
     const isOn = b.dataset.sort === mode;
@@ -6534,6 +6554,27 @@ async function runAcceptSuite() {
     const tTitleRect = $('content-title').getBoundingClientRect();
     const tHintLeft = tHintRect.left + parseFloat(getComputedStyle(tHint).paddingLeft);
     check('回收站提示与标题左对齐', Math.abs(tHintLeft - tTitleRect.left) <= 1, `hint=${tHintLeft} title=${tTitleRect.left}`);
+    const trashTimes = () => trashItems.map((x) => new Date(x.deleted_at).getTime());
+    check('回收站默认最近删除在前', trashTimes().every((t, i, list) => i === 0 || list[i - 1] >= t));
+    setGroupSort('expire');
+    await refresh();
+    const tMenu = $('group-sort-menu');
+    check(
+      '回收站即将过期排序',
+      !$('group-sort').hidden &&
+        $('group-sort-label').textContent === '即将过期' &&
+        trashTimes().every((t, i, list) => i === 0 || list[i - 1] <= t),
+      `label=${$('group-sort-label').textContent} n=${trashItems.length}`
+    );
+    check(
+      '回收站排序菜单只留默认/即将过期/名称/大小',
+      !tMenu.querySelector('[data-sort="expire"]').hidden &&
+        tMenu.querySelector('[data-sort="added"]').hidden &&
+        tMenu.querySelector('[data-sort="oldest"]').hidden &&
+        tMenu.querySelector('[data-sort="manual"]').hidden
+    );
+    setGroupSort('default');
+    await refresh();
 
     check(
       '移出热区只在分组/收藏可用',
