@@ -19,6 +19,11 @@ use walkdir::WalkDir;
 
 const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "avif"];
 
+/// 是否为受支持的图片后缀（大小写不敏感，不接受前导点）。
+pub fn is_image_ext(ext: &str) -> bool {
+    IMAGE_EXTS.contains(&ext.to_ascii_lowercase().as_str())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Asset {
     pub sha: String,
@@ -74,6 +79,13 @@ pub struct ScanStats {
 pub struct TrashItem {
     pub asset: Asset,
     pub deleted_at: String,
+}
+
+/// 从字节入库的结果。`added = false` 表示库里已有相同内容（按 sha 去重）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediaImport {
+    pub sha: String,
+    pub added: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -442,6 +454,92 @@ impl Library {
         self.seen.insert(sha);
         self.save()?;
         Ok(true)
+    }
+
+    /// 从内存字节入库（浏览器桥、未来的分享入口）。
+    ///
+    /// 与 `import_image_bytes` 的区别：这里自动探测宽高和动图标记
+    /// （GIF / APNG / 动画 WebP），不会再出现「GIF 被存成静态图」；
+    /// 同时返回 sha，方便调用方去重提示。
+    /// `ext` 必须是 [is_image_ext] 认可的后缀；`name` 会剥掉结尾的 `.<ext>`，
+    /// 为空时用 `untitled`。
+    pub fn import_media_bytes(
+        &mut self,
+        data: Vec<u8>,
+        ext: &str,
+        name: &str,
+        source: &str,
+        source_ref: &str,
+        tags: Vec<String>,
+        groups: Vec<String>,
+    ) -> Result<MediaImport> {
+        let ext = ext.trim().to_ascii_lowercase();
+        if !IMAGE_EXTS.contains(&ext.as_str()) {
+            anyhow::bail!("不支持的图片类型: {ext}");
+        }
+        if data.is_empty() {
+            anyhow::bail!("图片内容为空");
+        }
+
+        let sha = hex(&Sha256::digest(&data));
+        if self.seen.contains(&sha) {
+            return Ok(MediaImport { sha, added: false });
+        }
+
+        let dst = self.blob_path(&sha, &ext);
+        if !dst.exists() {
+            if let Some(parent) = dst.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            // 先写临时文件再改名，避免半截文件被当成有效 blob
+            let tmp = dst.with_extension(format!("{ext}.tmp"));
+            fs::write(&tmp, &data)?;
+            fs::rename(&tmp, &dst)?;
+        }
+
+        let (width, height) = image::image_dimensions(&dst).unwrap_or((0, 0));
+        let animated = looks_animated(&dst, &ext);
+        let name = media_name(name, &ext);
+        let (py, py_abbr) = pinyin_of(&name);
+        let tags = clean_list(tags);
+        let groups = clean_list(groups);
+
+        // 和 update() 一致：字节入库带的标签/分组要进登记表，
+        // 否则侧栏和标签管理要等重开库才看得到。
+        for t in &tags {
+            if !self.known_tags.iter().any(|x| x == t) {
+                self.known_tags.push(t.clone());
+            }
+        }
+        for g in &groups {
+            if !self.known_groups.iter().any(|x| x == g) {
+                self.known_groups.push(g.clone());
+            }
+        }
+
+        self.assets.push(Asset {
+            sha: sha.clone(),
+            ext: ext.to_string(),
+            bytes: data.len() as u64,
+            width,
+            height,
+            animated,
+            name: name.clone(),
+            source: source.to_string(),
+            source_ref: source_ref.to_string(),
+            added_at: Utc::now().to_rfc3339(),
+            tags,
+            py,
+            py_abbr,
+            groups,
+            starred: false,
+            used_at: String::new(),
+            readings: Arc::new(readings_of(&name)),
+            path: dst.to_string_lossy().to_string(),
+        });
+        self.seen.insert(sha.clone());
+        self.save()?;
+        Ok(MediaImport { sha, added: true })
     }
 
     /// 单文件入库（拖拽、选择器、剪贴板都走这里）。
@@ -1562,6 +1660,23 @@ pub fn match_score(a: &Asset, q: &str) -> i32 {
     0
 }
 
+/// 浏览器桥传过来的名字可能是文件名（带后缀）；库里 `name` 存不带后缀的展示名。
+fn media_name(name: &str, ext: &str) -> String {
+    let name = name.trim();
+    let suffix = format!(".{ext}");
+    let stem = if name.to_ascii_lowercase().ends_with(&suffix) {
+        &name[..name.len() - suffix.len()]
+    } else {
+        name
+    };
+    let stem = stem.trim();
+    if stem.is_empty() {
+        "untitled".to_string()
+    } else {
+        stem.to_string()
+    }
+}
+
 /// 只扫文件头，不解码：判断是不是多帧。
 /// - GIF：一律当动图（静态 GIF 极少，代价可忽略）
 /// - APNG：PNG 里有 acTL 块
@@ -2240,6 +2355,101 @@ mod tests {
         assert_eq!(lib.search("", Some(""), 10).len(), 1);
         assert_eq!(lib.search("无语", Some(""), 10).len(), 0);
         assert_eq!(lib.group_stats(), vec![("猫猫".to_string(), 1)]);
+
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    fn gif_bytes(frames: u8) -> Vec<u8> {
+        let mut buf = Vec::new();
+        {
+            let mut enc = image::codecs::gif::GifEncoder::new(&mut buf);
+            enc.set_repeat(image::codecs::gif::Repeat::Infinite).unwrap();
+            for i in 0..frames {
+                let frame = image::RgbaImage::from_pixel(3, 2, image::Rgba([i * 40, 20, 30, 255]));
+                enc.encode_frame(image::Frame::new(frame)).unwrap();
+            }
+        }
+        buf
+    }
+
+    fn png_bytes() -> Vec<u8> {
+        let mut buf = Vec::new();
+        image::RgbaImage::from_pixel(4, 5, image::Rgba([1, 2, 3, 255]))
+            .write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+            .unwrap();
+        buf
+    }
+
+    #[test]
+    fn import_media_bytes_marks_animated_and_keeps_meta() {
+        let base = std::env::temp_dir().join(format!("sb-media-gif-{}", std::process::id()));
+        let mut lib = Library::open(base.join("lib")).unwrap();
+
+        let res = lib
+            .import_media_bytes(
+                gif_bytes(3),
+                "GIF",
+                " emoji-123.gif ",
+                "bilibili",
+                "https://i0.hdslb.com/bfs/x.gif",
+                vec!["猫".into(), "猫".into()],
+                vec!["表情".into()],
+            )
+            .unwrap();
+        assert!(res.added);
+        assert_eq!(res.sha.len(), 64);
+
+        let a = lib.assets().iter().find(|a| a.sha == res.sha).unwrap();
+        assert!(a.animated, "GIF 必须标成动图");
+        assert_eq!(a.ext, "gif");
+        assert_eq!((a.width, a.height), (3, 2));
+        assert_eq!(a.name, "emoji-123");
+        assert_eq!(a.source, "bilibili");
+        assert_eq!(a.source_ref, "https://i0.hdslb.com/bfs/x.gif");
+        assert_eq!(a.tags, vec!["猫".to_string()]);
+        assert_eq!(a.groups, vec!["表情".to_string()]);
+        assert!(lib.blob_path(&res.sha, "gif").exists());
+        assert!(lib.search("emoji", None, 10).len() == 1);
+        // 标签/分组要立刻进登记表，侧栏和标签管理不用重开库
+        assert!(lib.group_stats().iter().any(|(n, _)| n == "表情"));
+        assert!(lib.tag_stats().iter().any(|(n, _)| n == "猫"));
+
+        // 落盘后 animated 不能丢
+        let lib = Library::open(base.join("lib")).unwrap();
+        let a = lib.assets().iter().find(|a| a.sha == res.sha).unwrap();
+        assert!(a.animated);
+        std::fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn import_media_bytes_dedups_and_rejects_bad_ext() {
+        let base = std::env::temp_dir().join(format!("sb-media-dedup-{}", std::process::id()));
+        let mut lib = Library::open(base.join("lib")).unwrap();
+
+        let first = lib
+            .import_media_bytes(png_bytes(), "png", "", "bilibili", "", vec![], vec![])
+            .unwrap();
+        assert!(first.added);
+        let a = &lib.assets()[0];
+        assert_eq!(a.name, "untitled");
+        assert!(!a.animated);
+        assert_eq!((a.width, a.height), (4, 5));
+
+        let again = lib
+            .import_media_bytes(png_bytes(), "png", "again.png", "bilibili", "", vec![], vec![])
+            .unwrap();
+        assert!(!again.added);
+        assert_eq!(again.sha, first.sha);
+        assert_eq!(lib.assets().len(), 1);
+
+        let err = lib
+            .import_media_bytes(b"<html>".to_vec(), "mp4", "x.mp4", "bilibili", "", vec![], vec![])
+            .unwrap_err();
+        assert!(err.to_string().contains("不支持"), "err = {err}");
+        assert!(lib
+            .import_media_bytes(Vec::new(), "gif", "e.gif", "bilibili", "", vec![], vec![])
+            .is_err());
+        assert_eq!(lib.assets().len(), 1, "失败的导入不能留下资产");
 
         std::fs::remove_dir_all(&base).ok();
     }

@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "StickerBox 导入",
+  "version": "0.1.0",
+  "description": "右键把 B站 图片/动图直接存进本地 StickerBox",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["contextMenus", "storage"],
+  "host_permissions": [
+    "http://127.0.0.1:17800/*",
+    "https://*.bilibili.com/*",
+    "https://*.hdslb.com/*"
+  ],
+  "action": {
+    "default_title": "StickerBox：右键图片可导入"
+  }
+}

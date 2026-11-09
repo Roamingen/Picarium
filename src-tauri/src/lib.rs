@@ -13,6 +13,10 @@ pub mod clipboard;
 /// 只读命令层：桌面和安卓共用。
 pub mod commands;
 
+/// 浏览器桥：本地 HTTP 服务，只桌面挂（安卓用分享进入，不需要）。
+#[cfg(not(mobile))]
+pub mod bridge;
+
 /// 平台能力边界（每个平台一份实现）。
 pub mod platform;
 

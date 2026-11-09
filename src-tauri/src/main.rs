@@ -968,6 +968,23 @@ fn main() {
                 }
             }
 
+            // 浏览器桥：扩展把图片字节从 17800 端口送进来；端口被占只告警
+            {
+                let state = app.state::<AppState>();
+                let lib = state.lib.clone();
+                let root = match lib.lock() {
+                    Ok(library) => library.root().to_path_buf(),
+                    Err(_) => PathBuf::new(),
+                };
+                if !root.as_os_str().is_empty() {
+                    stickerbox_lib::bridge::spawn(
+                        lib.clone(),
+                        root,
+                        stickerbox_lib::bridge::token(),
+                    );
+                }
+            }
+
             // 关掉 WebView2 的浏览器原生行为（原生右键菜单/加速键/缩放/DevTools 等）
             for label in ["main", "panel"] {
                 if let Some(win) = app.get_webview_window(label) {
