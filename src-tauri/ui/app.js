@@ -1522,6 +1522,7 @@ async function loadTrash() {
 
 let pointerDrag = null;
 let caretEl = null;
+const searchWrap = document.querySelector('.search-wrap');
 
 function orderKey() {
   if ((qInput.value || '').trim()) return null;
@@ -1645,7 +1646,59 @@ function beginPointerDrag(e, a) {
     active: false,
     ghost: null,
     target: null,
+    entered: null,
+    cancel: false,
   };
+}
+
+let pendingDropView = null;
+let dropViewBusy = false;
+
+function paintSidebarActive(name) {
+  document.querySelectorAll('.side-item').forEach((el) => {
+    el.classList.toggle('active', el.dataset.group === name);
+  });
+}
+
+// 拖着图片悬停到侧栏目标上：立即切到那个视图（分组 / 收藏 / 未分组 / 最近使用），
+// 不退出选择、不打断拖拽；之后在网格里松手就把图片放进这个视图。
+let dropViewTask = null;
+async function enterDropView(name) {
+  if (!pointerDrag || name === '__trash__') return;
+  pointerDrag.entered = name;
+  pendingDropView = name;
+  if (dropViewBusy) return;
+  dropViewBusy = true;
+  dropViewTask = (async () => {
+    try {
+      while (pendingDropView && pointerDrag) {
+        const next = pendingDropView;
+        pendingDropView = null;
+        if (currentGroup === next) continue;
+        currentGroup = next;
+        listLimit = 3000;
+        paintSidebarActive(next);
+        $('select-mode').hidden = false;
+        $('empty-trash').hidden = true;
+        $('trashbar').hidden = true;
+        pointerDrag.insert = null;
+        hideCaret();
+        await refresh();
+        if (!pointerDrag) return;
+        if (next === '__none__') {
+          await invoke('mark_ungrouped_seen');
+          await loadGroups();
+        }
+      }
+    } catch (err) {
+      toast('切换分组失败：' + err);
+    } finally {
+      pendingDropView = null;
+      dropViewBusy = false;
+      dropViewTask = null;
+    }
+  })();
+  await dropViewTask;
 }
 
 function makeGhost(shas, thumbs) {
@@ -1680,11 +1733,35 @@ document.addEventListener('mousemove', (e) => {
     document.body.appendChild(g);
     pointerDrag.ghost = g;
     document.body.classList.add('drag-active');
+    searchWrap.classList.add('drag-cancel-zone');
     const sel = window.getSelection && window.getSelection();
     if (sel) sel.removeAllRanges();
   }
 
   pointerDrag.ghost.style.transform = `translate(${e.clientX + ghostX}px, ${e.clientY + ghostY}px)`;
+
+  // 搜索框是取消区：拖到上面松手 = 放弃本次拖拽
+  const cr = searchWrap.getBoundingClientRect();
+  const overCancel =
+    e.clientX >= cr.left - 6 && e.clientX <= cr.right + 6 && e.clientY >= cr.top - 6 && e.clientY <= cr.bottom + 6;
+  pointerDrag.ghost.style.opacity = overCancel ? '0.35' : '';
+  searchWrap.classList.toggle('hot', overCancel);
+  pointerDrag.cancel = overCancel;
+  if (overCancel) {
+    document.querySelectorAll('.side-item.drop-target').forEach((x) => x.classList.remove('drop-target'));
+    pointerDrag.target = null;
+    pointerDrag.insert = null;
+    hideCaret();
+    return;
+  }
+
+  // 拖着图片靠近侧栏上下边缘时，侧栏自动滚动（与网格边缘一致）
+  const sb = document.querySelector('.sidebar');
+  const sbr = sb.getBoundingClientRect();
+  if (e.clientX >= sbr.left && e.clientX <= sbr.right && e.clientY >= sbr.top && e.clientY <= sbr.bottom) {
+    if (e.clientY < sbr.top + 56) sb.scrollTop -= 18;
+    else if (e.clientY > sbr.bottom - 56) sb.scrollTop += 18;
+  }
 
   if (grid.classList.contains('virtual')) {
     const scroller = document.querySelector('main');
@@ -1698,10 +1775,16 @@ document.addEventListener('mousemove', (e) => {
   document.querySelectorAll('.side-item.drop-target').forEach((x) => x.classList.remove('drop-target'));
   const raw = item && item.dataset.group ? item.dataset.group : null;
   const allowed =
-    raw === '__none__' || raw === '__star__' || raw === '__trash__' || (raw && !raw.startsWith('__'));
+    raw === '__none__' ||
+    raw === '__star__' ||
+    raw === '__recent__' ||
+    raw === '__trash__' ||
+    (raw && !raw.startsWith('__'));
   const group = allowed ? raw : null;
   if (group) item.classList.add('drop-target');
   pointerDrag.target = group;
+  // 悬停即进入：除了回收站，分组/收藏/未分组/最近使用都立即切过去
+  if (group && group !== '__trash__') enterDropView(group);
 
   // 在可排序视图里、鼠标位于网格上 → 显示插入位置
   if (!group && orderKey()) {
@@ -1729,14 +1812,56 @@ document.addEventListener('mouseup', async () => {
   pointerDrag = null;
   if (ghost) ghost.remove();
   document.body.classList.remove('drag-active');
+  searchWrap.classList.remove('drag-cancel-zone', 'hot');
   document.querySelectorAll('.side-item.drop-target').forEach((x) => x.classList.remove('drop-target'));
 
   if (!active) return;
   suppressClick = true;
   setTimeout(() => (suppressClick = false), 50);
   hideCaret();
+  if (drag.cancel) return;
+  // 若正在切换视图，等它切完再落数据，避免旧视图的刷新覆盖结果
+  if (dropViewTask) {
+    try {
+      await dropViewTask;
+    } catch (_) {
+      /* 切换失败已经 toast 过 */
+    }
+  }
 
   const insert = drag.insert;
+  const entered = drag.entered || null;
+
+  // 悬停进入过的视图：松手就放进这个视图（回收站仍走原来的删除逻辑）
+  if (entered && target !== '__trash__') {
+    try {
+      if (entered === '__none__') {
+        await invoke('clear_groups', { shas });
+        logAction(`已把 ${shas.length} 张移出分组`);
+      } else if (entered === '__star__') {
+        await invoke('batch_star', { shas, on: true });
+        logAction(`已收藏 ${shas.length} 张`);
+      } else if (!entered.startsWith('__')) {
+        await invoke('add_to_group', { shas, group: entered });
+        logAction(`已把 ${shas.length} 张加入「${entered}」`);
+        // 指针在网格里有插入点时，顺手排到那个位置（与组内拖排序一致）
+        if (insert != null && orderKey() === entered) {
+          const moving = new Set(shas);
+          const rest = shownItems.filter((a) => !moving.has(a.sha)).map((a) => a.sha);
+          const before = shownItems.slice(0, insert).filter((a) => !moving.has(a.sha)).length;
+          rest.splice(before, 0, ...shas);
+          await invoke('set_order', { key: entered, shas: rest });
+          logAction('已调整排序');
+        }
+      }
+      clearSelection();
+      await Promise.all([refresh(), loadGroups()]);
+    } catch (err) {
+      toast('拖拽失败：' + err);
+    }
+    return;
+  }
+
   if (!target && insert != null) {
     const key = orderKey();
     if (!key) return;
@@ -1773,6 +1898,17 @@ document.addEventListener('mouseup', async () => {
   } catch (err) {
     toast('拖拽失败：' + err);
   }
+});
+
+window.addEventListener('blur', () => {
+  if (!pointerDrag) return;
+  const g = pointerDrag.ghost;
+  pointerDrag = null;
+  if (g) g.remove();
+  document.body.classList.remove('drag-active');
+  searchWrap.classList.remove('drag-cancel-zone', 'hot');
+  document.querySelectorAll('.side-item.drop-target').forEach((x) => x.classList.remove('drop-target'));
+  hideCaret();
 });
 
 function readDragShas(e) {
