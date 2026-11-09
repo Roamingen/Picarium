@@ -2224,7 +2224,6 @@ const CARD_MENU_ITEMS = [
   { act: 'edit', label: '编辑…', icon: 'pencil', key: 'Enter' },
   { act: 'copyimg', label: '复制图片', icon: 'copy', key: '单击' },
   { act: 'copyfile', label: '复制文件', icon: 'file' },
-  { act: 'copypath', label: '复制路径', icon: 'link' },
   { sep: true },
   { act: 'star', label: '收藏', icon: 'star', key: 'S' },
   { sep: true },
@@ -2235,7 +2234,7 @@ const CARD_MENU_ITEMS = [
   { act: 'trash', label: '移到回收站', icon: 'trash', key: 'dd', danger: true },
 ];
 // 多选时只留批量项（单图专属的藏起来）
-const CARD_MENU_BATCH_HIDE = new Set(['edit', 'copyimg', 'copypath', 'setcover']);
+const CARD_MENU_BATCH_HIDE = new Set(['edit', 'copyimg', 'setcover']);
 
 let cardMenuSha = null;
 let cardMenuBatch = false;
@@ -2349,11 +2348,6 @@ async function cardMenuAction(act) {
         toast(`已复制原文件「${item.name || ''}」`);
         logAction(`已复制原文件「${item.name || ''}」`);
       }
-      return;
-    }
-    if (act === 'copypath') {
-      await navigator.clipboard.writeText(item.path || '');
-      toast('路径已复制');
       return;
     }
     if (act === 'star') {
@@ -6483,7 +6477,8 @@ async function runAcceptSuite() {
       await sleep(80);
       check('右键弹出卡片菜单', !$('cardmenu').hidden);
       const vis = [...document.querySelectorAll('#cardmenu [data-cm]')].filter((b) => !b.hidden);
-      check('菜单默认含编辑与单图项', vis.some((b) => b.dataset.cm === 'edit') && vis.length >= 8, `n=${vis.length}`);
+      check('菜单默认含编辑与单图项', vis.some((b) => b.dataset.cm === 'edit') && vis.length >= 7, `n=${vis.length}`);
+      check('菜单不含复制路径（不暴露 blob）', !vis.some((b) => b.dataset.cm === 'copypath'));
       closeCardMenu();
       await sleep(60);
       check('菜单可关闭', $('cardmenu').hidden);
