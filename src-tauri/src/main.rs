@@ -657,6 +657,7 @@ async fn show_font_settings(app: tauri::AppHandle) -> Result<(), String> {
     .resizable(true)
     .build()
     .map_err(|e| format!("打开字体设置失败：{e}"))?;
+    harden_webview(&win);
     let _ = win.show();
     let _ = win.set_focus();
     Ok(())
@@ -666,6 +667,67 @@ async fn show_font_settings(app: tauri::AppHandle) -> Result<(), String> {
 fn hide_font_settings(window: tauri::WebviewWindow) -> Result<(), String> {
     window.hide().map_err(|e| e.to_string())
 }
+
+/// 关掉 WebView2 自带的浏览器行为：原生右键菜单、浏览器加速键（F5/Ctrl+R、
+/// Ctrl+P/F、Ctrl+±、Alt+← 等）、缩放、自动填充与侧滑导航，并让 release
+/// 不再暴露 DevTools。debug 版默认不动，设 `STICKERBOX_HARDEN=1` 可强制开启。
+#[cfg(windows)]
+fn harden_webview(win: &tauri::WebviewWindow) {
+    let forced = cfg!(debug_assertions) && std::env::var_os("STICKERBOX_HARDEN").is_some();
+    if cfg!(debug_assertions) && !forced {
+        return;
+    }
+    let label = win.label().to_string();
+    let _ = win.with_webview(move |w| {
+        use webview2_com::Microsoft::Web::WebView2::Win32::{
+            ICoreWebView2Settings3, ICoreWebView2Settings4, ICoreWebView2Settings5,
+            ICoreWebView2Settings6,
+        };
+        use windows::core::Interface;
+        let res: Result<(), String> = (|| {
+            let core = unsafe { w.controller().CoreWebView2() }.map_err(|e| e.to_string())?;
+            let s = unsafe { core.Settings() }.map_err(|e| e.to_string())?;
+            unsafe {
+                s.SetAreDefaultContextMenusEnabled(false)
+                    .map_err(|e| e.to_string())?;
+                s.SetIsStatusBarEnabled(false)
+                    .map_err(|e| e.to_string())?;
+                s.SetIsZoomControlEnabled(false)
+                    .map_err(|e| e.to_string())?;
+                s.SetAreDevToolsEnabled(false)
+                    .map_err(|e| e.to_string())?;
+                if let Ok(s3) = s.cast::<ICoreWebView2Settings3>() {
+                    s3.SetAreBrowserAcceleratorKeysEnabled(false)
+                        .map_err(|e| e.to_string())?;
+                }
+                if let Ok(s4) = s.cast::<ICoreWebView2Settings4>() {
+                    s4.SetIsGeneralAutofillEnabled(false)
+                        .map_err(|e| e.to_string())?;
+                    s4.SetIsPasswordAutosaveEnabled(false)
+                        .map_err(|e| e.to_string())?;
+                }
+                if let Ok(s5) = s.cast::<ICoreWebView2Settings5>() {
+                    s5.SetIsPinchZoomEnabled(false)
+                        .map_err(|e| e.to_string())?;
+                }
+                if let Ok(s6) = s.cast::<ICoreWebView2Settings6>() {
+                    s6.SetIsSwipeNavigationEnabled(false)
+                        .map_err(|e| e.to_string())?;
+                }
+            }
+            Ok(())
+        })();
+        match res {
+            Ok(()) if forced => eprintln!("[harden] {label}: ok"),
+            Ok(()) => {}
+            Err(e) => eprintln!("[harden] {label}: {e}"),
+        }
+    });
+}
+
+#[cfg(not(windows))]
+fn harden_webview(_win: &tauri::WebviewWindow) {}
+
 
 /// 列出本机字体家族。Windows 用 fontdb 扫描系统字体；其他平台先返回空。
 #[tauri::command]
@@ -904,6 +966,25 @@ fn main() {
                 if let Err(e) = register_hotkey(app.handle(), &clip_hotkey_accel, "clip") {
                     eprintln!("[hotkey] 剪贴板热键注册失败: {e}");
                 }
+            }
+
+            // 关掉 WebView2 的浏览器原生行为（原生右键菜单/加速键/缩放/DevTools 等）
+            for label in ["main", "panel"] {
+                if let Some(win) = app.get_webview_window(label) {
+                    harden_webview(&win);
+                }
+            }
+            // WebView2 刚建好时偶尔还拿不到 CoreWebView2，启动后补一次
+            {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(800));
+                    for label in ["main", "panel"] {
+                        if let Some(win) = handle.get_webview_window(label) {
+                            harden_webview(&win);
+                        }
+                    }
+                });
             }
 
             // 窗口在配置里默认不可见：静默启动时完全不闪；正常启动才显示

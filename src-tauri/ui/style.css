@@ -155,6 +155,21 @@ html, body {
 body {
   display: flex;
   flex-direction: column;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 输入框与文件路径仍可选中文本；图片不参与原生拖拽 */
+input,
+textarea,
+[contenteditable],
+#e-path {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+img {
+  -webkit-user-drag: none;
 }
 
 header {

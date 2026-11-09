@@ -400,6 +400,16 @@
       if (e.key === 'Escape') invoke('hide_panel');
     });
 
+    // 面板里也不弹浏览器原生右键菜单
+    document.addEventListener('contextmenu', (e) => e.preventDefault(), true);
+    document.addEventListener(
+      'mousedown',
+      (e) => {
+        if (e.button === 1) e.preventDefault();
+      },
+      true
+    );
+
     function applyPanelFonts(raw) {
       const fonts = SBFonts.normalize(raw);
       const root = document.documentElement;

@@ -4636,10 +4636,14 @@ function handleCaptureMouse(e) {
   return true;
 }
 
+// 任何位置都不弹 WebView2 原生菜单；卡片/组行自己的 contextmenu 照常打开自定义菜单
+document.addEventListener('contextmenu', (e) => e.preventDefault(), true);
+
+// 中键不触发 Chromium 的自动滚动
 document.addEventListener(
-  'contextmenu',
+  'mousedown',
   (e) => {
-    if (capturingAction || hotkeyCapturing) e.preventDefault();
+    if (e.button === 1) e.preventDefault();
   },
   true
 );
@@ -6482,6 +6486,15 @@ async function runAcceptSuite() {
       closeCardMenu();
       await sleep(60);
       check('菜单可关闭', $('cardmenu').hidden);
+
+      // 空白处右键不弹 WebView2 原生菜单：全局捕获阶段已 preventDefault
+      const blankCtx = new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: 5,
+        clientY: 5,
+      });
+      check('空白处右键被拦截（不弹原生菜单）', grid.dispatchEvent(blankCtx) === false);
 
       card0.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
       await sleep(200);

@@ -622,6 +622,16 @@
       'use strict';
       const { invoke } = window.__TAURI__.core;
       const $ = (id) => document.getElementById(id);
+
+      // 字体窗口里也不弹浏览器原生右键菜单
+      document.addEventListener('contextmenu', (e) => e.preventDefault(), true);
+      document.addEventListener(
+        'mousedown',
+        (e) => {
+          if (e.button === 1) e.preventDefault();
+        },
+        true
+      );
       const NF_SAMPLE = 'Aa 0123 \u{f07b}';
 
       const FALLBACK_FONTS = [
