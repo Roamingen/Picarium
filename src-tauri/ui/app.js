@@ -2011,7 +2011,7 @@ function updateContentHead() {
 /* ---------- 分组 ---------- */
 
 let groupMeta = [];
-let dragGroup = null;
+let groupDrag = null;
 let coverGroup = null;
 
 async function loadGroups() {
@@ -2045,7 +2045,7 @@ async function loadGroups() {
     const b = document.createElement('button');
     b.className = 'side-item group-row' + (currentGroup === g.name ? ' active' : '');
     b.dataset.group = g.name;
-    b.draggable = true;
+    b.dataset.pinned = g.pinned ? '1' : '0';
     const isAnim = !!(g.animated && g.cover_path);
     const coverSrc = g.cover
       ? isAnim
@@ -2060,54 +2060,27 @@ async function loadGroups() {
       `<span class="g-thumb">${cover}</span>` +
       `<span class="g-info"><span class="g-name">${escapeHtml(g.name)}</span><span class="g-sub">${sub}</span></span>` +
       `<span class="g-count">${g.count}</span>`;
-    b.addEventListener('click', () => selectGroup(g.name));
+    b.addEventListener('click', () => {
+      if (suppressClick) return;
+      selectGroup(g.name);
+    });
     b.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       openGroupMenu(g.name, e.clientX, e.clientY);
     });
-    b.addEventListener('dragstart', (e) => {
-      dragGroup = g.name;
-      b.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', g.name);
-    });
-    b.addEventListener('dragend', () => {
-      dragGroup = null;
-      cleanGroupDropMarks();
-    });
-    b.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (dragGroup) {
-        e.dataTransfer.dropEffect = 'move';
-        const r = b.getBoundingClientRect();
-        const after = e.clientY > r.top + r.height / 2;
-        b.classList.toggle('drop-after', after);
-        b.classList.toggle('drop-before', !after);
-        return;
-      }
-      e.dataTransfer.dropEffect = 'copy';
-      b.classList.add('drop-target');
-    });
-    b.addEventListener('dragleave', () => {
-      b.classList.remove('drop-target', 'drop-before', 'drop-after');
-    });
-    b.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      if (dragGroup) {
-        const after = b.classList.contains('drop-after');
-        const from = dragGroup;
-        dragGroup = null;
-        cleanGroupDropMarks();
-        await reorderGroup(from, g.name, after);
-        return;
-      }
-      b.classList.remove('drop-target');
-      const shas = readDragShas(e);
-      if (!shas.length) return;
-      await invoke('add_to_group', { shas, group: g.name });
-      clearSelection();
-      await Promise.all([refresh(), loadGroups()]);
-      toast(`已把 ${shas.length} 张加入「${g.name}」`);
+    // 指针拖拽：全局 dragstart 已拦截（为关掉 WebView2 原生拖拽），
+    // 分组行若用 HTML5 DnD 会被一并拦掉，真实鼠标永远拖不动。
+    b.addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || pointerDrag) return;
+      groupDrag = {
+        name: g.name,
+        pinned: !!g.pinned,
+        sx: e.clientX,
+        sy: e.clientY,
+        active: false,
+        to: null,
+        after: false,
+      };
     });
     return b;
   };
@@ -2130,12 +2103,74 @@ function cleanGroupDropMarks() {
     .forEach((el) => el.classList.remove('drop-before', 'drop-after', 'drop-target', 'dragging'));
 }
 
+// 分组排序的指针拖拽：与卡片拖拽同源，避免 WebView2 原生 DnD 被全局拦截
+document.addEventListener('mousemove', (e) => {
+  if (!groupDrag) return;
+  if (!groupDrag.active) {
+    if (Math.hypot(e.clientX - groupDrag.sx, e.clientY - groupDrag.sy) < 6) return;
+    groupDrag.active = true;
+    document.body.classList.add('drag-active');
+    const src = document.querySelector(`.group-row[data-group="${CSS.escape(groupDrag.name)}"]`);
+    if (src) src.classList.add('dragging');
+    const sel = window.getSelection && window.getSelection();
+    if (sel) sel.removeAllRanges();
+  }
+  document
+    .querySelectorAll('#group-list .drop-before, #group-list .drop-after')
+    .forEach((el) => el.classList.remove('drop-before', 'drop-after'));
+  groupDrag.to = null;
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const row = under && under.closest ? under.closest('.group-row') : null;
+  if (!row || row.dataset.group === groupDrag.name) return;
+  // 置顶块与普通区各自排序，跨区不给落点（松手也不生效）
+  if ((row.dataset.pinned === '1') !== groupDrag.pinned) return;
+  const r = row.getBoundingClientRect();
+  groupDrag.after = e.clientY > r.top + r.height / 2;
+  row.classList.add(groupDrag.after ? 'drop-after' : 'drop-before');
+  groupDrag.to = row.dataset.group;
+});
+
+document.addEventListener('mouseup', async () => {
+  if (!groupDrag) return;
+  const gd = groupDrag;
+  groupDrag = null;
+  document.body.classList.remove('drag-active');
+  cleanGroupDropMarks();
+  if (!gd.active) return;
+  suppressClick = true;
+  setTimeout(() => (suppressClick = false), 50);
+  if (!gd.to) return;
+  await reorderGroup(gd.name, gd.to, gd.after);
+});
+
+window.addEventListener('blur', () => {
+  if (!groupDrag) return;
+  groupDrag = null;
+  document.body.classList.remove('drag-active');
+  cleanGroupDropMarks();
+});
+
+// 分组拖拽的纯顺序计算：order 为完整顺序（置顶在前），pinned 为置顶名单。
+// 置顶组与普通组各自排序，跨区返回 null；位置无效也返回 null。
+function nextGroupOrder(order, pinned, from, to, after) {
+  const pinSet = new Set(pinned);
+  if (!order.includes(from) || !order.includes(to) || from === to) return null;
+  if (pinSet.has(from) !== pinSet.has(to)) return null;
+  const zone = order.filter((n) => n !== from && pinSet.has(n) === pinSet.has(from));
+  const at = zone.indexOf(to);
+  if (at < 0) return null;
+  zone.splice(after ? at + 1 : at, 0, from);
+  if (pinSet.has(from)) return [...zone, ...order.filter((n) => !pinSet.has(n))];
+  return [...order.filter((n) => pinSet.has(n)), ...zone];
+}
+
 async function reorderGroup(from, to, after) {
   if (!from || !to || from === to) return;
-  const order = groupMeta.map((g) => g.name).filter((n) => n !== from);
-  const at = order.indexOf(to);
-  if (at < 0) return;
-  order.splice(after ? at + 1 : at, 0, from);
+  // 显示顺序：置顶块在前，普通组在后；不能直接用存储顺序，否则置顶块与普通区交错时落点会算错
+  const pinned = groupMeta.filter((g) => g.pinned).map((g) => g.name);
+  const display = [...pinned, ...groupMeta.filter((g) => !g.pinned).map((g) => g.name)];
+  const order = nextGroupOrder(display, pinned, from, to, after);
+  if (!order) return;
   try {
     await invoke('set_group_order', { order });
     await loadGroups();
@@ -6554,6 +6589,21 @@ async function runAcceptSuite() {
     await invoke('delete_tag', { name: '合并B' });
     await reloadTagRows();
     closeTagManage();
+
+    // 分组拖拽：顺序按显示顺序算（置顶块在前），跨区不生效
+    const gPinned = ['P1', 'P2'];
+    const gOrder = ['P1', 'A', 'P2', 'B']; // 存储顺序与显示顺序交错
+    check('分组拖拽跨区无效', nextGroupOrder(gOrder, gPinned, 'A', 'P1', true) === null);
+    check(
+      '分组拖拽按显示顺序插入',
+      JSON.stringify(nextGroupOrder(gOrder, gPinned, 'B', 'A', false)) ===
+        JSON.stringify(['P1', 'P2', 'B', 'A'])
+    );
+    check(
+      '置顶组只在置顶块内换位',
+      JSON.stringify(nextGroupOrder(gOrder, gPinned, 'P1', 'P2', true)) ===
+        JSON.stringify(['P2', 'P1', 'A', 'B'])
+    );
   } catch (err) {
     check('自测执行异常', false, err && err.stack ? err.stack : String(err));
   }

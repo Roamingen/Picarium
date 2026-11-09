@@ -808,6 +808,7 @@ kbd {
 }
 
 .side-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1012,8 +1013,22 @@ main {
 
 .side-item .g-count { flex: 0 0 auto; }
 .side-item.dragging { opacity: 0.45; }
-.side-item.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
-.side-item.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+/* 分组排序落点：直线分隔，不跟随圆角，也不和选中态的圆角描边混在一起 */
+.side-item.drop-before::after,
+.side-item.drop-after::after {
+  content: '';
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  height: 2px;
+  border-radius: 0;
+  background: var(--accent);
+  pointer-events: none;
+  z-index: 2;
+}
+.side-item.drop-before::after { top: 0; }
+.side-item.drop-after::after { bottom: 0; }
+body.drag-active .sidebar .group-row.active { border-color: transparent; box-shadow: none; background: transparent; }
 
 .cover-grid {
   display: grid;

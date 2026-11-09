@@ -157,7 +157,7 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
 - 版本真源（脚本只读这里，别散记）：
   - PC：`src-tauri/tauri.conf.json` 的 `version`；`src-tauri/Cargo.toml` 的 `version` 由脚本同步成同一个数（设置页显示的是 Cargo 版本）
   - 安卓：`src-tauri/tauri.android.conf.json` 的 `version`；`bundle.android.versionCode` 显式给码，公式 `major*1000000 + minor*1000 + patch`
-- **当前版本：PC `0.5.2` / 安卓 `0.4.1`（2026-11-09）**——升完版本号要同步改这一行。
+- **当前版本：PC `0.6.0` / 安卓 `0.4.1`（2026-11-09）**——升完版本号要同步改这一行。
 - 固定产物目录（本机，已 gitignore，不入库）：
   - `release/pc/StickerBox-<ver>.exe`
   - `release/android/StickerBox-<ver>-arm64-v8a.apk`
