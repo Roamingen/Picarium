@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StickerBox · PC 组内排序按钮 / 排序界面 mock</title>
+<style>
+  :root {
+    --bg: #0d1015;
+    --bg-2: #10141a;
+    --sidebar: #11151c;
+    --surface: #171c24;
+    --surface-2: #1e242e;
+    --surface-3: #232a35;
+    --line: rgba(255, 255, 255, .075);
+    --line-2: rgba(255, 255, 255, .12);
+    --text: #e9edf4;
+    --muted: #97a2b3;
+    --muted-2: #6f7a8b;
+    --accent: #6ea8fe;
+    --accent-2: #9cc3ff;
+    --accent-soft: rgba(110, 168, 254, .14);
+    --accent-line: rgba(110, 168, 254, .40);
+    --green: #4ade80;
+    --star: #f5b301;
+    --radius: 12px;
+    --shadow: 0 18px 48px rgba(0, 0, 0, .42);
+    --shadow-sm: 0 8px 24px rgba(0, 0, 0, .28);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: radial-gradient(1100px 560px at 72% -12%, rgba(110, 168, 254, .07), transparent 62%), #090b0f;
+    color: var(--text);
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    font-size: 13.5px;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { appearance: none; -webkit-appearance: none; border: 0; background: none; cursor: pointer; }
+  button:focus-visible, input:focus-visible { outline: 2px solid rgba(110, 168, 254, .65); outline-offset: 2px; }
+  ::selection { background: rgba(110, 168, 254, .3); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2b3340; border: 3px solid transparent; border-radius: 10px; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #3b4555; background-clip: padding-box; }
+
+  .app {
+    width: min(1040px, 100vw);
+    height: min(700px, 100vh);
+    margin: 0 auto;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+
+  /* 顶栏 */
+  .topbar { flex: none; display: flex; height: 56px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
+  .topbar-side { width: 254px; flex: none; display: flex; align-items: center; gap: 9px; padding: 0 14px; border-right: 1px solid var(--line); }
+  .logo { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: linear-gradient(145deg, #2b3648, #171c24); border: 1px solid var(--line-2); color: #cfd9e8; }
+  .brand { font-weight: 600; font-size: 13px; letter-spacing: .02em; }
+  .brand small { display: block; color: var(--muted-2); font-weight: 400; font-size: 10.5px; margin-top: 1px; }
+  .topbar-body { flex: 1; display: flex; align-items: center; gap: 10px; padding: 0 16px; min-width: 0; }
+  .search { flex: 1; min-width: 120px; height: 38px; border-radius: 10px; border: 1px solid var(--line-2); background: #0c0f14; color: var(--muted); display: flex; align-items: center; padding: 0 12px; gap: 8px; }
+  .search svg { color: var(--muted-2); flex: none; }
+  .chipbtn { height: 34px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--surface); display: inline-flex; align-items: center; gap: 6px; color: #c9d2df; white-space: nowrap; }
+  .chipbtn:hover { background: var(--surface-2); }
+  .clip { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--surface); color: #cdd6e2; font-size: 12px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(74, 222, 128, .13); }
+  .iconbtn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--surface); display: grid; place-items: center; color: #c3cdda; }
+
+  .body { flex: 1; display: flex; min-height: 0; }
+  .sidebar { width: 254px; flex: none; padding: 12px 10px; border-right: 1px solid var(--line); background: var(--sidebar); overflow-y: auto; }
+  .navitem { width: 100%; height: 38px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 9px; color: #c3ccda; }
+  .navitem + .navitem { margin-top: 2px; }
+  .navitem svg { color: #8c97a8; flex: none; }
+  .navitem .n { margin-left: auto; font-size: 11.5px; color: var(--muted-2); }
+  .navitem.on { background: var(--accent-soft); color: var(--accent-2); border: 1px solid var(--accent-line); }
+  .navitem.on svg, .navitem.on .n { color: var(--accent-2); }
+  .sechead { display: flex; align-items: center; justify-content: space-between; padding: 15px 10px 6px; color: var(--muted-2); font-size: 11px; letter-spacing: .06em; }
+  .plus { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line-2); display: grid; place-items: center; color: var(--muted); }
+  .grow { width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 10px; text-align: left; }
+  .grow:hover { background: rgba(255, 255, 255, .035); }
+  .grow.on { background: linear-gradient(90deg, rgba(110, 168, 254, .20), rgba(110, 168, 254, .075)); border: 1px solid transparent; box-shadow: inset 3px 0 0 var(--accent); }
+  .gcover { width: 34px; height: 34px; border-radius: 9px; flex: none; border: 1px solid var(--line-2); }
+  .gcover.folder { display: grid; place-items: center; color: #9aa6b6; background: var(--surface-2); }
+  .gmeta { min-width: 0; }
+  .gmeta b { display: block; font-weight: 500; font-size: 12.5px; color: #dbe2ec; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gmeta small { color: var(--muted-2); font-size: 11px; }
+  .gcount { margin-left: auto; font-size: 11px; color: var(--muted); background: #0c0f14; border: 1px solid var(--line); border-radius: 999px; padding: 2px 7px; }
+
+  .content { flex: 1; min-width: 0; overflow-y: auto; position: relative; }
+  .ghead { position: sticky; top: 0; z-index: 5; display: flex; align-items: flex-start; gap: 12px; padding: 16px 20px 10px; background: linear-gradient(var(--bg) 86%, rgba(13, 16, 21, 0)); }
+  .gtitle { min-width: 0; }
+  .gtitle h1 { margin: 0; font-size: 19px; letter-spacing: .01em; font-weight: 600; }
+  .gtitle p { margin: 3px 0 0; color: var(--muted-2); font-size: 12px; }
+  .gactions { margin-left: auto; display: flex; align-items: center; gap: 8px; padding-top: 2px; }
+
+  .sortbtn { height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--surface); color: #cdd6e2; }
+  .sortbtn:hover { background: var(--surface-2); border-color: rgba(110, 168, 254, .30); }
+  .sortbtn .mode { color: var(--accent-2); font-weight: 500; }
+  .sortbtn .chev { transition: transform .15s ease; color: var(--muted-2); }
+  .sortbtn[aria-expanded="true"] { border-color: var(--accent-line); background: var(--surface-2); }
+  .sortbtn[aria-expanded="true"] .chev { transform: rotate(180deg); }
+  .sortbtn .flag { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: -1px; display: none; }
+  .sortbtn.dirty .flag { display: block; }
+
+  /* 排序弹层 */
+  .sortpop {
+    position: absolute; top: 66px; right: 20px; z-index: 20;
+    width: 286px; padding: 6px;
+    border-radius: 12px; border: 1px solid var(--line-2);
+    background: #141920; box-shadow: var(--shadow);
+    transform-origin: top right;
+  }
+  .sortpop[hidden] { display: none; }
+  .pop-head { padding: 8px 10px 6px; color: var(--muted-2); font-size: 11px; letter-spacing: .06em; }
+  .opt { width: 100%; display: flex; align-items: flex-start; gap: 9px; padding: 8px 9px; border-radius: 8px; text-align: left; }
+  .opt:hover { background: rgba(255, 255, 255, .045); }
+  .opt .radio { width: 15px; height: 15px; margin-top: 1px; border-radius: 50%; border: 1.5px solid #5a6576; flex: none; display: grid; place-items: center; color: #06101f; }
+  .opt.on .radio { border-color: var(--accent); background: var(--accent); }
+  .opt.on .radio::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #0b1220; }
+  .opt b { display: block; font-weight: 500; font-size: 12.5px; color: #dfe6f0; }
+  .opt small { display: block; margin-top: 2px; color: var(--muted-2); font-size: 11px; line-height: 1.35; }
+  .opt .kbd { margin-left: auto; color: #6f7a8b; font-size: 10.5px; border: 1px solid var(--line-2); border-radius: 5px; padding: 1px 5px; }
+  .pop-note { margin: 6px 4px 2px; padding: 8px 9px; border-top: 1px solid var(--line); color: var(--muted-2); font-size: 11px; line-height: 1.45; }
+  .pop-note b { color: #b9c4d2; font-weight: 500; }
+
+  .banner { display: flex; align-items: center; gap: 8px; margin: 0 20px 8px; padding: 7px 10px; border-radius: 8px; border: 1px dashed rgba(110, 168, 254, .34); background: rgba(110, 168, 254, .06); color: #a9b6c7; font-size: 11.5px; }
+  .banner[hidden] { display: none; }
+  .banner b { color: var(--accent-2); font-weight: 500; }
+  .banner button { margin-left: auto; color: var(--accent-2); font-size: 11.5px; text-decoration: underline; text-underline-offset: 2px; }
+
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 0 20px 20px; }
+  .tile { position: relative; aspect-ratio: 1 / 1; border-radius: 8px; border: 1px solid var(--line); overflow: hidden; background: var(--surface); }
+  .tile .art { position: absolute; inset: 0; }
+  .tile .tag { position: absolute; right: 5px; top: 5px; font-size: 9.5px; padding: 1px 5px; border-radius: 4px; background: rgba(8, 11, 16, .72); color: #b7c3d3; border: 1px solid rgba(255, 255, 255, .08); }
+  .tile .dim { position: absolute; left: 6px; bottom: 6px; right: 6px; height: 11px; border-radius: 4px; background: rgba(8, 11, 16, .35); opacity: 0; }
+  body:not(.manual) .tile .dim { opacity: 1; }
+  body:not(.manual) .tile { cursor: default; }
+  .tile:nth-child(6n+1) .art { background: radial-gradient(120% 100% at 30% 20%, #3c4c66, #1b2434 70%); }
+  .tile:nth-child(6n+2) .art { background: radial-gradient(110% 100% at 70% 30%, #5b4a63, #241d2b 72%); }
+  .tile:nth-child(6n+3) .art { background: radial-gradient(120% 100% at 30% 70%, #405e59, #16211f 70%); }
+  .tile:nth-child(6n+4) .art { background: radial-gradient(120% 110% at 65% 25%, #6b5540, #2a2018 72%); }
+  .tile:nth-child(6n+5) .art { background: radial-gradient(120% 100% at 40% 40%, #44506b, #1a2030 70%); }
+  .tile:nth-child(6n) .art { background: radial-gradient(110% 110% at 60% 60%, #5f4250, #251820 72%); }
+  .tile .art::after { content: ""; position: absolute; inset: 18% 22%; border-radius: 50% 50% 46% 54%; background: radial-gradient(circle at 38% 32%, rgba(255,255,255,.32), rgba(255,255,255,.06) 55%, transparent 60%); filter: blur(.2px); }
+  .tile .mini { position: absolute; left: 10%; bottom: 8%; width: 44%; height: 12%; border-radius: 8px 8px 4px 4px; background: rgba(255,255,255,.12); }
+
+  .statusbar { flex: none; height: 27px; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-top: 1px solid var(--line); background: var(--bg-2); color: var(--muted-2); font-size: 11px; }
+  .statusbar .right { margin-left: auto; }
+
+  .shot { padding: 18px; }
+  .shot-note { width: min(1040px, 100vw); margin: 10px auto 0; color: var(--muted-2); font-size: 11.5px; line-height: 1.6; }
+  .shot-note code { color: #b9c4d2; }
+
+  /* 切换排序确认弹窗（对齐手机端） */
+  .confirm { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; background: rgba(4, 6, 10, .55); }
+  .confirm[hidden] { display: none; }
+  .cbox { width: 350px; padding: 18px 18px 14px; border-radius: 14px; border: 1px solid var(--line-2); background: var(--surface); box-shadow: var(--shadow); }
+  .cbox h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+  .cbox p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+  .cbox p b { color: var(--accent-2); font-weight: 500; }
+  .cacts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .cacts button { height: 32px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line-2); background: var(--surface-2); color: #c9d2df; }
+  .cacts .primary { border-color: transparent; background: var(--accent); color: #08111f; font-weight: 600; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 4px; }
+</style>
+</head>
+<body class="manual">
+<div class="shot">
+  <div class="app" aria-label="StickerBox 组内排序界面预览">
+    <div class="topbar">
+      <div class="topbar-side">
+        <span class="logo">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 9h8M8 13h5"/></svg>
+        </span>
+        <span class="brand">StickerBox <small>683 张 · 1413.70 MB</small></span>
+      </div>
+      <div class="topbar-body">
+        <label class="search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+          搜索表情，按名称 / 拼音过滤
+        </label>
+        <button class="chipbtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 5h18l-7 8v5l-4 2v-7z"/></svg> 筛选</button>
+        <button class="chipbtn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 12l5 5L20 6"/></svg> 多选</button>
+        <span class="clip"><span class="dot"></span>剪贴板捕获：开</span>
+        <button class="iconbtn" title="设置"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 4h-5l-.4 2.1a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.1h5l.4-2.1a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5c.1-.3.1-.7.1-1Z"/></svg></button>
+      </div>
+    </div>
+
+    <div class="body">
+      <aside class="sidebar">
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg> 全部 <span class="n">683</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h18v12H3z"/><path d="m3 7 4-4h10l4 4"/></svg> 未分组 <span class="n">13</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="m12 3 2.8 5.8 6.2.9-4.5 4.4 1 6.2L12 17.4 6.5 20.3l1-6.2L3 9.7l6.2-.9z"/></svg> 收藏 <span class="n">3</span></button>
+        <button class="navitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg> 最近使用 <span class="n">75</span></button>
+
+        <div class="sechead">分组 <span class="plus">+</span></div>
+        <button class="grow"><span class="gcover" style="background:linear-gradient(135deg,#5b4a63,#2a2233)"></span><span class="gmeta"><b>漆木</b><small>15 张表情</small></span><span class="gcount">15</span></button>
+        <button class="grow on"><span class="gcover" style="background:linear-gradient(135deg,#3c4c66,#1b2434)"></span><span class="gmeta"><b>蓝色大肥鱼</b><small>152 张表情</small></span><span class="gcount">152</span></button>
+        <button class="grow"><span class="gcover folder"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h6l2 2h10v10H3z"/></svg></span><span class="gmeta"><b>1</b><small>14 张表情</small></span><span class="gcount">14</span></button>
+        <button class="grow"><span class="gcover folder"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h6l2 2h10v10H3z"/></svg></span><span class="gmeta"><b>伊蕾娜</b><small>1 张表情</small></span><span class="gcount">1</span></button>
+        <button class="grow"><span class="gcover folder"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h6l2 2h10v10H3z"/></svg></span><span class="gmeta"><b>大肥鱼</b><small>286 张表情</small></span><span class="gcount">286</span></button>
+        <button class="grow"><span class="gcover folder"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 7h6l2 2h10v10H3z"/></svg></span><span class="gmeta"><b>希罗酱</b><small>40 张表情</small></span><span class="gcount">40</span></button>
+      </aside>
+
+      <section class="content">
+        <header class="ghead">
+          <div class="gtitle">
+            <h1>蓝色大肥鱼</h1>
+            <p>152 张表情 · 12 张动图</p>
+          </div>
+          <div class="gactions">
+            <button class="sortbtn" id="sortBtn" aria-expanded="true" aria-controls="sortPop">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 4v16m0 0-3-3m3 3 3-3M17 20V4m0 0-3 3m3-3 3 3"/></svg>
+              排序：<span class="mode" id="sortLabel">手动</span>
+              <span class="flag"></span>
+              <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="sortpop" id="sortPop">
+          <div class="pop-head">组内排序 <span style="float:right">Esc 关闭</span></div>
+          <button class="opt on" data-mode="manual">
+            <span class="radio"></span>
+            <span><b>手动排序</b><small>拖动图片调整，顺序会保存；切回这里即恢复</small></span>
+            <span class="kbd">S</span>
+          </button>
+          <button class="opt" data-mode="added">
+            <span class="radio"></span>
+            <span><b>最新入库</b><small>按加入时间从新到旧</small></span>
+          </button>
+          <button class="opt" data-mode="oldest">
+            <span class="radio"></span>
+            <span><b>最旧入库</b><small>按加入时间从旧到新</small></span>
+          </button>
+          <button class="opt" data-mode="size">
+            <span class="radio"></span>
+            <span><b>大小（大→小）</b><small>按文件体积排序</small></span>
+          </button>
+          <button class="opt" data-mode="name">
+            <span class="radio"></span>
+            <span><b>名称 A→Z</b><small>按文件名排序</small></span>
+          </button>
+          <div class="pop-note">排序只作用于<b>当前分组</b>，不动分组顺序。非手动模式时拖动不会改顺序，<b>手动顺序会保留</b>。</div>
+        </div>
+
+        <div class="banner" id="banner" hidden>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>
+          当前按「<b id="bannerMode">最新入库</b>」排序 · 拖动不会改变顺序
+          <button id="backManual">切回手动</button>
+        </div>
+
+        <div class="grid" id="grid"></div>
+      </section>
+    </div>
+
+    <div class="statusbar">
+      <span>Shift + 左键：从紫色锚点连续选到当前位置</span>
+      <span class="right">本地库 · 683 张表情</span>
+    </div>
+  </div>
+
+  <div class="confirm" id="sortConfirm" hidden>
+    <div class="cbox" role="dialog" aria-modal="true" aria-labelledby="sortConfirmTitle">
+      <h3 id="sortConfirmTitle">切换排序？</h3>
+      <p>手动排序顺序会保留，切回<b>「手动排序」</b>即可恢复；非手动模式下拖动图片不会改变顺序。</p>
+      <div class="cacts"><button id="confirmCancel">取消</button><button id="confirmOk" class="primary">切换</button></div>
+    </div>
+  </div>
+
+  <div class="shot-note">
+    <b style="color:#c9d2df">Mock 说明</b>：
+    排序按钮放在分组标题右侧，按当前视图保存；菜单里 5 个模式和手机端一致。
+    选中非手动模式后出现一条可撤销提示，拖动排序暂时失效，但手动顺序原样保留，切回「手动排序」立即恢复。
+    从「手动」切到其他排序时，先弹确认弹窗（和手机端一致）。
+    <div class="legend"><span>① 按钮显示当前模式</span><span>② 切换前确认</span><span>③ 非手动时禁用拖排序</span></div>
+  </div>
+</div>
+
+<script>
+  const grid = document.getElementById('grid');
+  for (let i = 0; i < 18; i++) {
+    const t = document.createElement('div');
+    t.className = 'tile';
+    t.innerHTML = '<div class="art"></div><div class="mini"></div><span class="tag">' + (i % 4 === 0 ? '动图' : 'PNG') + '</span><div class="dim"></div>';
+    grid.appendChild(t);
+  }
+
+  const btn = document.getElementById('sortBtn');
+  const pop = document.getElementById('sortPop');
+  const label = document.getElementById('sortLabel');
+  const banner = document.getElementById('banner');
+  const bannerMode = document.getElementById('bannerMode');
+  const names = { manual: '手动', added: '最新入库', oldest: '最旧入库', size: '大小', name: '名称' };
+
+  const confirmBox = document.getElementById('sortConfirm');
+  let curMode = 'manual';
+  let pendingMode = null;
+
+  function closePop() {
+    pop.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  }
+
+  function setMode(mode) {
+    curMode = mode;
+    label.textContent = names[mode];
+    btn.classList.toggle('dirty', mode !== 'manual');
+    document.body.classList.toggle('manual', mode === 'manual');
+    banner.hidden = mode === 'manual';
+    bannerMode.textContent = names[mode];
+    pop.querySelectorAll('.opt').forEach(o => o.classList.toggle('on', o.dataset.mode === mode));
+    closePop();
+  }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = pop.hidden;
+    pop.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  });
+
+  pop.addEventListener('click', (e) => {
+    const opt = e.target.closest('.opt');
+    if (!opt) return;
+    const mode = opt.dataset.mode;
+    if (mode === curMode) { closePop(); return; }
+    // 与手机端一致：从手动切到其他排序前先确认，避免以为手动顺序丢了
+    if (curMode === 'manual' && mode !== 'manual') {
+      pendingMode = mode;
+      closePop();
+      confirmBox.hidden = false;
+      return;
+    }
+    setMode(mode);
+  });
+
+  document.getElementById('confirmOk').addEventListener('click', () => {
+    if (pendingMode) setMode(pendingMode);
+    pendingMode = null;
+    confirmBox.hidden = true;
+  });
+  document.getElementById('confirmCancel').addEventListener('click', () => {
+    pendingMode = null;
+    confirmBox.hidden = true;
+  });
+  confirmBox.addEventListener('click', (e) => {
+    if (e.target === confirmBox) {
+      pendingMode = null;
+      confirmBox.hidden = true;
+    }
+  });
+
+  document.getElementById('backManual').addEventListener('click', () => setMode('manual'));
+
+  document.addEventListener('click', (e) => {
+    if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) {
+      closePop();
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!confirmBox.hidden) { pendingMode = null; confirmBox.hidden = true; return; }
+    closePop();
+  });
+
+  setMode('manual');
+  // 预览默认展开菜单，方便直接看样式
+  pop.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+</script>
+</body>
+</html>

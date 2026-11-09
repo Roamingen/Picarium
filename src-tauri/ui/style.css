@@ -1436,6 +1436,19 @@ body.drag-active .sidebar .group-row.active { border-color: transparent; box-sha
 }
 ::-webkit-scrollbar-corner { background: transparent; }
 
+/* 侧栏滚动条默认隐藏，鼠标悬停侧栏时再出现；组内（main）保持常显 */
+.sidebar { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: transparent; }
+.sidebar:hover { scrollbar-color: var(--line-2) transparent; }
+.sidebar:hover::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  background-clip: padding-box;
+}
+.sidebar:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--dim-2);
+  background-clip: padding-box;
+}
+
 /* ---------- 导入进度 ---------- */
 
 .progress {
