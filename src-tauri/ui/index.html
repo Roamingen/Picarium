@@ -30,6 +30,10 @@
       </button>
       <button id="settings-btn" class="pin-btn" title="设置">⚙️</button>
       <button id="pin" class="pin-btn" title="置顶窗口">📌</button>
+          <div id="remove-zone" class="remove-zone" hidden>
+            <span class="rz-main"><span class="rz-mi">−</span><span id="remove-zone-label">移出「」</span></span>
+            <small id="remove-zone-sub">松手移出当前分组</small>
+          </div>
     </div>
   </header>
 
@@ -37,7 +41,6 @@
     <div id="import-fill" class="import-fill"></div>
     <span id="import-text" class="import-text"></span>
   </div>
-  <div id="trash-hint" class="trash-hint" hidden>删除的图片会在这里保留 <b id="trash-hint-days">7</b> 天，到期后下次启动自动清理。</div>
 
   <div class="workspace">
     <aside class="sidebar">
@@ -53,12 +56,32 @@
     </aside>
 
     <main>
+      <div id="trash-hint" class="trash-hint" hidden>删除的图片会在这里保留 <b id="trash-hint-days">7</b> 天，到期后下次启动自动清理。</div>
       <div class="content-head">
         <div>
           <div id="content-title" class="content-title">全部</div>
           <div id="content-sub" class="content-sub">0 张表情</div>
         </div>
-        <div class="content-actions"></div>
+        <div class="content-actions">
+          <button id="group-sort" class="group-sort" aria-haspopup="menu" aria-expanded="false" hidden>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 4v16m0 0-3-3m3 3 3-3M17 20V4m0 0-3 3m3-3 3 3"/></svg>
+            <span>排序：<b id="group-sort-label">手动</b></span>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div id="group-sort-menu" class="sort-menu" role="menu" hidden>
+            <button role="menuitem" data-sort="default" hidden><b>默认顺序</b><small>该视图的原始顺序，不可拖动</small></button>
+            <button role="menuitem" data-sort="manual"><b>手动排序</b><small>拖动图片调整，顺序会保存</small></button>
+            <button role="menuitem" data-sort="added"><b>最新入库</b><small>按加入时间从新到旧</small></button>
+            <button role="menuitem" data-sort="oldest"><b>最旧入库</b><small>按加入时间从旧到新</small></button>
+            <button role="menuitem" data-sort="size"><b>大小（大→小）</b><small>按文件体积排序</small></button>
+            <button role="menuitem" data-sort="name"><b>名称 A→Z</b><small>按文件名排序</small></button>
+            <div id="sort-menu-note" class="sort-menu-note" hidden>全部 / 未分组 / 最近使用不支持手动排序</div>
+          </div>
+        </div>
+      </div>
+      <div id="sort-banner" class="sort-banner" hidden>
+        当前按「<b id="sort-banner-mode">最新入库</b>」排序 · 拖动不会改变顺序
+        <button id="sort-back-manual">切回手动</button>
       </div>
       <div id="grid" class="grid"></div>
       <button id="load-more" class="load-more" hidden>加载更多</button>

@@ -33,6 +33,8 @@ let anchorIndex = null;
 let anchorMode = 'add';
 let trashSelected = new Set();
 let trashItems = [];
+let groupSorts = new Map(); // 组内排序：纯视图状态，不写 orders
+const GROUP_SORT_LABELS = { default: '默认', manual: '手动', added: '最新入库', oldest: '最旧入库', size: '大小', name: '名称' };
 let starStyle = localStorage.getItem('stickerbox-star-style') || 'heart';
 let starColor = localStorage.getItem('stickerbox-star-color') || '#f5b301';
 let hoverDelay = Number(localStorage.getItem('stickerbox-hover-delay') || 350);
@@ -996,10 +998,12 @@ async function refresh(q) {
   $('empty-trash').hidden = true;
   const query = q === undefined ? qInput.value : q;
   const activeFilters = filtersActive() ? assetFilters : null;
+  const sortMode = currentGroupSort();
   const items = await invoke('list_assets', {
     q: query,
     group: groupParam(),
     limit: listLimit,
+    sort: sortMode === 'manual' || sortMode === 'default' ? null : sortMode,
     filters: activeFilters ? JSON.stringify(activeFilters) : null,
   });
   updateFilterChip();
@@ -1472,6 +1476,7 @@ async function loadTrash() {
   updateFilterChip();
   trashItems = items;
   shownItems = items;
+  updateContentHead();
   if (cursor >= items.length) cursor = Math.max(0, items.length - 1);
   trashSelected.clear();
   $('trashbar').hidden = true;
@@ -1548,6 +1553,7 @@ async function loadTrash() {
 let pointerDrag = null;
 let caretEl = null;
 const searchWrap = document.querySelector('.search-wrap');
+const removeZone = document.getElementById('remove-zone');
 
 function orderKey() {
   if ((qInput.value || '').trim()) return null;
@@ -1555,6 +1561,41 @@ function orderKey() {
     return null;
   }
   return currentGroup;
+}
+
+// 「移出」只对真实分组和收藏有意义；全部/未分组/最近/回收站不显示热区。
+function removeableView(name = currentGroup) {
+  if (!name) return false;
+  if (name === '__star__') return true;
+  return !name.startsWith('__');
+}
+
+function removeLabelFor(name = currentGroup) {
+  return name === '__star__' ? '取消收藏' : `移出「${name || ''}」`;
+}
+
+function paintRemoveZone() {
+  const ok = !!(pointerDrag && pointerDrag.active && removeableView());
+  removeZone.hidden = !ok;
+  document.body.classList.toggle('remove-zone-on', ok);
+  if (!ok) {
+    removeZone.classList.remove('hot');
+    return;
+  }
+  // 热区固定占满顶栏右侧（搜索框之后到窗口右缘），滚动画布时也一直可见
+  const mr = removeZone.parentElement.getBoundingClientRect();
+  const sr = searchWrap.getBoundingClientRect();
+  const left = Math.max(6, sr.right + 10 - mr.left);
+  const width = Math.max(180, mr.right - 8 - (sr.right + 10));
+  removeZone.style.left = `${left}px`;
+  removeZone.style.width = `${width}px`;
+  removeZone.style.right = 'auto';
+  const star = currentGroup === '__star__';
+  const n = pointerDrag.shas.length;
+  document.getElementById('remove-zone-label').textContent = removeLabelFor();
+  document.getElementById('remove-zone-sub').textContent = star
+    ? `松手取消收藏 · ${n} 张`
+    : `松手移出当前分组 · ${n} 张`;
 }
 
 function insertionIndex(e) {
@@ -1673,6 +1714,7 @@ function beginPointerDrag(e, a) {
     target: null,
     entered: null,
     cancel: false,
+    remove: false,
   };
 }
 
@@ -1710,6 +1752,7 @@ async function enterDropView(name) {
         hideCaret();
         await refresh();
         if (!pointerDrag) return;
+        paintRemoveZone();
         if (next === '__none__') {
           await invoke('mark_ungrouped_seen');
           await loadGroups();
@@ -1759,19 +1802,38 @@ document.addEventListener('mousemove', (e) => {
     pointerDrag.ghost = g;
     document.body.classList.add('drag-active');
     searchWrap.classList.add('drag-cancel-zone');
+    paintRemoveZone();
     const sel = window.getSelection && window.getSelection();
     if (sel) sel.removeAllRanges();
   }
 
   pointerDrag.ghost.style.transform = `translate(${e.clientX + ghostX}px, ${e.clientY + ghostY}px)`;
 
+  // 移出区 / 取消区都是叠加层，按矩形命中，不走 elementFromPoint
+  const rz = removeZone.getBoundingClientRect();
+  const overRemove =
+    !removeZone.hidden &&
+    e.clientX >= rz.left &&
+    e.clientX <= rz.right &&
+    e.clientY >= rz.top &&
+    e.clientY <= rz.bottom;
+
   // 搜索框是取消区：拖到上面松手 = 放弃本次拖拽
   const cr = searchWrap.getBoundingClientRect();
   const overCancel =
-    e.clientX >= cr.left - 6 && e.clientX <= cr.right + 6 && e.clientY >= cr.top - 6 && e.clientY <= cr.bottom + 6;
-  pointerDrag.ghost.style.opacity = overCancel ? '0.35' : '';
+    e.clientX >= cr.left - 6 && e.clientX <= cr.right + 6 && e.clientY >= cr.top - 14 && e.clientY <= cr.bottom + 14;
+  pointerDrag.ghost.style.opacity = overCancel || overRemove ? '0.35' : '';
   searchWrap.classList.toggle('hot', overCancel);
+  removeZone.classList.toggle('hot', overRemove);
   pointerDrag.cancel = overCancel;
+  pointerDrag.remove = overRemove;
+  if (overRemove) {
+    document.querySelectorAll('.side-item.drop-target').forEach((x) => x.classList.remove('drop-target'));
+    pointerDrag.target = null;
+    pointerDrag.insert = null;
+    hideCaret();
+    return;
+  }
   if (overCancel) {
     document.querySelectorAll('.side-item.drop-target').forEach((x) => x.classList.remove('drop-target'));
     pointerDrag.target = null;
@@ -1812,7 +1874,7 @@ document.addEventListener('mousemove', (e) => {
   if (group && group !== '__trash__') enterDropView(group);
 
   // 在可排序视图里、鼠标位于网格上 → 显示插入位置
-  if (!group && orderKey()) {
+  if (!group && orderKey() && currentGroupSort() === 'manual') {
     const g = grid.getBoundingClientRect();
     const overGrid =
       e.clientX >= g.left && e.clientX <= g.right && e.clientY >= g.top && e.clientY <= g.bottom;
@@ -1838,6 +1900,9 @@ document.addEventListener('mouseup', async () => {
   if (ghost) ghost.remove();
   document.body.classList.remove('drag-active');
   searchWrap.classList.remove('drag-cancel-zone', 'hot');
+  removeZone.hidden = true;
+  removeZone.classList.remove('hot');
+  document.body.classList.remove('remove-zone-on');
   document.querySelectorAll('.side-item.drop-target').forEach((x) => x.classList.remove('drop-target'));
 
   if (!active) return;
@@ -1852,6 +1917,24 @@ document.addEventListener('mouseup', async () => {
     } catch (_) {
       /* 切换失败已经 toast 过 */
     }
+  }
+
+  // 落在「移出当前分组 / 取消收藏」热区上
+  if (drag.remove) {
+    try {
+      if (currentGroup === '__star__') {
+        await invoke('batch_star', { shas, on: false });
+        logAction(`已取消收藏 ${shas.length} 张`);
+      } else if (removeableView()) {
+        await invoke('batch_ungroup', { shas, group: currentGroup });
+        logAction(`已把 ${shas.length} 张移出「${currentGroup}」`);
+      }
+      clearSelection();
+      await Promise.all([refresh(), loadGroups()]);
+    } catch (err) {
+      toast('移出失败：' + err);
+    }
+    return;
   }
 
   const insert = drag.insert;
@@ -1932,6 +2015,9 @@ window.addEventListener('blur', () => {
   if (g) g.remove();
   document.body.classList.remove('drag-active');
   searchWrap.classList.remove('drag-cancel-zone', 'hot');
+  removeZone.hidden = true;
+  removeZone.classList.remove('hot');
+  document.body.classList.remove('remove-zone-on');
   document.querySelectorAll('.side-item.drop-target').forEach((x) => x.classList.remove('drop-target'));
   hideCaret();
 });
@@ -2167,7 +2253,115 @@ function updateContentHead() {
   } else {
     sub.textContent = `${count} 张表情${animated ? ` · ${animated} 张动图` : ''}`;
   }
+  paintGroupSort();
 }
+
+/* ---------- 组内排序 ---------- */
+
+function isRealGroup(name = currentGroup) {
+  return !!name && !String(name).startsWith('__');
+}
+
+// 全部 / 未分组 / 最近使用 没有可写的成员顺序，只支持非手动排序
+const SORT_MANUAL_BLOCKED = new Set(['__all__', '__none__', '__recent__']);
+
+function sortableView(name = currentGroup) {
+  if (!name || name === '__trash__') return false;
+  return isRealGroup(name) || SORT_MANUAL_BLOCKED.has(name) || name === '__star__';
+}
+
+function manualSortAllowed(name = currentGroup) {
+  return sortableView(name) && !SORT_MANUAL_BLOCKED.has(name);
+}
+
+function defaultSortFor(name = currentGroup) {
+  return manualSortAllowed(name) ? 'manual' : 'default';
+}
+
+function currentGroupSort() {
+  if (!sortableView()) return 'manual';
+  return groupSorts.get(currentGroup) || defaultSortFor();
+}
+
+function setGroupSort(mode) {
+  if (!sortableView()) return;
+  if (mode === 'manual' && !manualSortAllowed()) return;
+  if (mode === defaultSortFor()) groupSorts.delete(currentGroup);
+  else groupSorts.set(currentGroup, mode);
+}
+
+function closeGroupSortMenu() {
+  const menu = $('group-sort-menu');
+  if (menu) menu.hidden = true;
+  const btn = $('group-sort');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function paintGroupSort() {
+  const btn = $('group-sort');
+  const menu = $('group-sort-menu');
+  const banner = $('sort-banner');
+  if (!btn || !menu || !banner) return;
+  const on = sortableView();
+  btn.hidden = !on;
+  if (!on) {
+    closeGroupSortMenu();
+    banner.hidden = true;
+    return;
+  }
+  const mode = currentGroupSort();
+  const isDefault = mode === 'default';
+  $('group-sort-label').textContent = GROUP_SORT_LABELS[mode] || '手动';
+  btn.classList.toggle('active', !isDefault && mode !== 'manual');
+  banner.hidden = mode === 'manual' || isDefault;
+  if (!banner.hidden) $('sort-banner-mode').textContent = GROUP_SORT_LABELS[mode] || mode;
+  const allowManual = manualSortAllowed();
+  menu.querySelector('[data-sort="manual"]').hidden = !allowManual;
+  menu.querySelector('[data-sort="default"]').hidden = allowManual;
+  $('sort-menu-note').hidden = allowManual;
+  $('sort-back-manual').textContent = allowManual ? '切回手动' : '恢复默认';
+  for (const b of menu.querySelectorAll('[data-sort]')) {
+    const isOn = b.dataset.sort === mode;
+    b.classList.toggle('on', isOn);
+    b.setAttribute('aria-checked', String(isOn));
+  }
+}
+
+$('group-sort').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const menu = $('group-sort-menu');
+  menu.hidden = !menu.hidden;
+  $('group-sort').setAttribute('aria-expanded', String(!menu.hidden));
+});
+
+$('group-sort-menu').addEventListener('click', async (e) => {
+  const opt = e.target.closest('[data-sort]');
+  if (!opt) return;
+  closeGroupSortMenu();
+  const next = opt.dataset.sort;
+  if (next === currentGroupSort()) return;
+  if (currentGroupSort() === 'manual' && next !== 'manual') {
+    const ok = await confirmHtml({
+      title: '切换排序？',
+      html: '手动排序的顺序会保留，切回「手动排序」即可恢复；非手动模式下拖动图片不会改变顺序。',
+      okText: '切换',
+    });
+    if (!ok) return;
+  }
+  setGroupSort(next);
+  await refresh();
+});
+
+document.addEventListener('click', (e) => {
+  const menu = $('group-sort-menu');
+  if (!menu || menu.hidden) return;
+  if (!menu.contains(e.target) && !$('group-sort').contains(e.target)) closeGroupSortMenu();
+});
+
+$('sort-back-manual').addEventListener('click', async () => {
+  setGroupSort(manualSortAllowed() ? 'manual' : 'default');
+  await refresh();
+});
 
 /* ---------- 分组 ---------- */
 
@@ -3260,6 +3454,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && popEl) return closePop();
   if (!$('cardmenu').hidden && e.key === 'Escape') return closeCardMenu();
   if (!$('gmenu').hidden && e.key === 'Escape') return closeGroupMenu();
+  if (!$('group-sort-menu').hidden && e.key === 'Escape') return closeGroupSortMenu();
   if (!$('prompt').hidden) {
     if (e.key === 'Escape') closePrompt(null);
     return;
@@ -6330,6 +6525,22 @@ async function runAcceptSuite() {
     );
     const tHint = $('trash-hint');
     check('回收站顶部提示保留天数', !tHint.hidden && tHint.textContent.includes(String(trashDays)), tHint.textContent.trim());
+    check(
+      '回收站标题同步为回收站',
+      $('content-title').textContent === '回收站' && $('content-sub').textContent.includes('张待处理'),
+      `${$('content-title').textContent} / ${$('content-sub').textContent}`
+    );
+    const tHintRect = tHint.getBoundingClientRect();
+    const tTitleRect = $('content-title').getBoundingClientRect();
+    const tHintLeft = tHintRect.left + parseFloat(getComputedStyle(tHint).paddingLeft);
+    check('回收站提示与标题左对齐', Math.abs(tHintLeft - tTitleRect.left) <= 1, `hint=${tHintLeft} title=${tTitleRect.left}`);
+
+    check(
+      '移出热区只在分组/收藏可用',
+      removeableView('__star__') && removeableView('P1') && !removeableView('__all__') && !removeableView('__none__') && !removeableView('__recent__') && !removeableView('__trash__'),
+    );
+    check('收藏的移出文案是取消收藏', removeLabelFor('__star__') === '取消收藏' && removeLabelFor('P1') === '移出「P1」');
+    check('移出热区默认隐藏', removeZone.hidden === true);
 
     assetFilters.maxBytes = 1;
     await refresh();
@@ -6803,6 +7014,55 @@ async function runAcceptSuite() {
     });
     check('新图入组可改放最后', posList.length === 3 && posList[2].sha === backSha, posList.map((a) => a.sha).join(','));
     newInGroup = 'front';
+
+    // 组内排序：按钮显示当前模式，非手动显示提示条，切回手动恢复
+    currentGroup = '入组位置验收';
+    await refresh();
+    check(
+      '排序按钮显示当前模式',
+      !$('group-sort').hidden && $('group-sort-label').textContent === '手动' && $('sort-banner').hidden,
+      $('group-sort-label').textContent + ' banner=' + $('sort-banner').hidden
+    );
+    setGroupSort('name');
+    await refresh();
+    check(
+      '非手动排序显示提示条',
+      $('sort-banner').hidden === false && $('group-sort-label').textContent === '名称' && currentGroupSort() === 'name',
+      $('group-sort-label').textContent + ' current=' + currentGroupSort()
+    );
+    setGroupSort('manual');
+    await refresh();
+    check('切回手动隐藏提示条', $('sort-banner').hidden === true && $('group-sort-label').textContent === '手动');
+    currentGroup = '__all__';
+    await refresh();
+    check(
+      '全部视图显示默认排序',
+      !$('group-sort').hidden && $('group-sort-label').textContent === '默认' && $('sort-banner').hidden === true,
+      $('group-sort-label').textContent
+    );
+    check(
+      '全部视图隐藏手动排序项',
+      $('group-sort-menu').querySelector('[data-sort="manual"]').hidden === true &&
+        $('group-sort-menu').querySelector('[data-sort="default"]').hidden === false
+    );
+    setGroupSort('name');
+    await refresh();
+    check('全部视图可按名称排序', $('sort-banner').hidden === false && $('group-sort-label').textContent === '名称');
+    setGroupSort('manual');
+    check('全部视图拒绝手动排序', currentGroupSort() === 'name' && groupSorts.get('__all__') === 'name', currentGroupSort());
+    setGroupSort('default');
+    await refresh();
+    check('恢复默认后隐藏提示条', $('sort-banner').hidden === true && $('group-sort-label').textContent === '默认');
+    currentGroup = '__star__';
+    await refresh();
+    check(
+      '收藏视图支持手动排序',
+      !$('group-sort').hidden &&
+        $('group-sort-label').textContent === '手动' &&
+        $('group-sort-menu').querySelector('[data-sort="manual"]').hidden === false
+    );
+    currentGroup = '__all__';
+    await refresh();
   } catch (err) {
     check('自测执行异常', false, err && err.stack ? err.stack : String(err));
   }
