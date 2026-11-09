@@ -47,6 +47,7 @@ let panelH = 520;
 let panelX = 0;
 let panelY = 0;
 let panelSort = 'recent';
+let newInGroup = 'front'; // 新图加入分组时放在最前（front）还是最后（back）
 let recentLimit = 60;
 const PANEL_SLOT_DEFAULTS = {
   up: ['ArrowUp', 'Ctrl+K'],
@@ -325,6 +326,29 @@ function saveSettings(patch) {
   invoke('patch_settings', { patch }).catch(() => {});
 }
 
+// 把图片加入分组后，按设置把它们排到组内最前或最后（与手机端「入组即最新」一致）。
+async function addToGroup(shas, group) {
+  await invoke('add_to_group', { shas, group });
+  try {
+    const res = await invoke('list_assets', {
+      q: '',
+      group,
+      limit: 5000,
+      sort: '',
+      filters: '{}',
+    });
+    const list = Array.isArray(res) ? res : (res && res.items) || [];
+    const member = list.map((a) => a.sha);
+    const added = shas.filter((s) => member.includes(s));
+    if (!added.length) return;
+    const rest = member.filter((s) => !added.includes(s));
+    const order = newInGroup === 'back' ? [...rest, ...added] : [...added, ...rest];
+    await invoke('set_order', { key: group, shas: order });
+  } catch (_) {
+    /* 排序失败不影响加入分组本身 */
+  }
+}
+
 // ---- 快贴面板按键 ----
 const PANEL_SLOTS = ['up', 'down', 'left', 'right', 'info'];
 const PANEL_SLOT_NAME = { up: '向上', down: '向下', left: '向左', right: '向右', info: '查看信息' };
@@ -483,6 +507,7 @@ async function syncSettings() {
   if (typeof s.panelX === 'number') panelX = s.panelX;
   if (typeof s.panelY === 'number') panelY = s.panelY;
   if (s.panelSort) panelSort = s.panelSort;
+  if (s.newInGroup === 'back') newInGroup = 'back';
   if (s.panelKeys && typeof s.panelKeys === 'object') {
     for (const slot of PANEL_SLOTS) {
       if (!Array.isArray(s.panelKeys[slot])) continue;
@@ -1842,7 +1867,7 @@ document.addEventListener('mouseup', async () => {
         await invoke('batch_star', { shas, on: true });
         logAction(`已收藏 ${shas.length} 张`);
       } else if (!entered.startsWith('__')) {
-        await invoke('add_to_group', { shas, group: entered });
+        await addToGroup(shas, entered);
         logAction(`已把 ${shas.length} 张加入「${entered}」`);
         // 指针在网格里有插入点时，顺手排到那个位置（与组内拖排序一致）
         if (insert != null && orderKey() === entered) {
@@ -1890,7 +1915,7 @@ document.addEventListener('mouseup', async () => {
       await invoke('batch_delete', { shas });
       logAction(`已把 ${shas.length} 张移入回收站`);
     } else {
-      await invoke('add_to_group', { shas, group: target });
+      await addToGroup(shas, target);
       logAction(`已把 ${shas.length} 张加入「${target}」`);
     }
     clearSelection();
@@ -3040,7 +3065,7 @@ document.querySelectorAll('.side-item').forEach((el) => {
       await invoke('clear_groups', { shas });
       toast(`已把 ${shas.length} 张移出分组`);
     } else {
-      await invoke('add_to_group', { shas, group: el.dataset.group });
+      await addToGroup(shas, el.dataset.group);
       toast(`已把 ${shas.length} 张加入「${el.dataset.group}」`);
     }
     clearSelection();
@@ -3501,6 +3526,7 @@ async function openSettings() {
   $('panel-pos-x').value = panelX;
   $('panel-pos-y').value = panelY;
   $('set-panel-sort').value = panelSort;
+  $('set-group-insert').value = newInGroup;
   $('set-recent-limit').value = recentLimit;
   fillPanelKeys();
 
@@ -3614,6 +3640,12 @@ $('set-recent-limit').addEventListener('change', (e) => {
 $('set-panel-sort').addEventListener('change', (e) => {
   panelSort = e.target.value;
   saveSettings({ panelSort });
+});
+
+$('set-group-insert').addEventListener('change', (e) => {
+  newInGroup = e.target.value === 'back' ? 'back' : 'front';
+  e.target.value = newInGroup;
+  saveSettings({ newInGroup });
 });
 
 $('panel-pos-apply').addEventListener('click', async () => {
@@ -5117,7 +5149,7 @@ function openBatchPanel(kind, opts = {}) {
       } else {
         const miss = shas.filter((s) => !hasSet(s, name));
         if (!miss.length) return;
-        if (isGroup) await invoke('add_to_group', { shas: miss, group: name });
+        if (isGroup) await addToGroup(miss, name);
         else await invoke('add_tags', { shas: miss, tags: [name] });
         for (const s of shas) {
           const st = setOf(s);
@@ -5134,7 +5166,7 @@ function openBatchPanel(kind, opts = {}) {
     const nm = String(name || '').trim();
     if (!nm) return;
     try {
-      if (isGroup) await invoke('add_to_group', { shas, group: nm });
+      if (isGroup) await addToGroup(shas, nm);
       else await invoke('add_tags', { shas, tags: [nm] });
       for (const s of shas) {
         const st = setOf(s);
@@ -5385,7 +5417,7 @@ async function runAction(action, e) {
           await refresh();
           flashCards(shas);
         } else if (currentGroup !== '__all__' && currentGroup !== '__none__' && currentGroup !== '__trash__' && currentGroup !== '__star__') {
-          await invoke('add_to_group', { shas, group: currentGroup });
+          await addToGroup(shas, currentGroup);
           logAction(`已复制 ${shas.length} 张到「${currentGroup}」`);
           await Promise.all([refresh(), loadGroups()]);
           flashCards(shas);
@@ -6740,6 +6772,37 @@ async function runAcceptSuite() {
       JSON.stringify(nextGroupOrder(gOrder, gPinned, 'P1', 'P2', true)) ===
         JSON.stringify(['P2', 'P1', 'A', 'B'])
     );
+
+    // 新图入组位置：默认最前，可改为最后
+    await invoke('create_group', { name: '入组位置验收' });
+    const posPool = await invoke('list_assets', { q: '', group: null, limit: 3, sort: '', filters: '{}' });
+    const frontShas = posPool.slice(0, 2).map((a) => a.sha);
+    newInGroup = 'front';
+    await addToGroup(frontShas, '入组位置验收');
+    let posList = await invoke('list_assets', {
+      q: '',
+      group: '入组位置验收',
+      limit: 50,
+      sort: '',
+      filters: '{}',
+    });
+    check(
+      '新图入组默认放最前',
+      posList.length === 2 && posList[0].sha === frontShas[0] && posList[1].sha === frontShas[1],
+      posList.map((a) => a.sha).join(',')
+    );
+    const backSha = posPool[2].sha;
+    newInGroup = 'back';
+    await addToGroup([backSha], '入组位置验收');
+    posList = await invoke('list_assets', {
+      q: '',
+      group: '入组位置验收',
+      limit: 50,
+      sort: '',
+      filters: '{}',
+    });
+    check('新图入组可改放最后', posList.length === 3 && posList[2].sha === backSha, posList.map((a) => a.sha).join(','));
+    newInGroup = 'front';
   } catch (err) {
     check('自测执行异常', false, err && err.stack ? err.stack : String(err));
   }
