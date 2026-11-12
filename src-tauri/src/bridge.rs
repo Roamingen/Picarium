@@ -29,11 +29,11 @@ pub const PORT: u16 = 17800;
 /// 烘焙进两端的共享密钥；扩展侧见 `extension/src/lib/bridge.ts` 的 `TOKEN`。
 pub const TOKEN: &str = "stickerbox-local-7f3c9a2e";
 
-/// 请求体上限：10 MB，超了直接 413，避免把内存和库撑爆。
-pub const MAX_BODY: usize = 10 * 1024 * 1024;
+/// 请求体上限：48 MB（base64 后约为原图 1.33 倍，够 32 MB 的原图）。超了直接 413。
+pub const MAX_BODY: usize = 48 * 1024 * 1024;
 
-/// /copy-raw 的请求体：base64 比原字节大约 1.33 倍，留够 10 MB 原图。
-const RAW_MAX_BODY: usize = 14 * 1024 * 1024;
+/// /copy-raw 的请求体：同样按 32 MB 原图 + base64 膨胀留余量。
+const RAW_MAX_BODY: usize = 48 * 1024 * 1024;
 
 /// 允许调试时用环境变量换 token（扩展那边也换成同一个值）。
 pub fn token() -> String {

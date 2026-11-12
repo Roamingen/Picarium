@@ -7,6 +7,7 @@ import {
   normalizeUrl,
   sniffExt,
   toBase64,
+  toDataUrl,
 } from "../src/lib/media";
 
 const bytes = (...parts: Array<string | number[]>): Uint8Array => {
@@ -57,6 +58,14 @@ test("fileNameFromUrl 用路径末段，猜不出就给兜底名", () => {
   );
   const fallback = fileNameFromUrl("https://i0.hdslb.com/bfs/emote/abc", "gif");
   assert.match(fallback, /^bilibili-\d+\.gif$/);
+});
+
+test("toDataUrl 带 mime 且解码后字节一致", () => {
+  const data = new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]);
+  const url = toDataUrl(data, "image/gif");
+  assert.ok(url.startsWith("data:image/gif;base64,"));
+  const b64 = url.slice("data:image/gif;base64,".length);
+  assert.deepEqual(new Uint8Array(Buffer.from(b64, "base64")), data);
 });
 
 test("toBase64 与 Node 的编码一致", () => {

@@ -7,11 +7,19 @@ import {
   normalizeUrl,
   sniffExt,
   toBase64,
+  toDataUrl,
 } from "./lib/media";
 
 const SAVE_MENU_ID = "stickerbox-save-image";
 const COPY_SAVE_MENU_ID = "stickerbox-copy-save-image";
 const COPY_ONLY_MENU_ID = "stickerbox-copy-only-image";
+const MIME: Record<string, string> = {
+  gif: "image/gif",
+  webp: "image/webp",
+  png: "image/png",
+  jpg: "image/jpeg",
+  bmp: "image/bmp",
+};
 const MENU_DOMAINS = ["https://*.bilibili.com/*"];
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -49,6 +57,7 @@ interface Reply {
   ok: boolean;
   added?: boolean;
   copied?: boolean;
+  downloaded?: boolean;
   error?: string;
 }
 
@@ -74,6 +83,12 @@ chrome.runtime.onMessage.addListener(
       );
       return true;
     }
+    if (message.type === "download") {
+      downloadImage(message.url).then(sendResponse, (e: unknown) =>
+        sendResponse({ ok: false, error: String(e) }),
+      );
+      return true;
+    }
     return false;
   },
 );
@@ -92,7 +107,7 @@ async function grab(rawUrl: string): Promise<Grabbed> {
 
   const bytes = new Uint8Array(await res.arrayBuffer());
   if (bytes.byteLength > MAX_BYTES) {
-    throw new Error(`图片 ${(bytes.byteLength / 1048576).toFixed(1)} MB，超过 10 MB 上限`);
+    throw new Error(`图片 ${(bytes.byteLength / 1048576).toFixed(1)} MB，超过 ${Math.round(MAX_BYTES / 1048576)} MB 上限`);
   }
 
   const ext =
@@ -146,6 +161,20 @@ async function copyImage(rawUrl: string): Promise<Reply> {
 }
 
 /** 仅复制：不写库，桌面端落临时文件后进剪贴板。 */
+/** 下载到本地：字节转 data URL 交给 Chrome 的下载器，落在 Downloads 根目录。 */
+async function downloadImage(rawUrl: string): Promise<Reply> {
+  try {
+    const g = await grab(rawUrl);
+    const filename = fileNameFromUrl(g.url, g.ext);
+    const dataUrl = toDataUrl(g.bytes, MIME[g.ext] ?? "application/octet-stream");
+    await chrome.downloads.download({ url: dataUrl, filename, saveAs: false });
+    flash("✓", "#2e7d32", "已下载到 Downloads");
+    return { ok: true, downloaded: true };
+  } catch (e) {
+    return failed(e, rawUrl, "下载失败");
+  }
+}
+
 async function copyOnly(rawUrl: string): Promise<Reply> {
   try {
     const g = await grab(rawUrl);

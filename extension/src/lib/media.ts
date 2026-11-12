@@ -1,5 +1,5 @@
 /** 与桥、扩展双侧约定的体积上限。 */
-export const MAX_BYTES = 10 * 1024 * 1024;
+export const MAX_BYTES = 32 * 1024 * 1024;
 
 /**
  * B站 CDN 的图片 URL 常带 `@` 处理后缀（`xxx.gif@320w_200h.webp`、`@!webp`）。
@@ -9,6 +9,11 @@ export function normalizeUrl(raw: string): string {
   if (!/^https?:/i.test(raw)) return raw;
   const at = raw.indexOf("@");
   return at > 0 ? raw.slice(0, at) : raw;
+}
+
+/** 拼一张 data URL；MV3 的 Service Worker 里没有 createObjectURL，下载只能走这条路。 */
+export function toDataUrl(bytes: Uint8Array, mime = "application/octet-stream"): string {
+  return `data:${mime};base64,${toBase64(bytes)}`;
 }
 
 /** 按文件头认格式；认不出返回 null。 */

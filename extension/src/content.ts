@@ -7,7 +7,7 @@ import {
 } from "./lib/overlay";
 
 const HOST_ID = "stickerbox-p3-host";
-const RESET_MS = 2400;
+const RESET_MS = 2600;
 const HIDE_MS = 160;
 
 type State = "idle" | "busy" | "added" | "dup" | "error";
@@ -64,6 +64,35 @@ const CSS = `
 .row:hover:not(:disabled) { background: rgba(255, 255, 255, .08); }
 .row:disabled { color: rgba(233, 237, 243, .4); cursor: not-allowed; }
 .row i { display: flex; flex: 0 0 auto; opacity: .85; }
+.notice {
+  --notice-bg: #f8f9fa; --notice-fg: #202124; --notice-line: rgba(0, 0, 0, .14);
+  --notice-x: #5f6368; --notice-x-hover: rgba(0, 0, 0, .08);
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%) translateY(-8px);
+  display: flex; align-items: flex-start; gap: 10px;
+  max-width: min(520px, 90vw); padding: 10px 10px 10px 12px; border-radius: 10px;
+  background: var(--notice-bg); color: var(--notice-fg);
+  font: 12px/1.5 system-ui, sans-serif;
+  border: 1px solid var(--notice-line); box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+  opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s;
+  z-index: 2147483000;
+}
+@media (prefers-color-scheme: dark) {
+  .notice {
+    --notice-bg: #292a2d; --notice-fg: #e8eaed; --notice-line: rgba(255, 255, 255, .16);
+    --notice-x: #9aa0a6; --notice-x-hover: rgba(255, 255, 255, .1);
+  }
+}
+.notice.show { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.notice .dot {
+  flex: 0 0 auto; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%;
+  background: #e5484d; color: #fff; font: 700 12px/18px system-ui; text-align: center;
+}
+.notice .msg { flex: 1 1 auto; padding-top: 1px; }
+.notice .x {
+  all: unset; flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+  color: var(--notice-x); font: 15px/22px system-ui; text-align: center; cursor: pointer;
+}
+.notice .x:hover { background: var(--notice-x-hover); }
 `;
 
 interface Ui {
@@ -72,6 +101,8 @@ interface Ui {
   btn: HTMLButtonElement;
   icon: HTMLSpanElement;
   menu: HTMLDivElement;
+  notice: HTMLDivElement;
+  noticeMsg: HTMLDivElement;
 }
 
 let ui: Ui | null = null;
@@ -81,6 +112,11 @@ let hideTimer = 0;
 let resetTimer = 0;
 let menuOpen = false;
 let busy = false;
+/** 最近一次「已存入/已复制/已下载/失败」的时间；鼠标移开时别立刻把结果藏掉。 */
+let resultAt = 0;
+/** 最近一次指针位置：请求结束时据此判断鼠标是不是已经离开图片。 */
+let lastX = -1;
+let lastY = -1;
 
 function ensureUi(): Ui {
   if (ui) return ui;
@@ -108,12 +144,28 @@ function ensureUi(): Ui {
       <button class="row" type="button" role="menuitem" data-act="copyOnly">
         <i>${ICONS.copy}</i><span>仅复制</span>
       </button>
-      <button class="row" type="button" role="menuitem" disabled title="下载到本机（还没做）">
+      <button class="row" type="button" role="menuitem" data-act="download">
         <i>${ICONS.download}</i><span>下载到本地</span>
       </button>
     </div>`;
 
-  shadow.append(style, wrap);
+  const notice = document.createElement("div");
+  notice.className = "notice";
+  notice.setAttribute("role", "alert");
+  const dot = document.createElement("span");
+  dot.className = "dot";
+  dot.textContent = "!";
+  const noticeMsg = document.createElement("div");
+  noticeMsg.className = "msg";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "x";
+  close.title = "关闭";
+  close.textContent = "×";
+  close.addEventListener("click", hideNotice);
+  notice.append(dot, noticeMsg, close);
+
+  shadow.append(style, wrap, notice);
   document.documentElement.appendChild(host);
 
   const btn = wrap.querySelector<HTMLButtonElement>(".btn")!;
@@ -139,12 +191,65 @@ function ensureUi(): Ui {
     void copyOnly();
   });
 
+  menu.querySelector<HTMLButtonElement>('[data-act="download"]')!.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeMenu();
+    void download();
+  });
+
   wrap.addEventListener("pointerenter", () => window.clearTimeout(hideTimer));
   wrap.addEventListener("pointerleave", scheduleHide);
 
-  ui = { host, wrap, btn, icon, menu };
+  ui = { host, wrap, btn, icon, menu, notice, noticeMsg };
   setState("idle");
   return ui;
+}
+
+/** 把后台/桥/浏览器的原始错误翻译成用户看得懂的一句话。 */
+function friendlyError(raw: string): string {
+  const t = (raw || "").trim();
+  if (/超过\s*\d+\s*MB/.test(t)) {
+    return t.includes("上限") ? t : "图片太大，超过单张上限（32 MB），压缩后再试";
+  }
+  if (/连不上|Failed to fetch|NetworkError|Load failed/i.test(t)) {
+    return "连不上 StickerBox：先启动桌面端，确认它没被关掉";
+  }
+  if (/413|body too large|请求体/i.test(t)) {
+    return "内容太大，桌面端没能接收（请求超过 48 MB），换小一点的图";
+  }
+  if (/unsupported ext/i.test(t)) {
+    return "这个格式不支持：只收 GIF / WebP / PNG / JPG";
+  }
+  if (/版本太旧/.test(t)) return t;
+  if (/抓图失败\s*HTTP\s*(403|412)/i.test(t)) {
+    return "B 站拒绝了这次抓取（HTTP 403），点开大图后再试";
+  }
+  if (/抓图失败\s*HTTP\s*(404)/i.test(t)) {
+    return "图片地址失效了（404），刷新页面再试";
+  }
+  if (/抓图失败/i.test(t) || /认不出图片格式/.test(t)) {
+    return "这张图没抓下来，换一张或点开大图再试";
+  }
+  if (/下载失败|Invalid URL|download/i.test(t)) {
+    return "下载没有成功，先试试「复制为文件」";
+  }
+  return t || "操作失败，再试一次";
+}
+
+function showNotice(text: string) {
+  const u = ensureUi();
+  u.noticeMsg.textContent = text;
+  u.notice.classList.add("show");
+}
+
+function hideNotice() {
+  ui?.notice.classList.remove("show");
+}
+
+function fail(raw: string) {
+  const text = friendlyError(raw);
+  setState("error", text);
+  showNotice(text);
 }
 
 function showFor(img: HTMLImageElement) {
@@ -213,7 +318,15 @@ function scheduleHide() {
 }
 
 function hideIfIdle() {
-  if (!menuOpen && !busy) hideNow();
+  if (menuOpen || busy) return;
+  // 结果状态还没播完就等一会儿再收，别让绿色 ✓ 一闪而过
+  const wait = RESET_MS - (Date.now() - resultAt);
+  if (wait > 0) {
+    window.clearTimeout(hideTimer);
+    hideTimer = window.setTimeout(hideNow, wait);
+    return;
+  }
+  hideNow();
 }
 
 function hideNow() {
@@ -231,6 +344,8 @@ function setState(state: State, message?: string) {
   u.btn.title = label;
   u.btn.setAttribute("aria-label", label || "存入 StickerBox");
 
+  if (state === "added" || state === "error") resultAt = Date.now();
+
   window.clearTimeout(resetTimer);
   if (state !== "idle" && state !== "busy") {
     resetTimer = window.setTimeout(() => {
@@ -239,36 +354,44 @@ function setState(state: State, message?: string) {
   }
 }
 
-async function submit(kind: "copy" | "copyOnly") {
+async function submit(kind: "copy" | "copyOnly" | "download") {
   if (busy || !active) return;
   const img = active;
   if (!img.isConnected) {
-    setState("error", "图片已经不在了");
+    fail("图片已经不在了");
     return;
   }
   const url = img.currentSrc || img.src;
   if (!/^https?:/i.test(url)) {
-    setState("error", "这张图没有可下载的地址");
+    fail("这张图没有可下载的地址");
     return;
   }
 
   busy = true;
-  setState("busy", kind === "copy" ? "正在复制并保存…" : "正在复制…");
+  hideNotice();
+  setState(
+    "busy",
+    kind === "copy" ? "正在复制并保存…" : kind === "download" ? "正在下载…" : "正在复制…",
+  );
   try {
     const res = (await chrome.runtime.sendMessage({ type: kind, url })) as
       | { ok?: boolean; added?: boolean; error?: string }
       | undefined;
     if (!res?.ok) {
-      setState("error", res?.error ?? "复制失败");
+      fail(res?.error ?? (kind === "download" ? "下载失败" : "复制失败"));
     } else if (kind === "copy") {
       setState("added", "已复制为文件，并存入 StickerBox");
+    } else if (kind === "download") {
+      setState("added", "已下载到 Downloads");
     } else {
       setState("added", "已复制为文件，去聊天窗口直接粘贴");
     }
   } catch (e) {
-    setState("error", e instanceof Error ? e.message : String(e));
+    fail(e instanceof Error ? e.message : String(e));
   } finally {
     busy = false;
+    // 请求期间鼠标可能已经移开，这里重新排一次隐藏；结果状态会先播完
+    if (!menuOpen && active && !withinActive(lastX, lastY)) scheduleHide();
   }
 }
 
@@ -278,6 +401,10 @@ function copy() {
 
 function copyOnly() {
   return submit("copyOnly");
+}
+
+function download() {
+  return submit("download");
 }
 
 /** B 站评论区是开放 Shadow DOM（<bili-comments>），视频封面/推荐位不是；只对评论图和查看器出钮。 */
@@ -292,16 +419,15 @@ function wantedImage(img: HTMLImageElement): boolean {
   return false;
 }
 
-/** 指针是否还在当前图内（留 2px 容差）。B 站 hover 会盖一层缩放遮罩，img 会收到假的 pointerout。 */
-function pointerOnActive(e: PointerEvent): boolean {
+/** 指针是否落在当前图内（留 2px 容差）。B 站 hover 会盖一层缩放遮罩，img 会收到假的 pointerout。 */
+function withinActive(x: number, y: number): boolean {
   if (!active) return false;
   const r = active.getBoundingClientRect();
-  return (
-    e.clientX >= r.left - 2 &&
-    e.clientX <= r.right + 2 &&
-    e.clientY >= r.top - 2 &&
-    e.clientY <= r.bottom + 2
-  );
+  return x >= r.left - 2 && x <= r.right + 2 && y >= r.top - 2 && y <= r.bottom + 2;
+}
+
+function pointerOnActive(e: PointerEvent): boolean {
+  return withinActive(e.clientX, e.clientY);
 }
 
 /** 逐层穿透开放 Shadow DOM，取指针下所有 img（含被 hover 遮罩盖住的）。 */
@@ -331,6 +457,8 @@ function imageUnderPointer(e: PointerEvent): HTMLImageElement | null {
 document.addEventListener(
   "pointerover",
   (e) => {
+    lastX = e.clientX;
+    lastY = e.clientY;
     const img = e.composedPath().find((n) => (n as Element).tagName === "IMG") as
       | HTMLImageElement
       | undefined;
@@ -350,6 +478,8 @@ let lastProbe = 0;
 document.addEventListener(
   "pointermove",
   (e) => {
+    lastX = e.clientX;
+    lastY = e.clientY;
     if (menuOpen) return;
     if (active && pointerOnActive(e)) {
       window.clearTimeout(hideTimer);
@@ -367,6 +497,8 @@ document.addEventListener(
 document.addEventListener(
   "pointerout",
   (e) => {
+    lastX = e.clientX;
+    lastY = e.clientY;
     if (menuOpen || !active) return;
     if (!pointerOnActive(e)) scheduleHide();
   },
@@ -385,11 +517,15 @@ document.addEventListener(
 document.addEventListener(
   "keydown",
   (e) => {
-    if (!menuOpen) return;
-    if (e.key === "Escape") {
+    if (e.key !== "Escape") return;
+    if (ui?.notice.classList.contains("show")) {
       e.stopPropagation();
-      closeMenu();
+      hideNotice();
+      return;
     }
+    if (!menuOpen) return;
+    e.stopPropagation();
+    closeMenu();
   },
   true,
 );
