@@ -141,7 +141,7 @@
   .fab .sb-btn { height: 28px; min-width: 28px; padding: 0; border-radius: 9px; }
   .menu {
     position: absolute; bottom: 44px; right: 8px; z-index: 5;
-    width: 196px; padding: 5px;
+    width: 208px; padding: 5px;
     background: rgba(28, 31, 36, .97);
     border: 1px solid var(--line-2); border-radius: 11px;
     box-shadow: var(--shadow);
@@ -302,8 +302,8 @@
   <section>
     <div class="sec-head"><h2>变体二 · 单钮 + 菜单</h2><span class="tag rec">推荐</span></div>
     <p class="note">
-      hover 只出现一个 28px 的 StickerBox 钮，点击在上方展开三行菜单：<b>存入</b> / 复制为文件 / 下载。
-      小表情也只占一个角，P4/P5 上线后不用改布局；菜单里能写快捷键和「未开放」说明。
+      hover 只出现一个 28px 的 StickerBox 钮，点击在上方展开三行菜单：<b>复制并保存到 StickerBox</b> / 仅复制 / 下载到本地（占位）。
+      小表情也只占一个角；不放 Enter、P4/P5 这类角标，保持干净。
     </p>
     <div class="bili">
       <div class="tile light demo-on" id="v2a">
@@ -315,17 +315,17 @@
         </div>
         <div class="menu">
           <button data-act="save">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-            存入 StickerBox <span class="k">Enter</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            复制并保存到 StickerBox
           </button>
           <div class="sep"></div>
-          <button disabled title="P4 未开放">
+          <button data-act="save">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-            复制为文件 <span class="k">P4</span>
+            仅复制
           </button>
-          <button disabled title="P5 未开放">
+          <button disabled title="下载到本机（还没做）">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-            下载到 Downloads <span class="k">P5</span>
+            下载到本地
           </button>
         </div>
       </div>

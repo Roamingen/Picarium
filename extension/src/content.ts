@@ -64,11 +64,6 @@ const CSS = `
 .row:hover:not(:disabled) { background: rgba(255, 255, 255, .08); }
 .row:disabled { color: rgba(233, 237, 243, .4); cursor: not-allowed; }
 .row i { display: flex; flex: 0 0 auto; opacity: .85; }
-.kbd { margin-left: auto; font-size: 10.5px; color: rgba(233, 237, 243, .38); }
-.tag {
-  margin-left: auto; font-size: 10.5px; color: rgba(233, 237, 243, .38);
-  border: 1px dashed rgba(233, 237, 243, .25); border-radius: 4px; padding: 1px 4px;
-}
 `;
 
 interface Ui {
@@ -103,18 +98,18 @@ function ensureUi(): Ui {
   wrap.className = "wrap";
   wrap.style.display = "none";
   wrap.innerHTML = `
-    <button class="btn" type="button" aria-label="存入 StickerBox" aria-expanded="false">
+    <button class="btn" type="button" aria-label="StickerBox 图片操作" aria-expanded="false">
       <span class="ico"></span>
     </button>
     <div class="menu" role="menu">
-      <button class="row" type="button" role="menuitem" data-act="save">
-        <i>${ICONS.save}</i><span>存入 StickerBox</span><kbd class="kbd">Enter</kbd>
+      <button class="row" type="button" role="menuitem" data-act="copy">
+        <i>${ICONS.copy}</i><span>复制并保存到 StickerBox</span>
       </button>
-      <button class="row" type="button" role="menuitem" disabled title="P4 未开放：把图以文件形式复制到剪贴板">
-        <i>${ICONS.copy}</i><span>复制为文件</span><span class="tag">P4</span>
+      <button class="row" type="button" role="menuitem" data-act="copyOnly">
+        <i>${ICONS.copy}</i><span>仅复制</span>
       </button>
-      <button class="row" type="button" role="menuitem" disabled title="P5 未开放：下载到 Downloads">
-        <i>${ICONS.download}</i><span>下载到 Downloads</span><span class="tag">P5</span>
+      <button class="row" type="button" role="menuitem" disabled title="下载到本机（还没做）">
+        <i>${ICONS.download}</i><span>下载到本地</span>
       </button>
     </div>`;
 
@@ -132,10 +127,16 @@ function ensureUi(): Ui {
     else openMenu();
   });
 
-  menu.querySelector<HTMLButtonElement>('[data-act="save"]')!.addEventListener("click", (e) => {
+  menu.querySelector<HTMLButtonElement>('[data-act="copy"]')!.addEventListener("click", (e) => {
     e.stopPropagation();
     closeMenu();
-    void save();
+    void copy();
+  });
+
+  menu.querySelector<HTMLButtonElement>('[data-act="copyOnly"]')!.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeMenu();
+    void copyOnly();
   });
 
   wrap.addEventListener("pointerenter", () => window.clearTimeout(hideTimer));
@@ -238,7 +239,7 @@ function setState(state: State, message?: string) {
   }
 }
 
-async function save() {
+async function submit(kind: "copy" | "copyOnly") {
   if (busy || !active) return;
   const img = active;
   if (!img.isConnected) {
@@ -252,24 +253,31 @@ async function save() {
   }
 
   busy = true;
-  setState("busy", "正在存入 StickerBox…");
+  setState("busy", kind === "copy" ? "正在复制并保存…" : "正在复制…");
   try {
-    const res = (await chrome.runtime.sendMessage({ type: "save", url })) as
+    const res = (await chrome.runtime.sendMessage({ type: kind, url })) as
       | { ok?: boolean; added?: boolean; error?: string }
       | undefined;
-    if (res?.ok) {
-      setState(
-        res.added ? "added" : "dup",
-        res.added ? "已存入 StickerBox" : "库里已有这张",
-      );
+    if (!res?.ok) {
+      setState("error", res?.error ?? "复制失败");
+    } else if (kind === "copy") {
+      setState("added", "已复制为文件，并存入 StickerBox");
     } else {
-      setState("error", res?.error ?? "导入失败");
+      setState("added", "已复制为文件，去聊天窗口直接粘贴");
     }
   } catch (e) {
     setState("error", e instanceof Error ? e.message : String(e));
   } finally {
     busy = false;
   }
+}
+
+function copy() {
+  return submit("copy");
+}
+
+function copyOnly() {
+  return submit("copyOnly");
 }
 
 /** B 站评论区是开放 Shadow DOM（<bili-comments>），视频封面/推荐位不是；只对评论图和查看器出钮。 */
@@ -381,11 +389,6 @@ document.addEventListener(
     if (e.key === "Escape") {
       e.stopPropagation();
       closeMenu();
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      e.stopPropagation();
-      closeMenu();
-      void save();
     }
   },
   true,

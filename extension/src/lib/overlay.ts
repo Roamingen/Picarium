@@ -2,7 +2,7 @@
 export const BUTTON_SIZE = 28;
 export const EDGE_MARGIN = 8;
 export const MENU_GAP = 6;
-export const MENU_WIDTH = 196;
+export const MENU_WIDTH = 208;
 export const MENU_HEIGHT = 112;
 
 export interface Box {

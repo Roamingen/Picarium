@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "StickerBox 导入",
-  "version": "0.2.2",
-  "description": "右键或悬停把 B站 图片/动图直接存进本地 StickerBox",
+  "version": "0.4.0",
+  "description": "右键或悬停把 B站 图片/动图存进本地 StickerBox，或以文件形式复制到剪贴板",
   "background": {
     "service_worker": "background.js",
     "type": "module"
