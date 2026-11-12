@@ -1,12 +1,12 @@
 {
   "name": "stickerbox-extension",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.2",
   "description": "StickerBox 浏览器导入扩展（MV3 + TypeScript + esbuild）",
   "scripts": {
-    "build": "esbuild src/background.ts --bundle --format=esm --target=chrome110 --outfile=dist/background.js && node -e \"require('node:fs').copyFileSync('manifest.json','dist/manifest.json')\"",
+    "build": "esbuild src/background.ts --bundle --format=esm --target=chrome110 --outfile=dist/background.js && esbuild src/content.ts --bundle --format=iife --target=chrome110 --outfile=dist/content.js && node -e \"require('node:fs').copyFileSync('manifest.json','dist/manifest.json')\"",
     "typecheck": "tsc --noEmit",
-    "test": "esbuild test/media.test.ts --bundle --platform=node --format=cjs --outfile=dist-test/media.test.cjs && node --test dist-test/media.test.cjs"
+    "test": "esbuild test/media.test.ts test/overlay.test.ts --bundle --platform=node --format=cjs --outdir=dist-test && node --test dist-test/media.test.js dist-test/overlay.test.js"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",

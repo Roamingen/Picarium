@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StickerBox · B站悬浮按钮样式 mock（P3 + P4/P5 占位）</title>
+<style>
+  :root {
+    --page: #0f1115;
+    --bili: #18191c;
+    --bili-2: #1f2126;
+    --surface: #212429;
+    --surface-2: #2a2e35;
+    --line: rgba(255, 255, 255, .10);
+    --line-2: rgba(255, 255, 255, .18);
+    --text: #e9edf4;
+    --muted: #98a2b3;
+    --muted-2: #6c7686;
+    --accent: #6ea8fe;
+    --accent-2: #9cc3ff;
+    --accent-soft: rgba(110, 168, 254, .16);
+    --ok: #4ade80;
+    --dup: #60a5fa;
+    --danger: #ff7a86;
+    --radius: 10px;
+    --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px 28px 80px;
+    background: radial-gradient(900px 480px at 50% -10%, rgba(110, 168, 254, .08), transparent 60%), var(--page);
+    color: var(--text);
+    font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+    font-size: 13.5px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 6px; letter-spacing: .2px; }
+  .sub { color: var(--muted); margin: 0 0 26px; line-height: 1.7; }
+  .sub b { color: var(--text); font-weight: 600; }
+  .legend { display: flex; gap: 18px; flex-wrap: wrap; color: var(--muted-2); font-size: 12px; margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.a { background: var(--accent); }
+  .dot.b { background: var(--ok); }
+  .dot.c { background: var(--dup); }
+  .dot.d { background: var(--danger); }
+
+  section { margin-top: 34px; }
+  .sec-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .sec-head h2 { font-size: 15px; margin: 0; font-weight: 650; }
+  .tag { font-size: 11px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); }
+  .tag.rec { border-color: rgba(110,168,254,.5); color: var(--accent-2); background: var(--accent-soft); }
+  .note { color: var(--muted); font-size: 12.5px; line-height: 1.75; margin: 8px 0 16px; max-width: 760px; }
+  .note b { color: var(--text); }
+
+  /* B站页面仿真容器 */
+  .bili {
+    background: var(--bili);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 18px;
+    align-items: start;
+  }
+  .tile {
+    position: relative;
+    border-radius: 8px;
+    aspect-ratio: 4 / 3;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+  .tile .art { position: absolute; inset: 0; border-radius: 8px; overflow: hidden; }
+  .tile .lbl {
+    position: relative; z-index: 1;
+    font-size: 11px; letter-spacing: .6px;
+    color: rgba(255,255,255,.85);
+    background: rgba(0,0,0,.32);
+    padding: 3px 8px; border-radius: 999px;
+    backdrop-filter: blur(4px);
+  }
+  .tile.light .lbl { color: #26303d; background: rgba(255,255,255,.66); }
+  .art.a1 { background: linear-gradient(135deg, #f6c1d9, #c9d8ff 55%, #a9f0e2); }
+  .art.a2 { background: linear-gradient(135deg, #f9d29d, #ffb1a8 60%, #d5b3ff); }
+  .art.a3 { background: linear-gradient(135deg, #9ad8ff, #6ea8fe 55%, #4b5cff); }
+  .art.a4 { background: linear-gradient(135deg, #2b3340, #3c4b63 60%, #22303f); }
+  .tile.small { aspect-ratio: 1; max-width: 96px; }
+
+  /* ---------- 通用按钮 ---------- */
+  .sb-btn {
+    -webkit-appearance: none; appearance: none;
+    border: 1px solid var(--line-2);
+    background: rgba(24, 25, 28, .82);
+    color: var(--text);
+    border-radius: 9px;
+    height: 30px;
+    min-width: 30px;
+    padding: 0 9px;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    font: inherit; font-size: 12px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: background .14s, border-color .14s, transform .14s, opacity .14s;
+    white-space: nowrap;
+  }
+  .sb-btn:hover { background: rgba(42, 46, 53, .95); border-color: rgba(255,255,255,.26); }
+  .sb-btn:active { transform: scale(.96); }
+  .sb-btn svg { width: 15px; height: 15px; flex: none; }
+  .sb-btn.primary { border-color: rgba(110,168,254,.55); background: rgba(110,168,254,.18); color: #dce9ff; }
+  .sb-btn.primary:hover { background: rgba(110,168,254,.3); }
+  .sb-btn.ghost { background: rgba(24,25,28,.62); }
+  .sb-btn:disabled, .sb-btn[aria-disabled="true"] {
+    cursor: not-allowed; opacity: .46;
+    border-style: dashed; border-color: rgba(255,255,255,.22);
+    background: rgba(24,25,28,.5);
+  }
+  .sb-btn .soon { font-size: 10px; color: var(--muted-2); margin-left: 2px; }
+
+  /* ---------- 变体一：三连图标条 ---------- */
+  .bar3 {
+    position: absolute; top: 8px; right: 8px;
+    display: flex; gap: 4px; z-index: 3;
+    opacity: 0; transform: translateY(-3px);
+    transition: opacity .16s, transform .16s;
+  }
+  .tile:hover .bar3, .tile.demo-on .bar3 { opacity: 1; transform: none; }
+  .bar3 .sb-btn { height: 28px; min-width: 28px; padding: 0 7px; border-radius: 8px; }
+  .bar3 .sb-btn .t { display: none; }
+
+  /* ---------- 变体二：主按钮 + 菜单 ---------- */
+  .fab {
+    position: absolute; bottom: 8px; right: 8px; z-index: 3;
+    opacity: 0; transform: translateY(3px);
+    transition: opacity .16s, transform .16s;
+  }
+  .tile:hover .fab, .tile.demo-on .fab { opacity: 1; transform: none; }
+  .fab .sb-btn { height: 28px; min-width: 28px; padding: 0; border-radius: 9px; }
+  .menu {
+    position: absolute; bottom: 44px; right: 8px; z-index: 5;
+    width: 196px; padding: 5px;
+    background: rgba(28, 31, 36, .97);
+    border: 1px solid var(--line-2); border-radius: 11px;
+    box-shadow: var(--shadow);
+    display: none;
+  }
+  .tile.demo-on .menu { display: block; }
+  .menu button {
+    width: 100%; height: 32px; padding: 0 8px;
+    border: 0; background: transparent; color: var(--text);
+    display: flex; align-items: center; gap: 9px;
+    border-radius: 7px; font: inherit; font-size: 12.5px; cursor: pointer;
+    text-align: left; white-space: nowrap;
+  }
+  .menu button:hover:not(:disabled) { background: rgba(255,255,255,.07); }
+  .menu button:disabled { color: var(--muted-2); cursor: not-allowed; }
+  .menu button svg { width: 15px; height: 15px; }
+  .menu .sep { height: 1px; background: var(--line); margin: 4px 6px; }
+  .menu .k { margin-left: auto; font-size: 10.5px; color: var(--muted-2); }
+
+  /* ---------- 变体三：常驻球 ---------- */
+  .ball-wrap { position: relative; height: 168px; padding: 20px 22px; }
+  .fc { display: flex; gap: 10px; align-items: flex-start; max-width: 460px; position: relative; z-index: 1; }
+  .fc .ava { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, #7fb4ff, #4d86e8); flex: none; }
+  .fc .who { color: var(--muted-2); font-size: 11.5px; margin-bottom: 5px; }
+  .fc .txt { color: var(--text); font-size: 12.5px; line-height: 1.9; }
+  .fc .em {
+    display: inline-block; width: 34px; height: 34px; border-radius: 6px;
+    vertical-align: middle; margin-left: 7px;
+    border: 1px solid rgba(255,255,255,.12);
+  }
+  .ball {
+    position: absolute; right: 18px; bottom: 16px;
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 1px solid rgba(110,168,254,.55);
+    background: radial-gradient(120% 120% at 30% 20%, #7fb4ff, #4d86e8 70%);
+    color: #08111f; display: grid; place-items: center;
+    box-shadow: 0 8px 22px rgba(70,120,220,.4);
+    cursor: pointer; z-index: 4;
+  }
+  .ball svg { width: 19px; height: 19px; }
+  .ball-menu {
+    position: absolute; right: 18px; bottom: 64px;
+    width: 178px; padding: 5px;
+    background: rgba(28,31,36,.97); border: 1px solid var(--line-2);
+    border-radius: 11px; box-shadow: var(--shadow); z-index: 5; display: none;
+  }
+  .ball-wrap.open .ball-menu { display: block; }
+
+  /* ---------- 状态演示 ---------- */
+  .states { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 11px; border-radius: 10px;
+    background: rgba(255,255,255,.04); border: 1px solid var(--line);
+    font-size: 12px; color: var(--muted);
+  }
+  .chip .sb-btn { height: 26px; min-width: 26px; padding: 0 7px; }
+  .chip.ok .sb-btn { border-color: rgba(74,222,128,.5); color: var(--ok); background: rgba(74,222,128,.12); }
+  .chip.dup .sb-btn { border-color: rgba(96,165,250,.5); color: var(--dup); background: rgba(96,165,250,.12); }
+  .chip.err .sb-btn { border-color: rgba(255,122,134,.5); color: var(--danger); background: rgba(255,122,134,.12); }
+  .spin { animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- 设置面板占位 ---------- */
+  .opts {
+    background: var(--bili); border: 1px solid var(--line); border-radius: 14px;
+    padding: 20px 22px; max-width: 420px;
+  }
+  .opts h3 { margin: 0 0 4px; font-size: 13.5px; }
+  .opts p { margin: 0 0 16px; color: var(--muted-2); font-size: 12px; line-height: 1.6; }
+  .field { margin-bottom: 13px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .field input {
+    width: 100%; height: 32px; padding: 0 10px;
+    background: #14161a; color: var(--text);
+    border: 1px solid var(--line-2); border-radius: 8px; font: inherit; font-size: 12.5px;
+  }
+  .field .hint { color: var(--muted-2); font-size: 11px; margin-top: 5px; }
+  .row { display: flex; gap: 9px; margin-top: 16px; }
+  .row .sb-btn { height: 32px; }
+  .mini-toast {
+    position: fixed; right: 24px; bottom: 24px; z-index: 20;
+    padding: 9px 14px; border-radius: 10px;
+    background: rgba(28,31,36,.97); border: 1px solid var(--line-2);
+    color: var(--text); font-size: 12.5px; box-shadow: var(--shadow);
+    opacity: 0; transform: translateY(6px); transition: .18s;
+    pointer-events: none;
+  }
+  .mini-toast.show { opacity: 1; transform: none; }
+  .mini-toast b { color: var(--accent-2); font-weight: 600; }
+
+  .spec { margin-top: 12px; color: var(--muted-2); font-size: 11.5px; line-height: 1.9; }
+  .spec code { color: var(--muted); background: rgba(255,255,255,.05); padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>B站图片悬浮按钮 · 样式 mock</h1>
+  <p class="sub">
+    P3 入口预览：在 B 站页面 hover 图片时出现的操作钮。<b>P4「复制为文件」、P5「下载到 Downloads」先按占位样式画</b>，灰色虚线、不可点。
+    三个变体都标了尺寸，选一个我再落实现。
+  </p>
+  <div class="legend">
+    <span><i class="dot a"></i>可点 / 主操作</span>
+    <span><i class="dot b"></i>已存入</span>
+    <span><i class="dot c"></i>库里已有</span>
+    <span><i class="dot d"></i>失败</span>
+    <span><i class="dot" style="background:#6c7686"></i>P4/P5 占位</span>
+  </div>
+
+  <!-- ================= 变体一 ================= -->
+  <section>
+    <div class="sec-head"><h2>变体一 · 三连图标条</h2><span class="tag">hover 出现在右上角</span></div>
+    <p class="note">
+      最直接：hover 图片，右上角浮出三个 28px 方形图标钮。图标省空间，但小表情（40–80px）上会盖住图，
+      而且 P4/P5 上线后一次出现三个按钮，误触概率高。
+    </p>
+    <div class="bili">
+      <div class="tile light demo-on">
+        <div class="art a1"></div><span class="lbl">GIF</span>
+        <div class="bar3">
+          <button class="sb-btn primary" title="存入 StickerBox" data-act="save">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button class="sb-btn" title="复制为文件（P4，未开放）" aria-disabled="true" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <button class="sb-btn" title="下载到 Downloads（P5，未开放）" aria-disabled="true" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="tile demo-on">
+        <div class="art a2"></div><span class="lbl">动画 WebP</span>
+        <div class="bar3">
+          <button class="sb-btn primary" title="存入 StickerBox" data-act="save">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <button class="sb-btn" aria-disabled="true" disabled title="复制为文件（P4，未开放）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <button class="sb-btn" aria-disabled="true" disabled title="下载到 Downloads（P5，未开放）">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="tile small">
+        <div class="art a3"></div>
+      </div>
+      <div class="tile small light">
+        <div class="art a4"></div>
+      </div>
+    </div>
+    <p class="spec">尺寸：钮 <code>28×28</code>，圆角 <code>8</code>，间距 <code>4</code>；容器距图片边 <code>8</code>。小图（96px）上三个钮约占 96px 宽。</p>
+  </section>
+
+  <!-- ================= 变体二 ================= -->
+  <section>
+    <div class="sec-head"><h2>变体二 · 单钮 + 菜单</h2><span class="tag rec">推荐</span></div>
+    <p class="note">
+      hover 只出现一个 28px 的 StickerBox 钮，点击在上方展开三行菜单：<b>存入</b> / 复制为文件 / 下载。
+      小表情也只占一个角，P4/P5 上线后不用改布局；菜单里能写快捷键和「未开放」说明。
+    </p>
+    <div class="bili">
+      <div class="tile light demo-on" id="v2a">
+        <div class="art a2"></div><span class="lbl">GIF · 点右下角试菜单</span>
+        <div class="fab">
+          <button class="sb-btn primary" title="StickerBox 操作">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+        <div class="menu">
+          <button data-act="save">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            存入 StickerBox <span class="k">Enter</span>
+          </button>
+          <div class="sep"></div>
+          <button disabled title="P4 未开放">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            复制为文件 <span class="k">P4</span>
+          </button>
+          <button disabled title="P5 未开放">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            下载到 Downloads <span class="k">P5</span>
+          </button>
+        </div>
+      </div>
+      <div class="tile small">
+        <div class="art a1"></div>
+        <div class="fab">
+          <button class="sb-btn primary" title="存入 StickerBox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="tile small light">
+        <div class="art a4"></div>
+        <div class="fab">
+          <button class="sb-btn primary" title="存入 StickerBox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="tile small">
+        <div class="art a3"></div>
+        <div class="fab">
+          <button class="sb-btn primary" title="存入 StickerBox">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="states">
+      <div class="chip"><span class="sb-btn primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>默认</div>
+      <div class="chip"><span class="sb-btn primary"><svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-6.2-8.6"/></svg></span>抓取中</div>
+      <div class="chip ok"><span class="sb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4.5 4.5L19 7"/></svg></span>已存入</div>
+      <div class="chip dup"><span class="sb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg></span>库里已有</div>
+      <div class="chip err"><span class="sb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/></svg></span>失败（title 给原因）</div>
+    </div>
+    <p class="spec">尺寸：钮 <code>28×28</code> 圆角 <code>9</code>；菜单宽 <code>196</code>、行高 <code>32</code>，距边 <code>8</code>，出现在钮上方 <code>bottom:44</code>。状态图标停留 <code>1.4s</code> 后回到 +。</p>
+  </section>
+
+  <!-- ================= 变体三 ================= -->
+  <section>
+    <div class="sec-head"><h2>变体三 · 页面常驻球</h2><span class="tag">兜底 / 面板内也能用</span></div>
+    <p class="note">
+      固定右下角的 40px 圆球（像客服球），点开菜单后手动选图或粘贴链接。作为 hover 按钮的兜底：
+      懒加载、`<canvas>`、背景图这些抓不到 `<img>` 的场景还能用。缺点是常驻会挡 B 站自己的按钮。
+    </p>
+    <div class="bili" style="grid-template-columns:1fr; padding:0; overflow:hidden;">
+      <div class="ball-wrap" id="v3">
+        <div class="art a4" style="position:absolute;inset:0;opacity:.30;border-radius:0;"></div>
+        <div class="fc">
+          <div class="ava"></div>
+          <div>
+            <div class="who">游客 · 3 分钟前</div>
+            <div class="txt">这个表情包我先收下了
+              <i class="em" style="background:linear-gradient(135deg,#f6c1d9,#c9d8ff 55%,#a9f0e2)"></i><i class="em" style="background:linear-gradient(135deg,#f9d29d,#ffb1a8 60%,#d5b3ff)"></i>
+            </div>
+          </div>
+        </div>
+        <div class="ball" title="StickerBox">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        </div>
+        <div class="ball-menu">
+          <button class="sb-btn primary" style="width:100%;justify-content:flex-start;margin-bottom:4px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+            存入这张图
+          </button>
+          <button class="sb-btn" style="width:100%;justify-content:flex-start;" disabled aria-disabled="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            复制为文件 <span class="soon">P4</span>
+          </button>
+          <button class="sb-btn" style="width:100%;justify-content:flex-start;margin-top:4px;" disabled aria-disabled="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+            下载到 Downloads <span class="soon">P5</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <p class="spec">尺寸：球 <code>40×40</code>，距右/下 <code>18</code>；菜单宽 <code>178</code>。球默认不透明，可拖拽停靠（下一版再定）。</p>
+  </section>
+
+  <!-- ================= 设置面板 ================= -->
+  <section>
+    <div class="sec-head"><h2>P3 设置面板（占位）</h2><span class="tag">扩展选项页 / popup</span></div>
+    <p class="note">token 和端口在两端都是烘焙值，P3 要做成可改：扩展侧存 <code>chrome.storage.local</code>，桌面端从 <code>settings.json</code> 读（需桌面端一起改）。下面是字段草样，先不定稿。</p>
+    <div class="opts">
+      <h3>StickerBox 连接</h3>
+      <p>桥默认在 <code>127.0.0.1:17800</code>，token 与桌面端一致才能导入。</p>
+      <div class="field">
+        <label>端口</label>
+        <input value="17800" />
+        <div class="hint">改完要同步改桌面端「设置 → 浏览器桥」。</div>
+      </div>
+      <div class="field">
+        <label>Token</label>
+        <input value="stickerbox-local-7f3c9a2e" />
+      </div>
+      <div class="row">
+        <button class="sb-btn primary" id="pingBtn">测试连接</button>
+        <button class="sb-btn">保存</button>
+      </div>
+    </div>
+    <p class="spec">「测试连接」调 <code>GET /ping</code>，成功显示版本号，失败给「先启动桌面端」。</p>
+  </section>
+</div>
+
+<div class="mini-toast" id="toast"></div>
+
+<script>
+  const toast = (html) => {
+    const el = document.getElementById('toast');
+    el.innerHTML = html;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 2000);
+  };
+
+  // 变体二：点主钮开关菜单
+  document.querySelectorAll('.fab .sb-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      btn.closest('.tile').classList.toggle('demo-on');
+    });
+  });
+
+  // 菜单里的存入：演示一个状态变化
+  document.querySelectorAll('.menu [data-act="save"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      toast('已存入 StickerBox · <b>动画保真</b>');
+      btn.closest('.tile').classList.remove('demo-on');
+    });
+  });
+
+  // 变体三
+  const v3 = document.getElementById('v3');
+  v3.querySelector('.ball').addEventListener('click', (e) => {
+    e.stopPropagation();
+    v3.classList.toggle('open');
+  });
+  v3.querySelector('.ball-menu [data-act], .ball-menu .primary').addEventListener('click', () => {
+    toast('已存入 StickerBox');
+    v3.classList.remove('open');
+  });
+  document.addEventListener('click', () => v3.classList.remove('open'));
+
+  document.getElementById('pingBtn').addEventListener('click', () => {
+    toast('桥在线 · <b>v0.12.1</b>');
+  });
+
+  // 变体一的主钮也演示一下
+  document.querySelectorAll('.bar3 [data-act="save"]').forEach((btn) => {
+    btn.addEventListener('click', () => toast('已存入 StickerBox'));
+  });
+</script>
+</body>
+</html>

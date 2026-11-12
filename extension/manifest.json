@@ -1,13 +1,27 @@
 {
   "manifest_version": 3,
   "name": "StickerBox 导入",
-  "version": "0.1.0",
-  "description": "右键把 B站 图片/动图直接存进本地 StickerBox",
+  "version": "0.2.2",
+  "description": "右键或悬停把 B站 图片/动图直接存进本地 StickerBox",
   "background": {
     "service_worker": "background.js",
     "type": "module"
   },
-  "permissions": ["contextMenus", "storage"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.bilibili.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "contextMenus",
+    "storage"
+  ],
   "host_permissions": [
     "http://127.0.0.1:17800/*",
     "https://*.bilibili.com/*",
