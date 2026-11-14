@@ -1,151 +1,129 @@
-# StickerBox · 表情盒
+<p align="center">
+  <img src="assets/readme/banner.svg" alt="Picarium · 贴屿 — Together. Instant. Everywhere." width="100%">
+</p>
 
-> **一个库，两台设备，所有聊天软件。**
-> 让散落在相册、微信、QQ 里的几千张表情包，变成「搜得到、找得快、随处贴」的个人资产。
+# Picarium · 贴屿
 
-方案版本 **v0.3（代码已开工）** · 2026-10-28 · 工作区 `C:\Users\13066\dsh\bqb`
+**Together. Instant. Everywhere.**<br>
+A cross-platform sticker hub.
 
-> ### 本轮已定
-> - 主战场：**聊天时快贴**；技术栈：**Tauri 2 + Rust + Vue/TS**
-> - 与聊天软件的代码接触面 **0 行**：只走系统剪贴板 + 系统分享，**微信/QQ/Telegram/Discord/LINE 一视同仁，无任何专用适配器**
-> - Android **延后**，核心 crate 不含平台代码，加壳即可
-> - 云端：**多通道可插拔**（文件夹 / WebDAV / S3 / 局域网 / 加密包），不绑死一家
-> - 代码状态：`cargo build` 通过、扫描入库通过、单测通过；GUI 需你本机运行验证 → [docs/06](docs/06-修订-v0.3.md)
+![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20Chrome-4D6BFE?style=flat-square)
+![Tauri 2](https://img.shields.io/badge/Tauri-2-24C8DB?style=flat-square&logo=tauri&logoColor=white)
+![Rust](https://img.shields.io/badge/Rust-stable-CE422B?style=flat-square&logo=rust&logoColor=white)
+![Manifest V3](https://img.shields.io/badge/Manifest-V3-4285F4?style=flat-square&logo=googlechrome&logoColor=white)
+[![license: MIT](https://img.shields.io/badge/license-MIT-4D6BFE?style=flat-square)](LICENSE)
+[![powered by dsh](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
----
+Picarium（picture + -arium，放图片的收藏馆）是一个本地优先的贴纸库。Windows 桌面端和 Android 共用一套 Rust 核心和同一种「普通文件夹」式的库格式；Chrome 扩展把 B 站图片存进桌面端的库。它不读取聊天软件的私有数据，只通过剪贴板、系统分享和文件导入，把表情包变成随时能搜、能贴的个人资产。中文名「贴屿」取「贴纸的小岛」之意。
 
-## 一页速览
+## 功能
 
-### 四个核心判断
+- **快贴面板**：`Ctrl+Alt+Space` 唤起，输入名称或拼音，方向键选择，回车复制，回到聊天窗口 `Ctrl+V`。不需要给任何聊天软件装插件。
+- **导入与去重**：扫描文件夹、拖拽图片、复制图片自动入库（资源管理器除外）；原图按内容哈希存放，重复导入不会重复占空间。
+- **搜索与整理**：名称 / 拼音过滤，分组、标签、收藏、最近使用和回收站。
+- **主题**：内置深 / 浅色与 Catppuccin 配色；库内 `themes/*.json` 可放自定义主题。
+- **B 站扩展**：评论图和大图悬停出现 `+`，右键菜单可复制或保存到本地库；需要桌面端在运行。
+- **Android 分享**：从其他 App 分享图片到 Picarium，浏览、搜索后再分享出去，也可以保存到相册。
+- **本地优先**：没有账号和云同步，图片不上传；库就是普通文件夹，复制即备份。
 
-1. **不碰任何聊天软件的底层。**
-   没有 QQ 适配器、没有微信解密、没有 hook。捕获只走操作系统的两个口子：**剪贴板**（Windows）和**系统分享**（Android）。
-   微信、QQ、Telegram、Discord、LINE、X、Ins 在这套模型里完全等价——它们是剪贴板的另一端，不是我们要对接的对象。
+## 当前状态
 
-2. **库就是一个普通文件夹。**
-   `blobs/` 存原始字节、`index.json` 只是索引。索引删了能重建，文件夹扔进任何网盘就能备份，资源管理器里直接看得到。
-
-3. **分类不是附属功能，是刚需。**
-   「相册里照片和表情包混在一起」是真痛点，所以「表情包 / 照片 / 截图」判别 + 批量清理排在 M2。
-
-4. **先做「快贴面板」，不是「大管理器」。**
-   价值发生在聊天时的那 3 秒：`Ctrl+Alt+Space` → 打两个字 → 回车 → 已经在剪贴板。
-
-### 形态
-
-```
-        ┌──────────────────── Windows ─────────────────────┐
- 任意应用│  捕获（全部通用，无 App 专用代码）                 │
- 资源管理器│   ├ 文件夹扫描导入                                │
-        │   ├ 剪贴板复制即入库（M1）                        │
-        │   └ 拖拽 / 收件箱（M1）                           │
-        │                    ↓                             │
-        │     ┌──────────────────────────────┐             │
-        │     │  库 StickerBox/               │◀────────────┼── 文件夹 / WebDAV / S3 / 加密包
-        │     │  blobs + index.json + ops/     │             │
-        │     └──────────────────────────────┘             │
-        │                    ↓                             │
-        │  快贴面板 Ctrl+Alt+Space → 回车复制 → Ctrl+V        │
-        └──────────────────────────────────────────────────┘
-                             ▲  同一套 core crate
-                             ▼
-        ┌──────────────────── Android（延后）───────────────┐
-        │  分享到 StickerBox → 浏览 / 搜索 → 再分享出去       │
-        └──────────────────────────────────────────────────┘
-```
-
-### 本机实测（2026-10-28）
-
-| 项 | 结果 |
-|---|---|
-| Rust / MSVC / Node / JDK / WebView2 | 全部就绪 |
-| `cargo build -p stickerbox` | ✅ 通过 |
-| 扫描示例目录 | ✅ 12 张入库，去重正确 |
-| `cargo test -p stickerbox-core` | ✅ 2 passed |
-| GUI 启动 | ⚠️ 沙箱里无法创建窗口，需本机运行 |
-
-> 注：早期勘察读过的微信/QQ 目录数据已**全部废弃**，代码里不存在任何相关适配器。
-
-### 架构
-
-| 层 | Windows | Android（延后） |
+| 平台 | 版本 | 状态 |
 |---|---|---|
-| 壳 | Tauri 2（WebView2） | Tauri 2／uniffi + Compose |
-| 核心 | **`stickerbox-core` 纯 Rust crate** | 同一份，不改一行 |
-| UI | 原生 HTML/CSS/JS（零 npm 依赖） | 复用或重写，接口不变 |
-| 数据 | blobs（内容寻址）+ index.json + ops 日志 | 同左 |
-| 集成 | 剪贴板 / 全局热键 / 托盘 | `ACTION_SEND` / 文件系统 |
-| 云端 | 多通道：文件夹 / WebDAV / S3 / 局域网 / 加密包 | 同左 |
+| Windows 10 / 11 | 0.14.1 | Windows 11 已验证；Windows 10 待验证 |
+| Android arm64 | 0.4.1 | 分享导入 / 浏览 / 再分享 |
+| Chrome 扩展 | 0.5.3 | B 站图片导入；Manifest V3 |
 
-### 路线图（v0.3，只排 PC）
+这是早期开发版：数据格式、命令和界面都可能变化，升级前建议先备份库。当前还没有公开的安装包；Windows 安装包、Android APK 和扩展 zip 会在公开发布后补下载入口。
 
-| 里程碑 | 内容 | 状态 |
-|---|---|---|
-| **M0** | 骨架、扫描、网格、搜索、剪贴板复制、热键面板 | 代码完成，待真机验证 |
-| **M1** | 标签、回收站、拖拽导入、剪贴板自动捕获、单实例、设置页 | 下一步 |
-| **M2** | OCR、自动标签、表情包判别、相似去重 | |
-| **M3** | 备份通道（文件夹/WebDAV/S3）+ 加密包 + 恢复 | |
-| **M4** | 索引换 SQLite/FTS5（规模需要时） | |
-| **M5** | Android 壳 | 按需 |
+<!-- TODO: 公开发布前补三端截图 / GIF、GitHub Releases 下载链接与 CI 徽章 -->
 
-> M0 的验收只有一句话：**在任意聊天窗口按热键，输入两个字，回车，图片进了输入框。**
+## 构建与运行
 
-### 已定 / 待定
+桌面端需要 Windows 10 / 11、Rust stable（MSVC 工具链）和 WebView2（Windows 11 通常自带；Windows 10 可能需要安装）。扩展与 Android CLI 需要 Node.js。
 
-| 状态 | 项 | 结论 |
-|---|---|---|
-| ✅ 已定 | 主战场 | 聊天时快贴 |
-| ✅ 已定 | 技术栈 | Tauri 2 + Rust + 原生 Web UI |
-| ✅ 已定 | 导入 | 通用入口，**无任何 App 专用适配器** |
-| ✅ 已定 | 云端 | 多通道可插拔，不绑死一家 |
-| ✅ 已定 | Android | 延后，核心保留接口 |
-| 🟡 待点头 | 库位置 | 默认 `%USERPROFILE%\StickerBox`，可改，支持便携模式 |
-| 🟡 待点头 | 系统下限 | Win10 1809+ / Win11（WebView2 要求） |
-| 🟡 待点头 | 构建权限 | 是否把会话切到完整权限，否则每次编译都要你批一次 |
-
----
-
-## 文档索引
-
-### 现行（按这个看）
-
-| 文档 | 作用 | 什么时候看 |
-|---|---|---|
-| [docs/14-数据结构.md](docs/14-数据结构.md) | 库里到底存了什么、为什么不用数据库、什么时候该换 | 想改数据模型 / 做备份同步前 |
-| [docs/13-下一步计划.md](docs/13-下一步计划.md) | 交互收尾 + 拖拽三步拆解 + 流程约定 | 决定下一轮做什么 |
-| [docs/11-待办.md](docs/11-待办.md) | 全部待办清单（含已完成标记） | 想知道还有什么没做 |
-| [docs/09-扩展性设计.md](docs/09-扩展性设计.md) | 插件 vs 小而美、四类扩展点 | 想加扩展功能前 |
-| [docs/07-跨平台评估.md](docs/07-跨平台评估.md) | macOS / iOS 要改什么、多少工作量 | 规划多端时 |
-| [docs/01-产品计划.md](docs/01-产品计划.md) | 问题拆解、功能地图、验收指标 | 回顾产品定位 |
-
-### 历史存档（结论已并入现行文档）
-
-| 文档 | 说明 |
-|---|---|
-| [docs/02-技术架构.md](docs/02-技术架构.md) | 早期架构稿：库格式、同步协议设计（栈部分已被 05 取代） |
-| [docs/03-可行性审查.md](docs/03-可行性审查.md) | 最初的可行性验证与风险表 |
-| [docs/04-附录-本机勘察记录.md](docs/04-附录-本机勘察记录.md) | 微信/QQ 目录实测记录（微信部分已废弃） |
-| [docs/05-技术决策-v0.2.md](docs/05-技术决策-v0.2.md) | 技术栈从 Python 转向 Tauri 的决策过程 |
-| [docs/06-修订-v0.3.md](docs/06-修订-v0.3.md) | 范围收窄、云通道设计、环境坑 |
-| [docs/08-面板与托盘.md](docs/08-面板与托盘.md) | 快贴面板与托盘的实现记录 |
-| [docs/10-搜索分组与剪贴板方案.md](docs/10-搜索分组与剪贴板方案.md) | 拼音搜索、分组、剪贴板捕获的设计 |
-| [docs/12-今日计划.md](docs/12-今日计划.md) | 某一天的执行计划与进度记录 |
-
----
-
-## 怎么跑起来
+### Windows 桌面端
 
 ```powershell
-cd C:\Users\13066\dsh\bqb
 cargo run -p stickerbox
 ```
 
-![StickerBox 主窗口](docs/screenshot.png)
+首次启动会在 `%USERPROFILE%\StickerBox` 建库；设置页可以看到当前库路径。改位置用 `STICKERBOX_HOME`。
 
-- 首次运行在 `%USERPROFILE%\StickerBox` 建库；换位置：`$env:STICKERBOX_HOME="D:\StickerBox"`
-- 界面里填一个装着表情包的文件夹 → 「扫描导入」
-- 命令行导入：`.\target\debug\stickerbox.exe scan "D:\表情包"`
-- 权限排查：`.\target\debug\stickerbox.exe diag`
-- `Ctrl+Alt+Space` 唤起快贴面板 → 输入 → 方向键 → 回车复制 → 聊天窗口 `Ctrl+V`
+测试：
 
-> 注：`.cargo/config.toml` 把编译输出指到了工作区外，因为开发环境会限制「工作区内可执行文件」写用户目录。详见 [docs/06 第 7 节](docs/06-修订-v0.3.md)。
+```powershell
+cargo test -p stickerbox-core
+pwsh -NoProfile -File scripts/accept.ps1
+```
+
+`scripts/accept.ps1` 是 Windows 端到端自测，会构建、跑核心测试和前端断言，约几分钟。
+
+发布构建：
+
+```powershell
+cargo build --release -p stickerbox
+```
+
+> 仓库内部的 crate / 可执行文件名仍是 `stickerbox`；用户可见名已改为 Picarium，身份迁移会单独处理。
+
+### Chrome 扩展
+
+```bash
+cd extension
+npm install
+npm run build
+```
+
+然后在 `chrome://extensions` 开启开发者模式，选择「加载已解压的扩展程序」，指向 `extension/dist`。打开 B 站页面即可使用；扩展需要本机桌面端在运行。
+
+```bash
+npm test
+npm run typecheck
+```
+
+### Android
+
+需要 Android SDK / NDK / JDK，release 包还需要签名配置；完整步骤见 [docs/25-安卓构建、签名与模拟器.md](docs/25-安卓构建、签名与模拟器.md)。只发布 arm64-v8a：
+
+```bash
+npx tauri android build --apk --target aarch64 --ci
+```
+
+调试包与模拟器步骤见同一份文档和 [docs/26-安卓模拟器速查.md](docs/26-安卓模拟器速查.md)。
+
+## 数据与备份
+
+库是一个普通文件夹：
+
+```text
+index.json                 索引与分组 / 标签等元数据
+blobs/ab/cd/<sha>.<ext>    原图，按内容哈希存放
+thumbs/                    缩略图
+trash/                     回收站
+settings.json              当前库的设置
+themes/*.json              自定义主题
+```
+
+默认路径是 `%USERPROFILE%\StickerBox`；设置 `STICKERBOX_HOME` 可以换到任意目录。当前版本仍沿用 `StickerBox` 目录名，后续身份迁移会迁到 Picarium，并保留数据。
+
+备份：退出应用后复制整个库文件夹即可；恢复时放回原位，或用 `STICKERBOX_HOME` 指过去。
+
+## 隐私
+
+- 不读取微信、QQ 等聊天软件的私有数据；导入只走剪贴板、系统分享和文件。
+- 没有账号、没有云同步，图片不会上传到服务器。
+- 桌面端和手机端各自本地保存；Chrome 扩展只在本机把图片交给桌面端，桌面端不在运行时不会入库。
+- 剪贴板捕获可以在设置里关闭；从资源管理器复制文件不会触发入库。
+
+## 更多文档
+
+- [开发导航](docs/27-开发导航.md) — 各模块在哪、怎么验证
+- [安卓构建、签名与模拟器](docs/25-安卓构建、签名与模拟器.md)
+- [品牌与标识](docs/29-品牌与标识.md) — Picarium / 贴屿 的命名与文案
+
+## License
+
+代码以 [MIT](LICENSE) 授权，Copyright (c) 2026 Ming Sun。
+
+Catppuccin（MIT）、Lucide（ISC）等第三方作品的许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
