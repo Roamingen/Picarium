@@ -143,7 +143,7 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
 - **commit 前先汇报、等用户点头**；不要自己连着提交。
 - 一个对话可以多个 commit，但同一件事的改动要聚合，且必须验证到边界（该跑的测试/截图/回归都跑完）再提交。
 - 一批一个 commit；body 写「为什么 + 关键验证结果」，不写流水账。
-- **不往 git 里加图片/二进制**（截图、APK、录屏）：体积会永久留在历史里。新截图一律放 `.demo/`（已 gitignore）或系统临时目录，用 `present` 给用户看；`docs/shots/` 已入库的历史图保留，不再新增。
+- **不往 git 里加图片/二进制**（截图、APK、录屏）：体积会永久留在历史里。新截图一律放 `.demo/`（已 gitignore）或系统临时目录，用 `present` 给用户看；`docs/` 不再保留测试截图。
 - **中间产物 mock 不进 git**：v1/v2… 过渡稿在提交前归档到 `docs/mock/archive/`（该目录已 gitignore），`docs/mock/` 只留最终稿；归档文件不参与构建/验收。
 - 例：`feat(android): 只读命令层与 thumb 协议搬进 lib crate`
 

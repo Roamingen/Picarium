@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme/banner.svg" alt="Picarium · 贴屿 — Together. Instant. Everywhere." width="100%">
+  <img src="docs/readme-banner.svg" alt="Picarium · 贴屿 — Together. Instant. Everywhere." width="100%">
 </p>
 
 # Picarium · 贴屿

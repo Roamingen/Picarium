@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 560" width="1200" height="560" role="img" aria-label="Picarium 贴屿 — Together. Instant. Everywhere. A cross-platform sticker hub.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0a0d16"/>
+      <stop offset="0.55" stop-color="#101627"/>
+      <stop offset="1" stop-color="#0b0f1a"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="950" cy="300" r="360" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#89b4fa" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#89b4fa" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="760" cy="470" r="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f5c2e7" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#f5c2e7" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowC" cx="210" cy="250" r="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#89b4fa" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#89b4fa" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="28" height="28" patternUnits="userSpaceOnUse">
+      <circle cx="1.6" cy="1.6" r="1.3" fill="#ffffff" fill-opacity="0.04"/>
+    </pattern>
+  </defs>
+
+  <rect width="1200" height="560" fill="url(#bg)"/>
+  <rect width="1200" height="560" fill="url(#dots)"/>
+  <rect width="1200" height="560" fill="url(#glowA)"/>
+  <rect width="1200" height="560" fill="url(#glowB)"/>
+  <rect width="1200" height="560" fill="url(#glowC)"/>
+  <rect x="0.5" y="0.5" width="1199" height="559" fill="none" stroke="#ffffff" stroke-opacity="0.06"/>
+
+  <!-- Left: brand block -->
+  <text x="84" y="100" font-family="'Cascadia Code', Consolas, monospace" font-size="13" fill="#89b4fa" fill-opacity="0.9"><tspan letter-spacing="0">贴屿</tspan><tspan letter-spacing="3.5"> · STICKER HUB</tspan></text>
+
+  <!-- serif wordmark, first i dot replaced with a heart -->
+  <text x="84" y="270" font-family="'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', system-ui, sans-serif" font-size="120" font-weight="800" fill="#f4f7ff">Picarium</text>
+  <g transform="translate(181 194)">
+    <path d="M0 18 C-7 12 -20 2 -20 -8 C-20 -15 -15 -18 -10 -18 C-4 -18 0 -14 0 -10 C0 -14 4 -18 10 -18 C15 -18 20 -15 20 -8 C20 2 7 12 0 18 Z" fill="#f5c2e7"/>
+    <circle cx="-6" cy="-9" r="2.2" fill="#ffffff" fill-opacity="0.55"/>
+  </g>
+
+  <text x="84" y="340" font-family="'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', system-ui, sans-serif" font-size="28" fill="#cdd6f4">Together. Instant. Everywhere.</text>
+  <text x="84" y="382" font-family="'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', system-ui, sans-serif" font-size="20" fill="#8b93a7">A cross-platform sticker hub.</text>
+  <rect x="84" y="420" width="64" height="2.5" rx="1.25" fill="#89b4fa" fill-opacity="0.85"/>
+  <text x="84" y="466" font-family="'Cascadia Code', Consolas, monospace" font-size="13" letter-spacing="2.6" fill="#6c7086">WINDOWS · ANDROID · CHROME</text>
+
+  <!-- Right: floating search + sticker wall -->
+  <g>
+    <rect x="656" y="64" width="456" height="54" rx="27" fill="#151a28" stroke="#2a3146"/>
+    <circle cx="688" cy="91" r="8" fill="none" stroke="#7f849c" stroke-width="2"/>
+    <path d="M694 97 L702 105" stroke="#7f849c" stroke-width="2" stroke-linecap="round"/>
+    <text x="720" y="97" font-family="'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', system-ui, sans-serif" font-size="16" fill="#7f849c">搜一搜，今天想贴哪一张？</text>
+    <path d="M0 -9 C0 -3 3 0 9 0 C3 0 0 3 0 9 C0 3 -3 0 -9 0 C-3 0 0 -3 0 -9 Z" transform="translate(1074 91)" fill="#f5c2e7" fill-opacity="0.9"/>
+  </g>
+
+  <!-- heart -->
+  <g transform="translate(656 178) rotate(-6 70 70)">
+    <rect x="3" y="8" width="140" height="140" rx="33" fill="#000000" fill-opacity="0.28"/>
+    <rect width="140" height="140" rx="33" fill="#f5c2e7"/>
+    <g transform="scale(1.4)">
+      <path d="M50 70 C50 70 26 56 26 40 C26 30 34 26 41 26 C46 26 50 30 50 34 C50 30 54 26 59 26 C66 26 74 30 74 40 C74 56 50 70 50 70 Z" fill="#1e1e2e" fill-opacity="0.82"/>
+    </g>
+  </g>
+
+  <!-- star -->
+  <g transform="translate(814 166) rotate(4 70 70)">
+    <rect x="3" y="8" width="140" height="140" rx="33" fill="#000000" fill-opacity="0.28"/>
+    <rect width="140" height="140" rx="33" fill="#89b4fa"/>
+    <g transform="scale(1.4)">
+      <path d="M50 28 L57 43 L74 45 L61 57 L65 74 L50 65 L35 74 L39 57 L26 45 L43 43 Z" fill="#1e1e2e" fill-opacity="0.82"/>
+    </g>
+  </g>
+
+  <!-- smile -->
+  <g transform="translate(972 180) rotate(-4 70 70)">
+    <rect x="3" y="8" width="140" height="140" rx="33" fill="#000000" fill-opacity="0.28"/>
+    <rect width="140" height="140" rx="33" fill="#a6e3a1"/>
+    <g transform="scale(1.4)">
+      <circle cx="40" cy="44" r="3.5" fill="#1e1e2e" fill-opacity="0.82"/>
+      <circle cx="60" cy="44" r="3.5" fill="#1e1e2e" fill-opacity="0.82"/>
+      <path d="M36 56 Q50 70 64 56" fill="none" stroke="#1e1e2e" stroke-opacity="0.82" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </g>
+
+  <!-- paw -->
+  <g transform="translate(656 338) rotate(6 70 70)">
+    <rect x="3" y="8" width="140" height="140" rx="33" fill="#000000" fill-opacity="0.28"/>
+    <rect width="140" height="140" rx="33" fill="#fab387"/>
+    <g transform="scale(1.4)">
+      <ellipse cx="50" cy="62" rx="15" ry="12" fill="#1e1e2e" fill-opacity="0.82"/>
+      <circle cx="32" cy="42" r="5.5" fill="#1e1e2e" fill-opacity="0.82"/>
+      <circle cx="44" cy="34" r="5.5" fill="#1e1e2e" fill-opacity="0.82"/>
+      <circle cx="56" cy="34" r="5.5" fill="#1e1e2e" fill-opacity="0.82"/>
+      <circle cx="68" cy="42" r="5.5" fill="#1e1e2e" fill-opacity="0.82"/>
+    </g>
+  </g>
+
+  <!-- sparkle -->
+  <g transform="translate(814 326) rotate(-5 70 70)">
+    <rect x="3" y="8" width="140" height="140" rx="33" fill="#000000" fill-opacity="0.28"/>
+    <rect width="140" height="140" rx="33" fill="#cba6f7"/>
+    <g transform="scale(1.4)">
+      <path d="M50 28 C53 42 58 47 72 50 C58 53 53 58 50 72 C47 58 42 53 28 50 C42 47 47 42 50 28 Z" fill="#1e1e2e" fill-opacity="0.82"/>
+    </g>
+  </g>
+
+  <!-- add / import -->
+  <g transform="translate(972 342) rotate(7 70 70)">
+    <rect x="3" y="8" width="140" height="140" rx="33" fill="#000000" fill-opacity="0.22"/>
+    <rect width="140" height="140" rx="33" fill="#121725" stroke="#45475a" stroke-width="2" stroke-dasharray="9 8"/>
+    <g transform="scale(1.4)">
+      <rect x="46" y="33" width="8" height="34" rx="4" fill="#89b4fa"/>
+      <rect x="33" y="46" width="34" height="8" rx="4" fill="#89b4fa"/>
+    </g>
+  </g>
+
+  <text x="1112" y="532" text-anchor="end" font-family="'Cascadia Code', Consolas, monospace" font-size="11.5" letter-spacing="2.2" fill="#4b5268">COLLECT · ORGANIZE · SEARCH · SHARE</text>
+</svg>

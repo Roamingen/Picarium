@@ -22,9 +22,14 @@ src-tauri/gen/android/app/src/main/assets/
 src-tauri/gen/android/keystore.properties
 *.jks
 
-# 截图不入库（体积考虑，2026-10-31 起）
+# 截图/测试图不入库（体积考虑，2026-10-31 起；2026-11-14 清理历史）
 .shots/
 docs/shots/
+docs/**/*.png
+
+# 本地 agent 配置与示例图，不入库
+.agents/
+sample/
 
 # 发版产物：固定在本机 release/，不入库（2026-11-07 起）
 release/
