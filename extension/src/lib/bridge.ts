@@ -42,7 +42,7 @@ export async function importImage(payload: ImportPayload): Promise<ImportResult>
       body: JSON.stringify(payload),
     });
   } catch {
-    return { ok: false, error: "连不上 StickerBox，先启动桌面端" };
+    return { ok: false, error: "连不上 Picarium，先启动桌面端" };
   }
 
   const body = (await res.json().catch(() => null)) as ImportResult | null;
@@ -65,7 +65,7 @@ export async function copyAsset(sha: string): Promise<{ ok: boolean; error?: str
       body: JSON.stringify({ sha }),
     });
   } catch {
-    return { ok: false, error: "连不上 StickerBox，先启动桌面端" };
+    return { ok: false, error: "连不上 Picarium，先启动桌面端" };
   }
 
   const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
@@ -95,7 +95,7 @@ export async function copyRaw(payload: {
       body: JSON.stringify(payload),
     });
   } catch {
-    return { ok: false, error: "连不上 StickerBox，先启动桌面端" };
+    return { ok: false, error: "连不上 Picarium，先启动桌面端" };
   }
 
   const body = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;

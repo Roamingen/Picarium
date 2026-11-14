@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "StickerBox 导入",
-  "version": "0.5.2",
-  "description": "右键或悬停把 B站 图片/动图存进本地 StickerBox、复制为文件或下载到本地",
+  "name": "Picarium 导入",
+  "version": "0.5.3",
+  "description": "右键或悬停把 B站 图片/动图存进本地 Picarium、复制为文件或下载到本地",
   "background": {
     "service_worker": "background.js",
     "type": "module"
@@ -29,6 +29,6 @@
     "https://*.hdslb.com/*"
   ],
   "action": {
-    "default_title": "StickerBox：右键图片可导入"
+    "default_title": "Picarium：右键图片可导入"
   }
 }

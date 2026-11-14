@@ -1089,7 +1089,7 @@ fn main() {
             }
 
             // 托盘菜单
-            let item_show = MenuItem::with_id(app, "show", "打开 StickerBox", true, None::<&str>)?;
+            let item_show = MenuItem::with_id(app, "show", "打开 Picarium", true, None::<&str>)?;
             let item_panel = MenuItem::with_id(app, "panel", "快贴面板", true, None::<&str>)?;
             let item_clip = MenuItem::with_id(app, "clip", "暂停剪贴板捕获", true, None::<&str>)?;
             let item_quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
@@ -1099,7 +1099,7 @@ fn main() {
 
             TrayIconBuilder::new()
                 .icon(tray_icon)
-                .tooltip("StickerBox · Ctrl+Alt+Space")
+                .tooltip("Picarium · Ctrl+Alt+Space")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event({
@@ -1210,5 +1210,5 @@ fn main() {
         });
     thumb::register(builder)
         .run(tauri::generate_context!())
-        .expect("StickerBox 启动失败");
+        .expect("Picarium 启动失败");
 }

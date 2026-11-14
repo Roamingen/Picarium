@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "StickerBox",
+  "productName": "Picarium",
   "version": "0.14.1",
   "identifier": "dev.stickerbox.desktop",
   "build": {
@@ -11,7 +11,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "StickerBox",
+        "title": "Picarium",
         "width": 1040,
         "height": 700,
         "minWidth": 720,
@@ -22,7 +22,7 @@
       {
         "label": "panel",
         "url": "panel.html",
-        "title": "StickerBox",
+        "title": "Picarium",
         "width": 720,
         "height": 520,
         "decorations": false,

@@ -134,12 +134,12 @@ function ensureUi(): Ui {
   wrap.className = "wrap";
   wrap.style.display = "none";
   wrap.innerHTML = `
-    <button class="btn" type="button" aria-label="StickerBox 图片操作" aria-expanded="false">
+    <button class="btn" type="button" aria-label="Picarium 图片操作" aria-expanded="false">
       <span class="ico"></span>
     </button>
     <div class="menu" role="menu">
       <button class="row" type="button" role="menuitem" data-act="copy">
-        <i>${ICONS.copy}</i><span>复制并保存到 StickerBox</span>
+        <i>${ICONS.copy}</i><span>复制并保存到 Picarium</span>
       </button>
       <button class="row" type="button" role="menuitem" data-act="copyOnly">
         <i>${ICONS.copy}</i><span>仅复制</span>
@@ -212,7 +212,7 @@ function friendlyError(raw: string): string {
     return t.includes("上限") ? t : "图片太大，超过单张上限（32 MB），压缩后再试";
   }
   if (/连不上|Failed to fetch|NetworkError|Load failed/i.test(t)) {
-    return "连不上 StickerBox：先启动桌面端，确认它没被关掉";
+    return "连不上 Picarium：先启动桌面端，确认它没被关掉";
   }
   if (/413|body too large|请求体/i.test(t)) {
     return "内容太大，桌面端没能接收（请求超过 48 MB），换小一点的图";
@@ -340,9 +340,9 @@ function setState(state: State, message?: string) {
   const u = ensureUi();
   u.btn.className = state === "idle" ? "btn" : `btn ${state}`;
   u.icon.innerHTML = ICONS[state] ?? ICONS.plus!;
-  const label = message ?? (state === "idle" ? "存入 StickerBox" : "");
+  const label = message ?? (state === "idle" ? "存入 Picarium" : "");
   u.btn.title = label;
-  u.btn.setAttribute("aria-label", label || "存入 StickerBox");
+  u.btn.setAttribute("aria-label", label || "存入 Picarium");
 
   if (state === "added" || state === "error") resultAt = Date.now();
 
@@ -380,7 +380,7 @@ async function submit(kind: "copy" | "copyOnly" | "download") {
     if (!res?.ok) {
       fail(res?.error ?? (kind === "download" ? "下载失败" : "复制失败"));
     } else if (kind === "copy") {
-      setState("added", "已复制为文件，并存入 StickerBox");
+      setState("added", "已复制为文件，并存入 Picarium");
     } else if (kind === "download") {
       setState("added", "已下载到 Downloads");
     } else {

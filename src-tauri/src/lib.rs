@@ -1,4 +1,4 @@
-//! StickerBox 库入口：桌面的 `main.rs` 和安卓的 `mobile_entry_point` 共用这里。
+//! Picarium 库入口：桌面的 `main.rs` 和安卓的 `mobile_entry_point` 共用这里。
 //!
 //! - `platform`：平台能力边界（分享进出、相册、文件选择、打开）
 //! - `state`：跨平台共享状态 `AppState`
@@ -88,5 +88,5 @@ pub fn run() {
 
     thumb::register(builder)
         .run(tauri::generate_context!())
-        .expect("StickerBox mobile 启动失败");
+        .expect("Picarium mobile 启动失败");
 }

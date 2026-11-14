@@ -3527,7 +3527,7 @@ window.__TAURI__.event.listen('library-changed', async () => {
 // 浏览器扩展导入完成：新图刷新走 library-changed，这里只负责给个明确反馈
 window.__TAURI__.event.listen('bridge-imported', (e) => {
   const { added } = e.payload || {};
-  toast(added ? '已存入 StickerBox' : '这张已经在库里了');
+  toast(added ? '已存入 Picarium' : '这张已经在库里了');
 });
 
 // 置顶窗口
@@ -3764,7 +3764,7 @@ async function openSettings() {
   syncTrashDaysUI();
   $('ghost-x').value = ghostX;
   $('ghost-y').value = ghostY;
-  $('set-version').textContent = `StickerBox v${s.version}`;
+  $('set-version').textContent = `Picarium · 贴屿 v${s.version}`;
   $('hotkey-value').textContent = s.hotkey || '未设置';
   $('clip-hotkey-value').textContent = s.clipHotkey || '未设置';
   renderKeymapEditor();

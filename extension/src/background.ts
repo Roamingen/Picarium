@@ -26,14 +26,14 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: SAVE_MENU_ID,
-      title: "存入 StickerBox",
+      title: "存入 Picarium",
       contexts: ["image"],
       // 只在 B 站页面出现：其他站点的图既没有 host 权限、也没有存的语义
       documentUrlPatterns: MENU_DOMAINS,
     });
     chrome.contextMenus.create({
       id: COPY_SAVE_MENU_ID,
-      title: "复制并保存到 StickerBox",
+      title: "复制并保存到 Picarium",
       contexts: ["image"],
       documentUrlPatterns: MENU_DOMAINS,
     });
@@ -138,7 +138,7 @@ async function saveImage(rawUrl: string): Promise<Reply> {
     flash(
       added ? "✓" : "=",
       added ? "#2e7d32" : "#1565c0",
-      added ? "已存入 StickerBox" : "库里已有这张，已跳过",
+      added ? "已存入 Picarium" : "库里已有这张，已跳过",
     );
     return { ok: true, added };
   } catch (e) {
@@ -153,7 +153,7 @@ async function copyImage(rawUrl: string): Promise<Reply> {
     const { sha } = await pushToLibrary(g, true);
     const copied = await copyAsset(sha);
     if (!copied.ok) throw new Error(copied.error ?? "复制失败");
-    flash("✓", "#2e7d32", "已复制并存入 StickerBox");
+    flash("✓", "#2e7d32", "已复制并存入 Picarium");
     return { ok: true, copied: true };
   } catch (e) {
     return failed(e, rawUrl, "复制失败");
@@ -189,8 +189,8 @@ async function copyOnly(rawUrl: string): Promise<Reply> {
 
 function failed(e: unknown, url: string, phase: string): Reply {
   const message = e instanceof Error ? e.message : String(e);
-  flash("!", "#c62828", `StickerBox ${phase}：${message}`);
-  console.warn("[StickerBox]", phase, message, url);
+  flash("!", "#c62828", `Picarium ${phase}：${message}`);
+  console.warn("[Picarium]", phase, message, url);
   return { ok: false, error: message };
 }
 
@@ -201,6 +201,6 @@ function flash(text: string, color: string, title: string) {
   void chrome.action.setTitle({ title });
   setTimeout(() => {
     void chrome.action.setBadgeText({ text: "" });
-    void chrome.action.setTitle({ title: "StickerBox：右键图片可导入" });
+    void chrome.action.setTitle({ title: "Picarium：右键图片可导入" });
   }, 3000);
 }

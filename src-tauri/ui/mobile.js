@@ -290,7 +290,7 @@ function renderGrid() {
     const hint =
       S.q || S.view !== "all" || hasFilters()
         ? "这里还没有匹配的表情。"
-        : "这里还没有表情。点右下角「+」，或把图片分享到手机上的 StickerBox。";
+        : "这里还没有表情。点右下角「+」，或把图片分享到手机上的 Picarium。";
     grid.innerHTML = `<div class="empty">${hint}</div>`;
     return;
   }
