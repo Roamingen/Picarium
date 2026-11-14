@@ -23,6 +23,7 @@ src-tauri/gen/android/keystore.properties
 *.jks
 
 # 截图不入库（体积考虑，2026-10-31 起）
+.shots/
 docs/shots/
 
 # 发版产物：固定在本机 release/，不入库（2026-11-07 起）
