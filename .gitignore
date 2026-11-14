@@ -36,3 +36,6 @@ release/
 
 # 中间 mock 归档：文件保留在本机，不入库（2026-11-08 起）
 docs/mock/archive/
+
+# 本机 Cargo target 配置，不入库（2026-11-14 起）
+.cargo/
