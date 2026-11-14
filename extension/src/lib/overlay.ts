@@ -39,7 +39,7 @@ export function placeButton(rect: Box, vp: Viewport): { left: number; top: numbe
   };
 }
 
-/** 菜单右对齐到钮；钮在图片右下角，优先向上展开，上面放不下才翻到下方。 */
+/** 菜单从钮的右侧展开；钮在图片右下角，优先向上，上面放不下才翻到下方。 */
 export function placeMenu(
   button: { left: number; top: number },
   vp: Viewport,
@@ -49,7 +49,7 @@ export function placeMenu(
   const belowTop = button.top + BUTTON_SIZE + MENU_GAP;
   const above = aboveTop >= EDGE_MARGIN;
   return {
-    left: Math.min(Math.max(button.left + BUTTON_SIZE - MENU_WIDTH, EDGE_MARGIN), maxLeft),
+    left: Math.min(Math.max(button.left + BUTTON_SIZE + MENU_GAP, EDGE_MARGIN), maxLeft),
     top: above
       ? aboveTop
       : Math.min(belowTop, Math.max(EDGE_MARGIN, vp.height - MENU_HEIGHT - EDGE_MARGIN)),

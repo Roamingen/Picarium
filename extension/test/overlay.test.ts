@@ -52,9 +52,9 @@ test("钮贴在图片右下角并向视口内夹", () => {
   );
 });
 
-test("菜单优先在钮上方并右对齐", () => {
+test("菜单优先在钮上方、从钮右侧展开", () => {
   const m = placeMenu({ left: 300, top: 200 }, { width: 800, height: 600 });
-  assert.equal(m.left, 300 + BUTTON_SIZE - MENU_WIDTH);
+  assert.equal(m.left, 300 + BUTTON_SIZE + MENU_GAP);
   assert.equal(m.top, 200 - MENU_GAP - MENU_HEIGHT);
   assert.equal(m.above, true);
 });
@@ -68,4 +68,9 @@ test("钮贴近顶部时菜单翻到下方", () => {
 test("窄视口里菜单夹在边距内", () => {
   const m = placeMenu({ left: 0, top: 400 }, { width: 220, height: 600 });
   assert.equal(m.left, EDGE_MARGIN);
+});
+
+test("钮贴近右边缘时菜单往左夹回", () => {
+  const m = placeMenu({ left: 700, top: 200 }, { width: 800, height: 600 });
+  assert.equal(m.left, 800 - MENU_WIDTH - EDGE_MARGIN);
 });
