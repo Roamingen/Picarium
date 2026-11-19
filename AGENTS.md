@@ -46,7 +46,7 @@
 
 - 不读微信/QQ 等软件私有数据；只做剪贴板/文件/分享入口。
 - 不引入 WASM/DLL/脚本插件运行时（除非用户明确批准）。
-- 不在用户真实库 `C:\Users\13066\StickerBox` 上做删除/批量测试；测试用 `STICKERBOX_HOME` 临时库。
+- 不在用户真实库 `C:\Users\13066\Picarium` 上做删除/批量测试；测试用 `STICKERBOX_HOME` 临时库。
 - 不擅自改用户全局配置；必须改时先备份并明确告知（Gradle 代理已有先例：`~/.gradle/gradle.properties.bak-stickerbox`）。
 - 不重复跑 release 构建；release 只在交付/装机器时跑。
 - 不用 `scripts/android-emu.ps1` 起模拟器（会弹终端）；不关用户正在用的模拟器。
@@ -160,7 +160,7 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
   - 安卓：`src-tauri/tauri.android.conf.json` 的 `version`；`bundle.android.versionCode` 显式给码，公式 `major*1000000 + minor*1000 + patch`
 - **当前版本：PC `0.14.1` / 安卓 `0.4.1`（2026-11-12）**——升完版本号要同步改这一行。
 - 固定产物目录（本机，已 gitignore，不入库）：
-  - `release/pc/StickerBox-<ver>.exe`
+  - `release/pc/Picarium-<ver>-win-x64.exe`
   - `release/android/StickerBox-<ver>-arm64-v8a.apk`
   - `release/versions.json`：两端版本、构建时间、sha256
 - 一条命令出包（只在交付 / 装自己机器时跑，平时别跑 release）：
@@ -169,5 +169,5 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
   pwsh -NoProfile -File scripts/release.ps1 -Target all -Bump minor
   ```
 
-  `-Target pc|android|all`；不带 `-Bump` 就按当前版本重出；`-DryRun` 只打印计划不出包；`-BumpOnly` 只升号写配置、不构建（功能落地先升号时用）。PC 步骤 = release 构建 + 覆盖 `%LOCALAPPDATA%\StickerBox\StickerBox.exe` + 修 HKCU 开机自启；`install-release.ps1` 保留成「只更新本机」的快捷方式（内部转调 release.ps1 -Target pc）。
+  `-Target pc|android|all`；不带 `-Bump` 就按当前版本重出；`-DryRun` 只打印计划不出包；`-BumpOnly` 只升号写配置、不构建（功能落地先升号时用）。PC 步骤 = release 构建 + 覆盖 `%LOCALAPPDATA%\Picarium\Picarium.exe` + 迁移桌面快捷方式/修 HKCU 开机自启 + 清空旧 `%LOCALAPPDATA%\StickerBox`；`install-release.ps1` 保留成「只更新本机」的快捷方式（内部转调 release.ps1 -Target pc）。
 - 安卓只打 `aarch64`，不做 universal；首次出安卓包后核对 `aapt2 dump badging` 里的 versionName/versionCode 是否等于配置值。

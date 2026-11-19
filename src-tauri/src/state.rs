@@ -66,15 +66,60 @@ pub fn candidate_roots() -> Vec<PathBuf> {
     }
     let mut v = Vec::new();
     if let Ok(p) = std::env::var("USERPROFILE") {
-        v.push(PathBuf::from(p).join("StickerBox"));
+        let p = PathBuf::from(p);
+        // 迁移成功后旧目录不存在；迁移失败时优先继续用旧库，别建一个空的新库。
+        if p.join("StickerBox").exists() && !p.join("Picarium").exists() {
+            v.push(p.join("StickerBox"));
+            v.push(p.join("Picarium"));
+        } else {
+            v.push(p.join("Picarium"));
+            v.push(p.join("StickerBox"));
+        }
     }
     if let Ok(p) = std::env::var("LOCALAPPDATA") {
-        v.push(PathBuf::from(p).join("StickerBox"));
+        let p = PathBuf::from(p);
+        v.push(p.join("Picarium"));
+        v.push(p.join("StickerBox"));
     }
     if let Ok(d) = std::env::current_dir() {
+        v.push(d.join("Picarium"));
         v.push(d.join("StickerBox"));
     }
     v
+}
+
+/// 把默认库 `%USERPROFILE%\StickerBox` 原地改名成 `Picarium`（同盘瞬间完成）。
+///
+/// 只处理默认库；设置了 `STICKERBOX_HOME` 时不碰。改名失败就继续用旧目录，
+/// 不复制、不删除，避免 1.6 GB 的库搬到一半。
+#[cfg(not(mobile))]
+pub fn migrate_default_library() {
+    if std::env::var_os("STICKERBOX_HOME").is_some() {
+        return;
+    }
+    let Some(profile) = std::env::var_os("USERPROFILE").map(PathBuf::from) else {
+        return;
+    };
+    match migrate_library_in(&profile) {
+        Ok(true) => eprintln!(
+            "[library] default {} -> {}",
+            profile.join("StickerBox").display(),
+            profile.join("Picarium").display()
+        ),
+        Ok(false) => {}
+        Err(e) => eprintln!("[library] 默认库改名失败，继续用旧目录: {e}"),
+    }
+}
+
+#[cfg(not(mobile))]
+fn migrate_library_in(profile: &std::path::Path) -> std::io::Result<bool> {
+    let old = profile.join("StickerBox");
+    let new = profile.join("Picarium");
+    if !old.is_dir() || new.exists() {
+        return Ok(false);
+    }
+    std::fs::rename(&old, &new)?;
+    Ok(true)
 }
 
 /// 安卓库根目录：应用私有目录（不需要存储权限）。
@@ -121,7 +166,7 @@ pub fn autostart_apply(enable: bool, exe: &str) -> std::io::Result<()> {
             "add",
             RUN_KEY,
             "/v",
-            "StickerBox",
+            "Picarium",
             "/t",
             "REG_SZ",
             "/d",
@@ -129,7 +174,7 @@ pub fn autostart_apply(enable: bool, exe: &str) -> std::io::Result<()> {
             "/f",
         ]);
     } else {
-        cmd.args(["delete", RUN_KEY, "/v", "StickerBox", "/f"]);
+        cmd.args(["delete", RUN_KEY, "/v", "Picarium", "/f"]);
     }
     cmd.creation_flags(0x08000000);
     let status = cmd.status()?;
@@ -148,7 +193,7 @@ pub fn autostart_enabled() -> bool {
     use std::os::windows::process::CommandExt;
     const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
     let mut cmd = std::process::Command::new("reg");
-    cmd.args(["query", RUN_KEY, "/v", "StickerBox"]);
+    cmd.args(["query", RUN_KEY, "/v", "Picarium"]);
     cmd.creation_flags(0x08000000);
     cmd.output().map(|o| o.status.success()).unwrap_or(false)
 }
@@ -156,4 +201,24 @@ pub fn autostart_enabled() -> bool {
 #[cfg(not(windows))]
 pub fn autostart_enabled() -> bool {
     false
+}
+
+#[cfg(all(test, not(mobile)))]
+mod tests {
+    use super::migrate_library_in;
+
+    #[test]
+    fn default_library_renames_once() {
+        let base = std::env::temp_dir().join(format!("picarium-migrate-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(base.join("StickerBox")).unwrap();
+        std::fs::write(base.join("StickerBox").join("index.json"), "{}").unwrap();
+
+        assert!(migrate_library_in(&base).unwrap());
+        assert!(base.join("Picarium").join("index.json").exists());
+        assert!(!base.join("StickerBox").exists());
+        assert!(!migrate_library_in(&base).unwrap());
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
 }

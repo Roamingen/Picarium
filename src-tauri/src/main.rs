@@ -885,6 +885,10 @@ fn main() {
     #[cfg(windows)]
     migrate_app_data();
 
+    // 默认库目录从 StickerBox 改名到 Picarium；改名失败时继续用旧库。
+    #[cfg(windows)]
+    stickerbox_lib::state::migrate_default_library();
+
     let lib = open_library();
 
     // 启动时恢复「剪贴板捕获」开关

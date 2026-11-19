@@ -64,7 +64,7 @@ if ($Bump) {
 }
 
 if ($DryRun) {
-    if ($doPc) { Write-Host "PC      $pcVersion  -> release/pc/StickerBox-$pcVersion.exe" }
+    if ($doPc) { Write-Host "PC      $pcVersion  -> release/pc/Picarium-$pcVersion-win-x64.exe" }
     if ($doAndroid) { Write-Host "Android $andVersion (code $(Get-VersionCode $andVersion))  -> release/android/StickerBox-$andVersion-arm64-v8a.apk" }
     Write-Host '（DryRun：未构建、未写文件）'
     return
@@ -103,24 +103,68 @@ if ($doPc) {
 
     $exe = Join-Path $env:LOCALAPPDATA 'StickerBoxBuild/target/release/stickerbox.exe'
     if (-not (Test-Path $exe)) { throw "找不到 release 产物：$exe" }
-    $dstDir = Join-Path $env:LOCALAPPDATA 'StickerBox'
-    $dst = Join-Path $dstDir 'StickerBox.exe'
+    $dstDir = Join-Path $env:LOCALAPPDATA 'Picarium'
+    $oldDstDir = Join-Path $env:LOCALAPPDATA 'StickerBox'
+    $oldDst = Join-Path $oldDstDir 'StickerBox.exe'
+    $dst = Join-Path $dstDir 'Picarium.exe'
     New-Item -ItemType Directory -Force -Path $dstDir | Out-Null
-    Get-Process stickerbox -ErrorAction SilentlyContinue | Stop-Process -Force
+    Get-Process -Name stickerbox, Picarium -ErrorAction SilentlyContinue | Stop-Process -Force
     Start-Sleep -Milliseconds 400
     Copy-Item -Force $exe $dst
     Write-Host "已安装：$dst" -ForegroundColor Green
 
-    # 之前开过开机自启就改写指向，没开过不动
+    # 桌面和旧安装目录里的快捷方式改成新目录的 Picarium.exe
+    $sh = New-Object -ComObject WScript.Shell
+    $links = @()
+    foreach ($dir in @([Environment]::GetFolderPath('Desktop'), $dstDir, $oldDstDir)) {
+        if (Test-Path $dir) { $links += @(Get-ChildItem $dir -Filter *.lnk -ErrorAction SilentlyContinue) }
+    }
+    foreach ($lnk in $links) {
+        $sc = $sh.CreateShortcut($lnk.FullName)
+        $oldPicarium = Join-Path $oldDstDir 'Picarium.exe'
+        if ($sc.TargetPath -ne $oldDst -and $sc.TargetPath -ne $oldPicarium) { continue }
+        $sc.TargetPath = $dst
+        $sc.WorkingDirectory = $dstDir
+        $sc.Save()
+        if ($lnk.DirectoryName -eq [Environment]::GetFolderPath('Desktop')) {
+            $newLnk = Join-Path $lnk.DirectoryName 'Picarium.lnk'
+            if ($lnk.FullName -ne $newLnk) {
+                if (Test-Path $newLnk) { Remove-Item -Force $lnk.FullName } else { Move-Item -Force $lnk.FullName $newLnk }
+            }
+        } else {
+            Remove-Item -Force $lnk.FullName -ErrorAction SilentlyContinue
+        }
+    }
+    # 旧安装目录：删旧 exe 和上一版装进去的 Picarium.exe，空了再删目录
+    foreach ($old in @($oldDst, (Join-Path $oldDstDir 'Picarium.exe'))) {
+        if (Test-Path $old) { Remove-Item -Force $old -ErrorAction SilentlyContinue }
+    }
+    if (Test-Path $oldDstDir) {
+        $left = Get-ChildItem $oldDstDir -Force -ErrorAction SilentlyContinue
+        if (-not $left) {
+            Remove-Item -Force $oldDstDir -ErrorAction SilentlyContinue
+            Write-Host "已清理旧安装目录：$oldDstDir" -ForegroundColor Green
+        } else {
+            Write-Host "旧安装目录还有文件，未删除：$oldDstDir" -ForegroundColor Yellow
+        }
+    }
+
+    # 旧 Run 键迁到 Picarium，避免继续拉旧 exe
     $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-    if (Get-ItemProperty -Path $runKey -Name StickerBox -ErrorAction SilentlyContinue) {
-        Set-ItemProperty -Path $runKey -Name StickerBox -Value "`"$dst`" --tray"
+    $oldRun = Get-ItemProperty -Path $runKey -Name StickerBox -ErrorAction SilentlyContinue
+    $newRun = Get-ItemProperty -Path $runKey -Name Picarium -ErrorAction SilentlyContinue
+    if ($oldRun) {
+        Set-ItemProperty -Path $runKey -Name Picarium -Value "`"$dst`" --tray"
+        Remove-ItemProperty -Path $runKey -Name StickerBox -ErrorAction SilentlyContinue
+        Write-Host '开机自启已从 StickerBox 迁到 Picarium' -ForegroundColor Green
+    } elseif ($newRun) {
+        Set-ItemProperty -Path $runKey -Name Picarium -Value "`"$dst`" --tray"
         Write-Host '开机自启已指向 release 版本' -ForegroundColor Green
     }
 
     $pcOut = Join-Path $releaseRoot 'pc'
     New-Item -ItemType Directory -Force -Path $pcOut | Out-Null
-    $pcFile = Join-Path $pcOut "StickerBox-$pcVersion.exe"
+    $pcFile = Join-Path $pcOut "Picarium-$pcVersion-win-x64.exe"
     Copy-Item -Force $exe $pcFile
 }
 
@@ -179,7 +223,7 @@ $now = (Get-Date).ToString('yyyy-MM-ddTHH:mm:sszzz')
 if ($pcFile) {
     $meta['pc'] = @{
         version = $pcVersion
-        file    = "pc/StickerBox-$pcVersion.exe"
+        file    = "pc/Picarium-$pcVersion-win-x64.exe"
         built   = $now
         sha256  = (Get-FileHash -Path $pcFile -Algorithm SHA256).Hash.ToLower()
     }
