@@ -772,6 +772,56 @@ fn list_system_fonts() -> Vec<serde_json::Value> {
     }
 }
 
+/// 把旧 identifier 的 app data 一次性搬到新目录。
+///
+/// 旧目录只读不删：要回滚，删掉新目录、把旧版 exe 放回去即可。
+/// 复制先落到 `<新 identifier>.migrating`，成功后再改名，避免中途失败留下
+/// 一个“看起来已经迁完”的空壳目录；失败下次启动会重试。
+#[cfg(windows)]
+fn migrate_app_data() {
+    const OLD_ID: &str = "dev.stickerbox.desktop";
+    const NEW_ID: &str = "dev.picarium.desktop";
+
+    let Some(base) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) else {
+        return;
+    };
+    let old = base.join(OLD_ID);
+    let new = base.join(NEW_ID);
+    if !old.is_dir() || new.exists() {
+        return;
+    }
+
+    let staging = base.join(format!("{NEW_ID}.migrating"));
+    let _ = std::fs::remove_dir_all(&staging);
+    if let Err(e) = copy_tree(&old, &staging) {
+        eprintln!("[migrate] app data 复制失败，下次启动重试: {e}");
+        let _ = std::fs::remove_dir_all(&staging);
+        return;
+    }
+    if let Err(e) = std::fs::rename(&staging, &new) {
+        eprintln!("[migrate] app data 改名失败，下次启动重试: {e}");
+        let _ = std::fs::remove_dir_all(&staging);
+        return;
+    }
+    eprintln!("[migrate] app data {} -> {}", old.display(), new.display());
+}
+
+#[cfg(windows)]
+fn copy_tree(src: &Path, dst: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let to = dst.join(entry.file_name());
+        if ty.is_dir() {
+            copy_tree(&entry.path(), &to)?;
+        } else if ty.is_file() {
+            std::fs::copy(entry.path(), &to)?;
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
@@ -829,6 +879,11 @@ fn main() {
     let Some(singleton) = acquire_singleton() else {
         return;
     };
+
+    // 旧 identifier 的 WebView2 数据只在升级后第一次启动时搬一次。
+    // 必须赶在建窗口之前：WebView2 的 profile 目录由 identifier 派生，窗口一建就晚了。
+    #[cfg(windows)]
+    migrate_app_data();
 
     let lib = open_library();
 
