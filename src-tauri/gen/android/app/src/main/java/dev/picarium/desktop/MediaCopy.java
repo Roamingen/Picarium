@@ -1,4 +1,4 @@
-package dev.stickerbox.desktop;
+package dev.picarium.desktop;
 
 import android.content.Context;
 import android.net.Uri;

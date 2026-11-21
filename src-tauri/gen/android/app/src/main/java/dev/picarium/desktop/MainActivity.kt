@@ -1,4 +1,4 @@
-package dev.stickerbox.desktop
+package dev.picarium.desktop
 
 import android.content.Intent
 import android.os.Bundle

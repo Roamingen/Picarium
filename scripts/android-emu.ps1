@@ -20,7 +20,7 @@ param(
   [int]$ShotDelaySec = -1,
   [switch]$NoLaunch,
   [switch]$Fresh,
-  [string]$Package = "dev.stickerbox.desktop"
+  [string]$Package = "dev.picarium.desktop"
 )
 
 $ErrorActionPreference = "Continue"

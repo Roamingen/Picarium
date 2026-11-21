@@ -1,4 +1,4 @@
-package dev.stickerbox.desktop;
+package dev.picarium.desktop;
 
 import android.content.ClipData;
 import android.content.ContentResolver;

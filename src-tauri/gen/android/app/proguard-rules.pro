@@ -20,7 +20,7 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 # JNI 反射调用：名字只存在于 Rust 字符串里，必须保留
--keep class dev.stickerbox.desktop.ShareBridge { public static *; }
--keep class dev.stickerbox.desktop.PickerBridge { public static *; }
--keep class dev.stickerbox.desktop.InboxBridge { public static *; }
--keep class dev.stickerbox.desktop.MediaCopy { public static *; }
+-keep class dev.picarium.desktop.ShareBridge { public static *; }
+-keep class dev.picarium.desktop.PickerBridge { public static *; }
+-keep class dev.picarium.desktop.InboxBridge { public static *; }
+-keep class dev.picarium.desktop.MediaCopy { public static *; }
