@@ -44,6 +44,21 @@ pub fn config_dir() -> PathBuf {
     CONFIG_DIR.get().cloned().unwrap_or_else(default_dir)
 }
 
+/// Windows 路径比较：忽略大小写、斜杠方向与末尾分隔符。
+///
+/// 同一个目录可能以 `C:\a\b`、`C:/a/b`、`c:\A\B\` 三种写法混进最近库，
+/// 直接字符串比较会让「当前」标记和去重失效。
+pub fn same_dir(a: &Path, b: &Path) -> bool {
+    fn norm(p: &Path) -> String {
+        let mut s = p.to_string_lossy().replace('/', "\\").to_lowercase();
+        while s.len() > 1 && s.ends_with('\\') {
+            s.pop();
+        }
+        s
+    }
+    norm(a) == norm(b)
+}
+
 fn legacy_root() -> Option<&'static PathBuf> {
     LEGACY_ROOT.get()
 }
@@ -100,7 +115,7 @@ pub fn save_pointer(lib_root: &Path) -> std::io::Result<()> {
         })
         .unwrap_or_default();
     let cur = lib_root.to_string_lossy().to_string();
-    recent.retain(|r| r != &cur);
+    recent.retain(|r| !same_dir(Path::new(r), lib_root));
     recent.insert(0, cur.clone());
     recent.truncate(10);
     let v = serde_json::json!({
@@ -140,7 +155,11 @@ pub fn forget_recent(path: &str) -> std::io::Result<()> {
     let Some(list) = v.get_mut("recent").and_then(|r| r.as_array_mut()) else {
         return Ok(());
     };
-    list.retain(|x| x.as_str() != Some(path));
+    let want = PathBuf::from(path);
+    list.retain(|x| match x.as_str() {
+        Some(s) => !same_dir(Path::new(s), &want),
+        None => true,
+    });
     let text = serde_json::to_string_pretty(&v).unwrap_or_else(|_| "{}".to_string());
     write_atomic(&pointer_path(), &text)
 }
@@ -158,7 +177,7 @@ fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
 pub fn ensure_for_library(lib_root: &Path) {
     let pointer = load_pointer();
     if let Some(p) = pointer {
-        if p != lib_root {
+        if !same_dir(&p, lib_root) {
             eprintln!(
                 "[config] 指针指向 {}，但本次打开的是 {}（保持指针不变）",
                 p.display(),

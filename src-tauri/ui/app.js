@@ -3847,6 +3847,10 @@ function renderRecentLibs(list) {
       forget.className = 'btn small';
       forget.textContent = '移除';
       forget.addEventListener('click', async () => {
+        const ok = await confirmDialog(
+          `从最近库列表移除？\n${item.path}\n只移除这条记录，不会删除磁盘上的文件。`
+        );
+        if (!ok) return;
         try {
           await invoke('library_forget', { path: item.path });
           await refreshLibraryLocations();
@@ -3861,12 +3865,33 @@ function renderRecentLibs(list) {
   }
 }
 
+function samePath(a, b) {
+  const norm = (p) =>
+    String(p || '')
+      .replace(/[\\/]+/g, '\\')
+      .toLowerCase()
+      .replace(/\\$/, '');
+  return norm(a) === norm(b);
+}
+
 async function refreshLibraryLocations() {
   try {
     const info = await invoke('library_locations');
     $('set-root').textContent = info.root;
     $('set-root-meta').textContent = `${info.assets} 张 · ${fmtSize(info.bytes)}`;
     renderRecentLibs(info.recent);
+    const banner = $('lib-banner');
+    const pending = !!(info.pointer && !samePath(info.pointer, info.root));
+    banner.classList.toggle('info', pending && info.pointerCanOpen === true);
+    if (pending && info.pointerCanOpen !== true) {
+      banner.textContent = `上次打开的库打不开：${info.pointer}。当前临时使用 ${info.root}；可以重试切换，或从最近库移除这条记录（不会删文件）。`;
+      banner.hidden = false;
+    } else if (pending) {
+      banner.textContent = `已选择新库：${info.pointer}。应用重启后生效；重启前仍用 ${info.root}。`;
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
     return info;
   } catch (e) {
     toast('读取库信息失败：' + e);
@@ -3890,11 +3915,11 @@ async function useLibrary(path, create) {
   if (create) {
     if (check.isLibrary) return toast('这个目录已经是库了');
     if (check.exists && !check.empty) return toast('目录不是空的：请选空目录，或改用「打开其他库」');
-  } else if (!check.exists || !check.isLibrary) {
-    return toast('这个目录不是 Picarium 库（没有 index.json）');
+  } else if (!check.canOpen) {
+    return toast(check.exists ? '这个目录不是 Picarium 库（没有 index.json）' : '目录不存在');
   }
   const verb = create ? '在这里新建库' : '切换到这个库';
-  const ok = await confirmDialog(`${verb}：${path}（切换后需要重启才会生效）`);
+  const ok = await confirmDialog(`${verb}：${path}（切换后需要重启应用才生效）`);
   if (!ok) return;
   try {
     await invoke('library_use', { path, create });
@@ -3932,6 +3957,13 @@ $('set-copy-root').addEventListener('click', async () => {
     toast('已复制库路径');
   } catch {
     toast('复制失败：' + text);
+  }
+});
+$('set-open-config').addEventListener('click', async () => {
+  try {
+    await invoke('open_config_folder');
+  } catch (e) {
+    toast('打开配置目录失败：' + e);
   }
 });
 $('restart-later').addEventListener('click', () => ($('restart-dlg').hidden = true));
@@ -6849,6 +6881,10 @@ async function runAcceptSuite() {
     const missingDir = loc.root.replace(/[\\/][^\\/]+$/, '') + '\\__picarium_missing__';
     const chkMissing = await invoke('library_dir_check', { path: missingDir });
     check('目录检查识别不存在的目录', chkMissing.exists === false, JSON.stringify(chkMissing));
+    check('目录检查返回 canOpen', typeof chkLib.canOpen === 'boolean', JSON.stringify(chkLib));
+    check('库异常提示条默认隐藏', $('lib-banner').hidden === true, 'hidden');
+    check('库信息返回 pointerCanOpen', Object.prototype.hasOwnProperty.call(loc, 'pointerCanOpen'), String(loc.pointerCanOpen));
+    check('配置目录按钮就位', !!$('set-open-config'), 'btn');
     let rejected = '';
     try {
       await invoke('library_use', { path: missingDir, create: false });

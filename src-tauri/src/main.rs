@@ -82,17 +82,29 @@ fn set_pinned(window: tauri::WebviewWindow, pinned: bool) -> Result<(), String> 
 
 /// 单实例锁：抢到 127.0.0.1:47821 的是第一个实例，抢不到就通知它显示窗口后退出。
 /// 用网络端口而不是命名互斥体，是为了少一个 Windows 专属 API、也方便跨平台。
+///
+/// 「立即重启」是先拉起新进程、再让旧进程退出，新进程第一次绑端口时旧的往往
+/// 还没退干净——所以绑失败后重试几秒，而不是立刻当成“已有实例”退出，
+/// 否则重启会变成只关不开。正常重复启动时这段重试只是延迟几秒静默退出。
 fn acquire_singleton() -> Option<std::net::TcpListener> {
-    match std::net::TcpListener::bind("127.0.0.1:47821") {
-        Ok(listener) => Some(listener),
-        Err(_) => {
-            use std::io::Write;
-            if let Ok(mut stream) = std::net::TcpStream::connect("127.0.0.1:47821") {
-                let _ = stream.write_all(b"show");
+    use std::io::Write;
+    const ADDR: &str = "127.0.0.1:47821";
+    const RETRIES: u32 = 30;
+    for attempt in 0..RETRIES {
+        match std::net::TcpListener::bind(ADDR) {
+            Ok(listener) => return Some(listener),
+            Err(_) => {
+                if attempt == 0 {
+                    if let Ok(mut stream) = std::net::TcpStream::connect(ADDR) {
+                        let _ = stream.write_all(b"show");
+                    }
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
             }
-            None
         }
     }
+    eprintln!("[singleton] {ADDR} 一直被占用，退出（可能是另一个实例正在重启）");
+    None
 }
 
 fn show_main(app: &tauri::AppHandle) {
@@ -652,6 +664,17 @@ fn open_library_folder(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn open_config_folder() -> Result<(), String> {
+    let dir = picarium_lib::config::config_dir();
+    std::fs::create_dir_all(&dir).map_err(|e| format!("创建配置目录失败：{e}"))?;
+    std::process::Command::new("explorer")
+        .arg(&dir)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn hide_panel(window: tauri::WebviewWindow) -> Result<(), String> {
     window.hide().map_err(|e| e.to_string())
 }
@@ -1042,6 +1065,7 @@ fn main() {
             set_clipboard_enabled,
             set_autostart,
             open_library_folder,
+            open_config_folder,
             hide_panel,
             show_font_settings,
             hide_font_settings,

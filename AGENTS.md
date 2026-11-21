@@ -71,7 +71,7 @@ docs/               设计、路线、验收、交接
 - 前端状态：`app.js` 单文件（约 4k 行），无构建步骤
 - 主题：内置深/浅 + Catppuccin 四套 + `%APPDATA%\Picarium\themes/*.json` 自定义
 - 图标：内嵌 Lucide SVG（`ICONS` 映射）
-- 当前验收：**175 条前端断言 + 22 条 core 测试 + 5 条浏览器桥单测 + 11 条扩展单测**；性能：3000 张首屏约 0.7s / 70 节点
+- 当前验收：**179 条前端断言 + 22 条 core 测试 + 5 条浏览器桥单测 + 11 条扩展单测**；性能：3000 张首屏约 0.7s / 70 节点
 
 ## 5. 常用命令
 
@@ -160,7 +160,7 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
   - PC：`src-tauri/tauri.conf.json` 的 `version`；`src-tauri/Cargo.toml` 的 `version` 由脚本同步成同一个数（设置页显示的是 Cargo 版本）
   - 安卓：`src-tauri/tauri.android.conf.json` 的 `version`；`bundle.android.versionCode` 显式给码，公式 `major*1000000 + minor*1000 + patch`
   - 扩展：`extension/manifest.json` 的 `version`（Chrome 读它）；`extension/package.json` 必须同步同一个数，`release.ps1` 会校验
-- **当前版本：PC `0.16.0` / 安卓 `0.6.0` / 扩展 `0.6.0`（2026-11-21）**——升完版本号要同步改这一行。
+- **当前版本：PC `0.17.1` / 安卓 `0.6.0` / 扩展 `0.6.0`（2026-11-21）**——升完版本号要同步改这一行。
 - 固定产物目录（本机，已 gitignore，不入库）：
   - `release/pc/Picarium-<ver>-win-x64.exe`
   - `release/android/Picarium-<ver>-arm64-v8a.apk`

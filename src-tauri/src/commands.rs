@@ -546,13 +546,24 @@ pub fn library_locations(state: State<'_, AppState>) -> Result<serde_json::Value
         (lib.root().to_path_buf(), stats.assets, stats.bytes)
     };
     let cur = root.to_string_lossy().to_string();
+    let pointer = crate::config::load_pointer();
+    // 指针指向的库还能不能打开：不存在、空壳、也不是库 → 才算「打不开」。
+    // 只是刚切过去、还没重启应用时，指针指向的是合法库，不该报错。
+    let pointer_can_open = pointer.as_ref().map(|p| {
+        p.is_dir()
+            && (p.join("index.json").is_file()
+                || looks_like_library(p)
+                || std::fs::read_dir(p)
+                    .map(|mut d| d.next().is_none())
+                    .unwrap_or(false))
+    });
     let recent: Vec<serde_json::Value> = crate::config::recent()
         .into_iter()
         .map(|p| {
             serde_json::json!({
                 "path": p,
                 "exists": std::path::Path::new(&p).is_dir(),
-                "current": p == cur,
+                "current": crate::config::same_dir(std::path::Path::new(&p), &root),
             })
         })
         .collect();
@@ -561,7 +572,13 @@ pub fn library_locations(state: State<'_, AppState>) -> Result<serde_json::Value
         "assets": assets,
         "bytes": bytes,
         "recent": recent,
+        "pointer": pointer.map(|p| p.to_string_lossy().to_string()),
+        "pointerCanOpen": pointer_can_open,
     }))
+}
+
+fn looks_like_library(root: &std::path::Path) -> bool {
+    root.join("blobs").is_dir() || root.join("thumbs").is_dir()
 }
 
 /// 检查用户选的目录：已存在的库 / 空目录 / 不是库 / 父目录不存在。
@@ -582,12 +599,17 @@ pub fn library_dir_check(path: String) -> Result<serde_json::Value, String> {
         .parent()
         .map(|p| p.is_dir())
         .unwrap_or(false);
+    // 老版本「新建空库」只建了 blobs/thumbs、没写 index.json；这种目录仍当作库打开，
+    // 否则用户切走以后就再也点不回来了。
+    let looks_like_library = !is_library && looks_like_library(&root);
     Ok(serde_json::json!({
         "exists": exists,
         "isLibrary": is_library,
+        "looksLikeLibrary": looks_like_library,
         "empty": empty,
         "parentOk": parent_ok,
         "isAbsolute": root.is_absolute(),
+        "canOpen": root.is_absolute() && (is_library || looks_like_library || (exists && empty)),
     }))
 }
 
@@ -604,10 +626,20 @@ pub fn library_use(path: String, create: bool) -> Result<serde_json::Value, Stri
     }
     if create {
         std::fs::create_dir_all(&root).map_err(|e| format!("创建目录失败：{e}"))?;
+        // 立刻写一份空库（index.json），否则空目录永远过不了「是不是 Picarium 库」的检查，
+        // 切走以后就再也点不回来了。
+        let lib = picarium_core::Library::open(&root).map_err(|e| format!("初始化库失败：{e}"))?;
+        lib.save().map_err(|e| format!("初始化库失败：{e}"))?;
     } else if !root.is_dir() {
         return Err("目录不存在".to_string());
-    } else if !root.join("index.json").is_file() {
-        return Err("这个目录不是 Picarium 库（没有 index.json）".to_string());
+    } else {
+        let has_index = root.join("index.json").is_file();
+        let empty = std::fs::read_dir(&root)
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(false);
+        if !has_index && !empty && !looks_like_library(&root) {
+            return Err("这个目录不是 Picarium 库（没有 index.json）".to_string());
+        }
     }
     crate::config::save_pointer(&root).map_err(|e| format!("保存库指针失败：{e}"))?;
     Ok(serde_json::json!({ "path": root.to_string_lossy() }))

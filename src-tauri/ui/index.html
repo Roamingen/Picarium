@@ -190,13 +190,13 @@
 
   <div id="restart-dlg" class="modal-mask" hidden>
     <div class="modal small">
-      <div class="modal-head"><span class="modal-title">需要重启</span></div>
-      <div class="confirm-text">切换后要重启 Picarium 才会加载新库。</div>
+      <div class="modal-head"><span class="modal-title">需要重启应用</span></div>
+      <div class="confirm-text">切换后要重启应用才会加载新库（不是重启电脑）。</div>
       <div id="restart-dlg-path" class="dlg-path dim"></div>
       <div class="modal-actions">
         <div class="spacer"></div>
         <button id="restart-later" class="btn" type="button">稍后</button>
-        <button id="restart-now" class="btn primary" type="button">立即重启</button>
+        <button id="restart-now" class="btn primary" type="button">立即重启应用</button>
       </div>
     </div>
   </div>
@@ -296,12 +296,14 @@
         <div class="set-btns">
           <button id="set-open" class="btn small" type="button">打开文件夹</button>
           <button id="set-copy-root" class="btn small" type="button">复制路径</button>
+          <button id="set-open-config" class="btn small" type="button">配置目录</button>
         </div>
       </div>
+      <div id="lib-banner" class="lib-banner" hidden></div>
       <div class="set-row">
         <div class="set-text">
           <div class="set-label">其他库</div>
-          <div class="dim set-value">新建一个空库，或打开已有的 Picarium 库；切换后需要重启</div>
+          <div class="dim set-value">新建一个空库，或打开已有的 Picarium 库；切换后需要重启应用</div>
         </div>
         <div class="set-btns">
           <button id="lib-new" class="btn small" type="button">新建库…</button>
@@ -311,7 +313,7 @@
       <div class="set-row set-row-block">
         <div class="set-text">
           <div class="set-label">最近库</div>
-          <div class="dim set-value">点一下切换；切库后需要重启应用</div>
+          <div class="dim set-value">点一下切换；切库后需要重启应用。「移除」只从列表移除，不删磁盘文件。</div>
           <div id="recent-libs" class="recent-libs"></div>
         </div>
       </div>

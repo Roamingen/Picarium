@@ -3546,6 +3546,24 @@ input[type="checkbox"]:checked {
 /* 确认弹窗：盖在设置面板之上 */
 #confirm.modal-mask { z-index: 130; }
 #restart-dlg.modal-mask { z-index: 130; }
+
+/* 库指针打不开时的提示条（设置 › 数据） */
+.lib-banner {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--fg);
+  font-size: 12.5px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+/* 只是「已切换、待应用重启」，用中性蓝，不要和“打不开”的警告混淆 */
+.lib-banner.info {
+  border-color: rgba(59, 130, 246, 0.45);
+  background: rgba(59, 130, 246, 0.12);
+}
 .confirm-title {
   font-size: 13.5px;
   font-weight: 600;
