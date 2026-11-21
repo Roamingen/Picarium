@@ -21,7 +21,7 @@ class MainActivity : TauriActivity() {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
     PickerBridge.activity = this
-    // 别的 App「分享到 StickerBox」时，先把图片收进 cache/inbox/
+    // 别的 App「分享到 Picarium」时，先把图片收进 cache/inbox/
     InboxBridge.capture(this, intent)
     // targetSdk 35+ 强制 edge-to-edge：WebView 会画到状态栏/导航栏底下，
     // 这里把系统栏高度补成 padding，页面就不用自己猜安全区。

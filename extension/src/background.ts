@@ -10,9 +10,9 @@ import {
   toDataUrl,
 } from "./lib/media";
 
-const SAVE_MENU_ID = "stickerbox-save-image";
-const COPY_SAVE_MENU_ID = "stickerbox-copy-save-image";
-const COPY_ONLY_MENU_ID = "stickerbox-copy-only-image";
+const SAVE_MENU_ID = "picarium-save-image";
+const COPY_SAVE_MENU_ID = "picarium-copy-save-image";
+const COPY_ONLY_MENU_ID = "picarium-copy-only-image";
 const MIME: Record<string, string> = {
   gif: "image/gif",
   webp: "image/webp",

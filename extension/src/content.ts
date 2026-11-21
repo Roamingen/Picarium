@@ -6,7 +6,7 @@ import {
   placeMenu,
 } from "./lib/overlay";
 
-const HOST_ID = "stickerbox-p3-host";
+const HOST_ID = "picarium-p3-host";
 const RESET_MS = 2600;
 const HIDE_MS = 160;
 

@@ -1,4 +1,4 @@
-// StickerBox 移动端（批 5：图库页 + 底部导航）
+// Picarium 移动端（批 5：图库页 + 底部导航）
 // 数据全部走 lib crate 里已注册的只读命令，缩略图走共享的 thumb 协议。
 
 const T = window.__TAURI__ || {};
@@ -1609,7 +1609,7 @@ function closeGmenu() {
   if (m) m.hidden = true;
 }
 
-/** 存一批图到系统相册（安卓写 Pictures/StickerBox）。 */
+/** 存一批图到系统相册（安卓写 Pictures/Picarium）。 */
 async function saveAlbum(shas) {
   const done = [];
   let fail = 0;
@@ -1622,7 +1622,7 @@ async function saveAlbum(shas) {
     }
   }
   if (done.length) await markUsed(done);
-  if (!fail) toast(`已存 ${done.length} 张到相册 Pictures/StickerBox`);
+  if (!fail) toast(`已存 ${done.length} 张到相册 Pictures/Picarium`);
   else if (!done.length) toast(`保存失败 ${fail} 张`);
   else toast(`已存 ${done.length} 张，${fail} 张失败`);
 }
@@ -4306,7 +4306,7 @@ $("v-save").addEventListener("click", async () => {
   try {
     await invoke("save_to_gallery", { sha: a.sha });
     await markUsed([a.sha]);
-    toast("已存到相册 Pictures/StickerBox");
+    toast("已存到相册 Pictures/Picarium");
   } catch (err) {
     toast("保存失败：" + err);
   }

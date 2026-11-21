@@ -69,7 +69,7 @@ pub fn register<R: tauri::Runtime>(builder: tauri::Builder<R>) -> tauri::Builder
             };
         }
 
-        match stickerbox_core::ensure_thumb_from(&root, &sha, &src) {
+        match picarium_core::ensure_thumb_from(&root, &sha, &src) {
             Ok(path) => match std::fs::read(&path) {
                 Ok(bytes) => tauri::http::Response::builder()
                     .header(

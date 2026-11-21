@@ -1,6 +1,6 @@
 //! 浏览器桥：本地 HTTP 服务，让浏览器扩展把图片字节直接送进库。
 //!
-//! 只监听 `127.0.0.1:17800`，靠 `X-StickerBox-Token` 头鉴权。普通网页跨站
+//! 只监听 `127.0.0.1:17800`，靠 `X-Picarium-Token` 头鉴权。普通网页跨站
 //! fetch 设不了自定义头，所以别的站点没法往库里灌图。
 //!
 //! 契约见 `docs/28-浏览器插件方案.md` 第 6 节：
@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use serde::Deserialize;
-use stickerbox_core::Library;
+use picarium_core::Library;
 use tauri::{AppHandle, Emitter};
 use tiny_http::{Header, Method, Request, Response, Server};
 
@@ -27,7 +27,7 @@ use crate::platform::ShareOut;
 pub const PORT: u16 = 17800;
 
 /// 烘焙进两端的共享密钥；扩展侧见 `extension/src/lib/bridge.ts` 的 `TOKEN`。
-pub const TOKEN: &str = "stickerbox-local-7f3c9a2e";
+pub const TOKEN: &str = "picarium-local-7f3c9a2e";
 
 /// 请求体上限：48 MB（base64 后约为原图 1.33 倍，够 32 MB 的原图）。超了直接 413。
 pub const MAX_BODY: usize = 48 * 1024 * 1024;
@@ -37,7 +37,7 @@ const RAW_MAX_BODY: usize = 48 * 1024 * 1024;
 
 /// 允许调试时用环境变量换 token（扩展那边也换成同一个值）。
 pub fn token() -> String {
-    std::env::var("STICKERBOX_BRIDGE_TOKEN")
+    std::env::var("PICARIUM_BRIDGE_TOKEN")
         .ok()
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| TOKEN.to_string())
@@ -77,7 +77,7 @@ fn handle(
         return request.respond(
             Response::empty(204)
                 .with_header(header("Access-Control-Allow-Origin", "*"))
-                .with_header(header("Access-Control-Allow-Headers", "X-StickerBox-Token, Content-Type"))
+                .with_header(header("Access-Control-Allow-Headers", "X-Picarium-Token, Content-Type"))
                 .with_header(header("Access-Control-Allow-Methods", "GET, POST, OPTIONS"))
                 .with_header(header("Access-Control-Max-Age", "86400")),
         );
@@ -203,7 +203,7 @@ fn handle(
 fn authorized(headers: &[Header], token: &str) -> bool {
     headers
         .iter()
-        .find(|h| h.field.equiv("X-StickerBox-Token"))
+        .find(|h| h.field.equiv("X-Picarium-Token"))
         .map(|h| h.value.to_string() == token)
         .unwrap_or(false)
 }
@@ -233,7 +233,7 @@ pub fn import_payload(lib: &Arc<Mutex<Library>>, root: &Path, body: &[u8]) -> (u
         Err(e) => return err(400, format!("bad json: {e}")),
     };
     let ext = req.ext.trim().to_ascii_lowercase();
-    if !stickerbox_core::is_image_ext(&ext) {
+    if !picarium_core::is_image_ext(&ext) {
         return err(400, format!("unsupported ext: {}", req.ext));
     }
     let data = match base64::engine::general_purpose::STANDARD.decode(req.data.as_bytes()) {
@@ -264,7 +264,7 @@ pub fn import_payload(lib: &Arc<Mutex<Library>>, root: &Path, body: &[u8]) -> (u
     };
 
     // 缩略图失败不影响入库结果，下次打开库还会补
-    if let Err(e) = stickerbox_core::ensure_thumb(root, &imported.sha, &ext) {
+    if let Err(e) = picarium_core::ensure_thumb(root, &imported.sha, &ext) {
         eprintln!("[bridge] 缩略图生成失败 {}: {e}", imported.sha);
     }
 
@@ -333,7 +333,7 @@ pub fn copy_raw_payload(ext: &str, name: &str, data: &str) -> (u16, String) {
     use base64::Engine as _;
 
     let ext = ext.trim().to_ascii_lowercase();
-    if !stickerbox_core::is_image_ext(&ext) {
+    if !picarium_core::is_image_ext(&ext) {
         return err(400, format!("unsupported ext: {ext}"));
     }
     let bytes = match base64::engine::general_purpose::STANDARD.decode(data.as_bytes()) {
@@ -356,7 +356,7 @@ pub fn copy_raw_payload(ext: &str, name: &str, data: &str) -> (u16, String) {
 
 /// 临时文件目录：剪贴板里存的是路径，文件不能在粘贴前删掉，所以按天清理旧文件。
 fn copy_dir() -> PathBuf {
-    std::env::temp_dir().join("StickerBox-copies")
+    std::env::temp_dir().join("Picarium-copies")
 }
 
 fn write_copy_file(bytes: &[u8], ext: &str, name: &str) -> std::io::Result<PathBuf> {
@@ -364,7 +364,7 @@ fn write_copy_file(bytes: &[u8], ext: &str, name: &str) -> std::io::Result<PathB
     std::fs::create_dir_all(&dir)?;
     prune_copies(&dir);
 
-    let stem = safe_stem(name).unwrap_or_else(|| "stickerbox".to_string());
+    let stem = safe_stem(name).unwrap_or_else(|| "picarium".to_string());
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -446,7 +446,7 @@ mod tests {
             .unwrap()
             .as_nanos();
         let root = std::env::temp_dir().join(format!(
-            "stickerbox-bridge-{tag}-{}-{nanos}",
+            "picarium-bridge-{tag}-{}-{nanos}",
             std::process::id()
         ));
         std::fs::create_dir_all(&root).unwrap();

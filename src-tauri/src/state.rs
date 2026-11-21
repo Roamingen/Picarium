@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
-use stickerbox_core::Library;
+use picarium_core::Library;
 
 /// 剪贴板闸门：桌面用真实现，安卓用空实现（保证 `AppState` 两边同一个形状）。
 #[cfg(windows)]
@@ -58,10 +58,11 @@ impl AppState {
     }
 }
 
-/// 桌面库根目录候选，按优先级。`STICKERBOX_HOME` 一旦设置就只认它。
+/// 桌面库根目录候选，按优先级。`PICARIUM_HOME` 一旦设置就只认它
+/// （旧名 `STICKERBOX_HOME` 继续兼容）。
 #[cfg(not(mobile))]
 pub fn candidate_roots() -> Vec<PathBuf> {
-    if let Ok(p) = std::env::var("STICKERBOX_HOME") {
+    if let Ok(p) = std::env::var("PICARIUM_HOME").or_else(|_| std::env::var("STICKERBOX_HOME")) {
         return vec![PathBuf::from(p)];
     }
     let mut v = Vec::new();
@@ -90,11 +91,11 @@ pub fn candidate_roots() -> Vec<PathBuf> {
 
 /// 把默认库 `%USERPROFILE%\StickerBox` 原地改名成 `Picarium`（同盘瞬间完成）。
 ///
-/// 只处理默认库；设置了 `STICKERBOX_HOME` 时不碰。改名失败就继续用旧目录，
+/// 只处理默认库；设置了 `PICARIUM_HOME` 时不碰。改名失败就继续用旧目录，
 /// 不复制、不删除，避免 1.6 GB 的库搬到一半。
 #[cfg(not(mobile))]
 pub fn migrate_default_library() {
-    if std::env::var_os("STICKERBOX_HOME").is_some() {
+    if std::env::var_os("PICARIUM_HOME").is_some() {
         return;
     }
     let Some(profile) = std::env::var_os("USERPROFILE").map(PathBuf::from) else {
@@ -124,18 +125,30 @@ fn migrate_library_in(profile: &std::path::Path) -> std::io::Result<bool> {
 
 /// 安卓库根目录：应用私有目录（不需要存储权限）。
 ///
-/// 调试时可以用 `STICKERBOX_HOME` 覆盖（`adb shell am start` 传不了环境变量，
-/// 一般用 `run-as` 手工放文件）。
+/// 调试时可以用 `PICARIUM_HOME`（或旧名 `STICKERBOX_HOME`）覆盖
+/// （`adb shell am start` 传不了环境变量，一般用 `run-as` 手工放文件）。
 #[cfg(mobile)]
 pub fn candidate_roots(app: &tauri::AppHandle) -> Vec<PathBuf> {
     use tauri::Manager;
 
-    if let Ok(p) = std::env::var("STICKERBOX_HOME") {
+    if let Ok(p) = std::env::var("PICARIUM_HOME").or_else(|_| std::env::var("STICKERBOX_HOME")) {
         return vec![PathBuf::from(p)];
     }
     let mut v = Vec::new();
     if let Ok(dir) = app.path().app_data_dir() {
-        v.push(dir.join("StickerBox"));
+        let new = dir.join("Picarium");
+        let old = dir.join("StickerBox");
+        // 2b 之前装在旧目录；能原地改名就搬过来，失败就继续用旧目录。
+        if !new.exists() && old.is_dir() {
+            let _ = std::fs::rename(&old, &new);
+        }
+        if old.is_dir() && !new.exists() {
+            v.push(old.clone());
+            v.push(new);
+        } else {
+            v.push(new);
+            v.push(old);
+        }
     }
     v
 }

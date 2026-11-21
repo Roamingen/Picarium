@@ -1,4 +1,4 @@
-# StickerBox · 项目工作守则（AGENTS.md）
+# Picarium · 项目工作守则（AGENTS.md）
 
 > 这个文件每个新对话都会读。**保持短**，细节放 `docs/`，别在这里堆历史。
 
@@ -24,7 +24,7 @@
 | 改动 | 最低验证 |
 |---|---|
 | 只改 JS/CSS | `node --check src-tauri/ui/app.js` + 隐藏 CDP 单点检查（见 2.1） |
-| 改 Rust | `cargo build -p stickerbox`（必要时 `cargo test -p stickerbox-core`） |
+| 改 Rust | `cargo build -p picarium`（必要时 `cargo test -p picarium-core`） |
 | UI 行为/键盘/筛选 | 跑 `pwsh -NoProfile -File scripts/accept.ps1` |
 | 性能/虚拟滚动 | `pwsh -NoProfile -File scripts/perf.ps1` |
 | 准备发版/交付 | `scripts/accept.ps1 -Shots` + `scripts/install-release.ps1` |
@@ -36,8 +36,8 @@
 ### 2.1 测试窗口纪律（硬规则）
 
 - 自动化验证默认**不显示、不聚焦任何窗口**：不按全局热键、不调用 show/focus/bringToFront、不启动可见窗口。
-- 优先用 `startHidden`（或 `Start-Process -WindowStyle Hidden`）+ WebView2 CDP，在**隐藏页面**里断言。实测隐藏窗口的 WebView2 页面仍可 `Runtime.evaluate`，两个 StickerBox 窗口 `IsWindowVisible=false`。
-- 起隐藏应用的固定做法：`STICKERBOX_HOME=临时库`，设置 `startHidden: true`，加 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9333 --remote-allow-origins=*"`，**不要按 Ctrl+Alt+Space**；直接对 `panel.html` / `tauri.localhost` 页面 eval。
+- 优先用 `startHidden`（或 `Start-Process -WindowStyle Hidden`）+ WebView2 CDP，在**隐藏页面**里断言。实测隐藏窗口的 WebView2 页面仍可 `Runtime.evaluate`，两个 Picarium 窗口 `IsWindowVisible=false`。
+- 起隐藏应用的固定做法：`PICARIUM_HOME=临时库`，设置 `startHidden: true`，加 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9333 --remote-allow-origins=*"`，**不要按 Ctrl+Alt+Space**；直接对 `panel.html` / `tauri.localhost` 页面 eval。
 - 面板隐藏时页面没冻结：直接调 `search('')` / `render()` / `paint()` 验证，不需要先弹出来。**禁止**用“Escape + 全局热键”的 ensure 逻辑抢前台。
 - 截图只用 CDP `Page.captureScreenshot` 或 `.tools/shot_main.ps1`（纯截图）；不要为了截图把窗口弹出来。
 - 确实需要用户看见窗口时，先问一句；测完立即隐藏。
@@ -46,7 +46,7 @@
 
 - 不读微信/QQ 等软件私有数据；只做剪贴板/文件/分享入口。
 - 不引入 WASM/DLL/脚本插件运行时（除非用户明确批准）。
-- 不在用户真实库 `C:\Users\13066\Picarium` 上做删除/批量测试；测试用 `STICKERBOX_HOME` 临时库。
+- 不在用户真实库 `C:\Users\13066\Picarium` 上做删除/批量测试；测试用 `PICARIUM_HOME` 临时库。
 - 不擅自改用户全局配置；必须改时先备份并明确告知（Gradle 代理已有先例：`~/.gradle/gradle.properties.bak-stickerbox`）。
 - 不重复跑 release 构建；release 只在交付/装机器时跑。
 - 不用 `scripts/android-emu.ps1` 起模拟器（会弹终端）；不关用户正在用的模拟器。
@@ -75,9 +75,9 @@ docs/               设计、路线、验收、交接
 ## 5. 常用命令
 
 ```powershell
-cargo build -p stickerbox                 # debug 桌面
-cargo build --release -p stickerbox       # release（GUI 子系统，无终端）
-cargo test -p stickerbox-core
+cargo build -p picarium                 # debug 桌面
+cargo build --release -p picarium       # release（GUI 子系统，无终端）
+cargo test -p picarium-core
 pwsh -NoProfile -File scripts/accept.ps1
 pwsh -NoProfile -File scripts/install-release.ps1
 ```
@@ -86,11 +86,11 @@ pwsh -NoProfile -File scripts/install-release.ps1
 
 ```bash
 # 用临时库，别碰用户的真实库
-export STICKERBOX_HOME="$TEMP/stickerbox-verify/lib"
-"$LOCALAPPDATA/StickerBoxBuild/target/debug/stickerbox.exe" > .demo/app.out.log 2>&1 &
+export PICARIUM_HOME="$TEMP/picarium-verify/lib"
+"$LOCALAPPDATA/PicariumBuild/target/debug/picarium.exe" > .demo/app.out.log 2>&1 &
 ```
 
-要看某个状态就传 `STICKERBOX_UI_STATE`（如 `tagmanage`、`filters`、`settings:keys`）；截图跑 `.tools/shot_main.ps1 <输出路径>`（纯截图，不弹窗），图存 `.demo/`。
+要看某个状态就传 `PICARIUM_UI_STATE`（如 `tagmanage`、`filters`、`settings:keys`）；截图跑 `.tools/shot_main.ps1 <输出路径>`（纯截图，不弹窗），图存 `.demo/`。
 
 安卓（仅在用户明确要做 M2 时）：
 
@@ -104,7 +104,7 @@ npx tauri android build --debug --apk --target x86_64 --ci
 npx tauri android build --apk --target aarch64 --ci        # release（已配签名，只打 arm64）
 ```
 
-**发版只打 arm64-v8a**（`--target aarch64`），不要 universal：四个 ABI 各塞一份 ~11 MB 的 `libstickerbox_lib.so`，包会从 13.5 MB 涨到 48 MB。只有明确要发布到 GitHub Release 或单独要某个架构时，才**按架构分别**出包，不做 all-in-one。
+**发版只打 arm64-v8a**（`--target aarch64`），不要 universal：四个 ABI 各塞一份 ~11 MB 的 `libpicarium_lib.so`，包会从 13.5 MB 涨到 48 MB。只有明确要发布到 GitHub Release 或单独要某个架构时，才**按架构分别**出包，不做 all-in-one。
 
 模拟器、签名、打包与验收的完整步骤见 **`docs/25-安卓构建、签名与模拟器.md`**（含「同 AVD 已在运行」等常见错误）；日常起模拟器只看 **`docs/26-安卓模拟器速查.md`**（用 `ops_bash` 后台直接跑 emulator，别用 ps1、别拼 adb 路径）。**模拟器起来后不要关**，用户还要在上面测。
 
@@ -162,7 +162,7 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
 - **当前版本：PC `0.16.0` / 安卓 `0.6.0` / 扩展 `0.6.0`（2026-11-21）**——升完版本号要同步改这一行。
 - 固定产物目录（本机，已 gitignore，不入库）：
   - `release/pc/Picarium-<ver>-win-x64.exe`
-  - `release/android/StickerBox-<ver>-arm64-v8a.apk`
+  - `release/android/Picarium-<ver>-arm64-v8a.apk`
   - `release/extension/Picarium-extension-<ver>.zip`
   - `release/versions.json`：pc / android / extension 各段版本、构建时间、sha256
 - 一条命令出包（只在交付 / 装自己机器时跑，平时别跑 release）：

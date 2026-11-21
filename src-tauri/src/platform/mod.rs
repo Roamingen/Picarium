@@ -5,7 +5,7 @@
 //! - **交出去**：桌面写系统剪贴板（CF_HDROP，GIF 动画能保住）；安卓没有等价的
 //!   图片剪贴板，只能走 ACTION_SEND 分享面板 —— 所以这里叫 [`ShareOut`] 而不是
 //!   `Clipboard`，接口按「把文件交给别的 App」来设计。
-//! - **进相册 / 出相册**：安卓的「保存」是写 MediaStore 的 Pictures/StickerBox，
+//! - **进相册 / 出相册**：安卓的「保存」是写 MediaStore 的 Pictures/Picarium，
 //!   「选图」走 Photo Picker（Android 13+ 免权限）；桌面分别对应「导出到文件夹」
 //!   和文件选择器。
 //! - **收进来**：安卓靠 ACTION_SEND 接到别人分享的图；桌面没有这个入口，靠剪贴板

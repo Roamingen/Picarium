@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use stickerbox_core::{Library, ScanStats};
-use stickerbox_lib::commands::{read_settings_value, settings_file};
-use stickerbox_lib::platform::{Opener, ShareOut};
-use stickerbox_lib::state::{autostart_apply, candidate_roots, AppState};
-use stickerbox_lib::{clipboard, platform, thumb};
+use picarium_core::{Library, ScanStats};
+use picarium_lib::commands::{read_settings_value, settings_file};
+use picarium_lib::platform::{Opener, ShareOut};
+use picarium_lib::state::{autostart_apply, candidate_roots, AppState};
+use picarium_lib::{clipboard, platform, thumb};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager, State};
@@ -27,8 +27,8 @@ fn open_library() -> Library {
         }
     }
     eprintln!("无法打开库，已尝试：\n{}", tried.join("\n"));
-    eprintln!("解决办法：设置环境变量 STICKERBOX_HOME 指向一个可写目录，例如");
-    eprintln!("  $env:STICKERBOX_HOME = \"D:\\StickerBox\"");
+    eprintln!("解决办法：设置环境变量 PICARIUM_HOME 指向一个可写目录，例如");
+    eprintln!("  $env:PICARIUM_HOME = \"D:\\Picarium\"");
     std::process::exit(1);
 }
 
@@ -233,14 +233,14 @@ fn js_log(msg: String) {
 
 #[tauri::command]
 fn selftest_mode() -> String {
-    let v = std::env::var("STICKERBOX_SELFTEST").unwrap_or_default();
+    let v = std::env::var("PICARIUM_SELFTEST").unwrap_or_default();
     eprintln!("[selftest] mode={v:?}");
     v
 }
 
 #[tauri::command]
 fn ui_state() -> String {
-    std::env::var("STICKERBOX_UI_STATE").unwrap_or_default()
+    std::env::var("PICARIUM_UI_STATE").unwrap_or_default()
 }
 
 #[tauri::command]
@@ -361,8 +361,8 @@ async fn import_paths(
     for p in &paths {
         let path = Path::new(p);
         if path.is_dir() {
-            stickerbox_core::collect_images(path, &mut files);
-        } else if stickerbox_core::image_ext(path).is_some() {
+            picarium_core::collect_images(path, &mut files);
+        } else if picarium_core::image_ext(path).is_some() {
             files.push(path.to_path_buf());
         }
     }
@@ -391,8 +391,8 @@ async fn import_paths(
                     let guard = lib.lock().map_err(|e| e.to_string())?;
                     guard.root().to_path_buf()
                 };
-                let ext = stickerbox_core::image_ext(file).unwrap_or_default();
-                let _ = stickerbox_core::ensure_thumb(&root, &sha, &ext);
+                let ext = picarium_core::image_ext(file).unwrap_or_default();
+                let _ = picarium_core::ensure_thumb(&root, &sha, &ext);
             }
             Ok(None) => stats.duplicated += 1,
             Err(e) => {
@@ -468,7 +468,7 @@ fn copy_asset(state: State<'_, AppState>, sha: String) -> Result<(), String> {
     };
 
     let (w, h, bytes) =
-        stickerbox_core::load_rgba(Path::new(&path)).map_err(|e| format!("{e:#}"))?;
+        picarium_core::load_rgba(Path::new(&path)).map_err(|e| format!("{e:#}"))?;
 
     let result = clip_copy(&state.gate, w, h, &bytes);
     if result.is_ok() {
@@ -670,10 +670,10 @@ fn hide_font_settings(window: tauri::WebviewWindow) -> Result<(), String> {
 
 /// 关掉 WebView2 自带的浏览器行为：原生右键菜单、浏览器加速键（F5/Ctrl+R、
 /// Ctrl+P/F、Ctrl+±、Alt+← 等）、缩放、自动填充与侧滑导航，并让 release
-/// 不再暴露 DevTools。debug 版默认不动，设 `STICKERBOX_HARDEN=1` 可强制开启。
+/// 不再暴露 DevTools。debug 版默认不动，设 `PICARIUM_HARDEN=1` 可强制开启。
 #[cfg(windows)]
 fn harden_webview(win: &tauri::WebviewWindow) {
-    let forced = cfg!(debug_assertions) && std::env::var_os("STICKERBOX_HARDEN").is_some();
+    let forced = cfg!(debug_assertions) && std::env::var_os("PICARIUM_HARDEN").is_some();
     if cfg!(debug_assertions) && !forced {
         return;
     }
@@ -844,7 +844,7 @@ fn main() {
     if args.len() >= 2 && args[1] == "diag" {
         println!("USERPROFILE   = {:?}", std::env::var("USERPROFILE"));
         println!("LOCALAPPDATA  = {:?}", std::env::var("LOCALAPPDATA"));
-        println!("STICKERBOX_HOME = {:?}", std::env::var("STICKERBOX_HOME"));
+        println!("PICARIUM_HOME = {:?}", std::env::var("PICARIUM_HOME"));
         println!("cwd           = {:?}", std::env::current_dir());
         for root in candidate_roots() {
             let existed = root.exists();
@@ -866,7 +866,7 @@ fn main() {
         return;
     }
 
-    // 命令行导入：stickerbox.exe scan <目录>
+    // 命令行导入：picarium.exe scan <目录>
     // 图形界面之外也能批量入库，方便脚本化和排查问题。
     if args.len() >= 3 && args[1] == "scan" {
         let mut lib = open_library();
@@ -887,7 +887,7 @@ fn main() {
 
     // 默认库目录从 StickerBox 改名到 Picarium；改名失败时继续用旧库。
     #[cfg(windows)]
-    stickerbox_lib::state::migrate_default_library();
+    picarium_lib::state::migrate_default_library();
 
     let lib = open_library();
 
@@ -950,25 +950,25 @@ fn main() {
             blacklist: blacklist.clone(),
         })
         .invoke_handler(tauri::generate_handler![
-            stickerbox_lib::commands::list_assets,
-            stickerbox_lib::commands::get_asset,
-            stickerbox_lib::commands::themes_list,
-            stickerbox_lib::commands::library_stats,
-            stickerbox_lib::commands::group_stats,
-            stickerbox_lib::commands::group_list,
-            stickerbox_lib::commands::set_group_cover,
-            stickerbox_lib::commands::set_group_order,
-            stickerbox_lib::commands::set_pinned_groups,
+            picarium_lib::commands::list_assets,
+            picarium_lib::commands::get_asset,
+            picarium_lib::commands::themes_list,
+            picarium_lib::commands::library_stats,
+            picarium_lib::commands::group_stats,
+            picarium_lib::commands::group_list,
+            picarium_lib::commands::set_group_cover,
+            picarium_lib::commands::set_group_order,
+            picarium_lib::commands::set_pinned_groups,
             scan_folder,
             import_paths,
             copy_asset,
             copy_asset_file,
-            stickerbox_lib::commands::create_group,
+            picarium_lib::commands::create_group,
             copy_assets_files,
             set_window_size,
             set_hotkey,
             open_asset,
-            stickerbox_lib::commands::source_stats,
+            picarium_lib::commands::source_stats,
             set_clip_hotkey,
             selftest_mode,
             js_log,
@@ -980,34 +980,34 @@ fn main() {
             export_settings,
             import_settings,
             set_order,
-            stickerbox_lib::commands::batch_star,
-            stickerbox_lib::commands::add_tags,
-            stickerbox_lib::commands::remove_tags,
-            stickerbox_lib::commands::set_asset_tags,
-            stickerbox_lib::commands::create_tag,
-            stickerbox_lib::commands::rename_tag,
-            stickerbox_lib::commands::merge_tags,
-            stickerbox_lib::commands::delete_tag,
-            stickerbox_lib::commands::batch_ungroup,
+            picarium_lib::commands::batch_star,
+            picarium_lib::commands::add_tags,
+            picarium_lib::commands::remove_tags,
+            picarium_lib::commands::set_asset_tags,
+            picarium_lib::commands::create_tag,
+            picarium_lib::commands::rename_tag,
+            picarium_lib::commands::merge_tags,
+            picarium_lib::commands::delete_tag,
+            picarium_lib::commands::batch_ungroup,
             batch_delete,
             set_pinned,
             update_asset,
-            stickerbox_lib::commands::delete_asset,
-            stickerbox_lib::commands::share_assets,
-            stickerbox_lib::commands::add_to_group,
-            stickerbox_lib::commands::clear_groups,
-            stickerbox_lib::commands::mark_used,
-            stickerbox_lib::commands::rename_group,
-            stickerbox_lib::commands::remove_group,
+            picarium_lib::commands::delete_asset,
+            picarium_lib::commands::share_assets,
+            picarium_lib::commands::add_to_group,
+            picarium_lib::commands::clear_groups,
+            picarium_lib::commands::mark_used,
+            picarium_lib::commands::rename_group,
+            picarium_lib::commands::remove_group,
             mark_ungrouped_seen,
-            stickerbox_lib::commands::tag_stats,
-            stickerbox_lib::commands::get_trash_days,
-            stickerbox_lib::commands::set_trash_days,
-            stickerbox_lib::commands::trash_list,
-            stickerbox_lib::commands::trash_restore,
-            stickerbox_lib::commands::trash_delete,
-            stickerbox_lib::commands::trash_purge,
-            stickerbox_lib::commands::get_settings,
+            picarium_lib::commands::tag_stats,
+            picarium_lib::commands::get_trash_days,
+            picarium_lib::commands::set_trash_days,
+            picarium_lib::commands::trash_list,
+            picarium_lib::commands::trash_restore,
+            picarium_lib::commands::trash_delete,
+            picarium_lib::commands::trash_purge,
+            picarium_lib::commands::get_settings,
             set_clipboard_enabled,
             set_autostart,
             open_library_folder,
@@ -1036,10 +1036,10 @@ fn main() {
                     Err(_) => PathBuf::new(),
                 };
                 if !root.as_os_str().is_empty() {
-                    stickerbox_lib::bridge::spawn(
+                    picarium_lib::bridge::spawn(
                         lib.clone(),
                         root,
-                        stickerbox_lib::bridge::token(),
+                        picarium_lib::bridge::token(),
                         app.handle().clone(),
                     );
                 }
@@ -1193,7 +1193,7 @@ fn main() {
                 .build(app)?;
 
             // 自测钩子：验证「复制出去不会被自己再收一遍」
-            let selftest = std::env::var("STICKERBOX_SELFTEST").ok();
+            let selftest = std::env::var("PICARIUM_SELFTEST").ok();
             if matches!(
                 selftest.as_deref(),
                 Some("copy") | Some("file") | Some("files")
@@ -1234,7 +1234,7 @@ fn main() {
                             Err(e) => println!("[selftest] file: {e}"),
                         }
                     } else {
-                        match stickerbox_core::load_rgba(Path::new(&p)) {
+                        match picarium_core::load_rgba(Path::new(&p)) {
                             Ok((w, h, bytes)) => {
                                 let r = clip_copy(&gate, w, h, &bytes);
                                 println!("[selftest] copy: {r:?}");

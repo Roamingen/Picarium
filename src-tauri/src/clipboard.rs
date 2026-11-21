@@ -14,7 +14,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use stickerbox_core::Library;
+use picarium_core::Library;
 use tauri::{AppHandle, Emitter};
 
 use windows::core::PWSTR;
@@ -100,7 +100,7 @@ pub fn spawn(
 
             // 先看来源：资源管理器和本应用自己复制的，不当成表情
             let (source, raw) = foreground_app();
-            if source == "资源管理器" || raw.eq_ignore_ascii_case("stickerbox.exe") {
+            if source == "资源管理器" || raw.eq_ignore_ascii_case("picarium.exe") {
                 continue;
             }
 
@@ -125,7 +125,7 @@ pub fn spawn(
                 continue;
             }
 
-            let Ok(png) = stickerbox_core::rgba_to_png(w, h, &rgba) else {
+            let Ok(png) = picarium_core::rgba_to_png(w, h, &rgba) else {
                 continue;
             };
 

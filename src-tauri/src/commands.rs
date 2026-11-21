@@ -5,7 +5,7 @@
 
 use std::sync::atomic::Ordering;
 
-use stickerbox_core::Asset;
+use picarium_core::Asset;
 use tauri::State;
 
 use crate::state::{autostart_enabled, AppState};
@@ -102,10 +102,10 @@ pub fn list_assets(
     let lib = state.lib.lock().map_err(|e| e.to_string())?;
     let sort = sort.unwrap_or_default();
     let filters_json = filters.and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok());
-    if std::env::var("STICKERBOX_FILTER_DEBUG").is_ok() {
+    if std::env::var("PICARIUM_FILTER_DEBUG").is_ok() {
         eprintln!("[filter-raw] {:?}", filters_json);
     }
-    if std::env::var("STICKERBOX_FILTER_DEBUG").is_ok() {
+    if std::env::var("PICARIUM_FILTER_DEBUG").is_ok() {
         eprintln!(
             "[call] q={:?} group={:?} limit={:?} f={:?}",
             q, group, limit, filters_json
@@ -184,7 +184,7 @@ fn apply_query(list: Vec<Asset>, q: &str, limit: Option<usize>) -> Vec<Asset> {
         list
     } else {
         list.into_iter()
-            .filter(|a| stickerbox_core::match_score(a, q) > 0)
+            .filter(|a| picarium_core::match_score(a, q) > 0)
             .collect()
     };
     if let Some(l) = limit {
@@ -414,7 +414,7 @@ pub fn apply_filters(list: Vec<Asset>, f: &AssetFilters) -> Vec<Asset> {
             true
         })
         .collect();
-    if std::env::var("STICKERBOX_FILTER_DEBUG").is_ok() {
+    if std::env::var("PICARIUM_FILTER_DEBUG").is_ok() {
         eprintln!(
             "[filter] before={} after={} exts={:?} tags={:?} maxB={:?} minB={:?}",
             before,
@@ -880,7 +880,7 @@ pub fn save_to_gallery(state: State<'_, AppState>, sha: String) -> Result<(), St
             std::path::Path::new(&a.path)
                 .file_name()
                 .and_then(|s| s.to_str())
-                .unwrap_or("stickerbox")
+                .unwrap_or("picarium")
                 .to_string()
         } else {
             format!("{}.{}", a.name.trim(), a.ext)
@@ -947,8 +947,8 @@ pub fn import_paths_simple(
     for p in &paths {
         let path = Path::new(p);
         if path.is_dir() {
-            stickerbox_core::collect_images(path, &mut files);
-        } else if stickerbox_core::image_ext(path).is_some() {
+            picarium_core::collect_images(path, &mut files);
+        } else if picarium_core::image_ext(path).is_some() {
             files.push(path.to_path_buf());
         }
     }
@@ -969,8 +969,8 @@ pub fn import_paths_simple(
                     let lib = state.lib.lock().map_err(|e| e.to_string())?;
                     lib.root().to_path_buf()
                 };
-                let ext = stickerbox_core::image_ext(file).unwrap_or_default();
-                let _ = stickerbox_core::ensure_thumb(&root, &sha, &ext);
+                let ext = picarium_core::image_ext(file).unwrap_or_default();
+                let _ = picarium_core::ensure_thumb(&root, &sha, &ext);
             }
             Ok(None) => duplicated += 1,
             Err(e) => {
@@ -984,7 +984,7 @@ pub fn import_paths_simple(
     }))
 }
 
-/// 取走「分享到 StickerBox」的图片（安卓）；桌面没有系统分享入口，返回空。
+/// 取走「分享到 Picarium」的图片（安卓）；桌面没有系统分享入口，返回空。
 #[tauri::command]
 pub fn take_shared_paths() -> Result<Vec<String>, String> {
     #[cfg(target_os = "android")]

@@ -45,15 +45,15 @@ Picarium（picture + -arium，放图片的收藏馆）是一个本地优先的�
 ### Windows 桌面端
 
 ```powershell
-cargo run -p stickerbox
+cargo run -p picarium
 ```
 
-首次启动会在 `%USERPROFILE%\StickerBox` 建库；设置页可以看到当前库路径。改位置用 `STICKERBOX_HOME`。
+首次启动会在 `%USERPROFILE%\Picarium` 建库；设置页可以看到当前库路径。改位置用 `PICARIUM_HOME`。
 
 测试：
 
 ```powershell
-cargo test -p stickerbox-core
+cargo test -p picarium-core
 pwsh -NoProfile -File scripts/accept.ps1
 ```
 
@@ -62,10 +62,10 @@ pwsh -NoProfile -File scripts/accept.ps1
 发布构建：
 
 ```powershell
-cargo build --release -p stickerbox
+cargo build --release -p picarium
 ```
 
-> 仓库内部的 crate / 可执行文件名仍是 `stickerbox`；用户可见名已改为 Picarium，身份迁移会单独处理。
+> 仓库内部的 crate / 可执行文件名已统一为 `picarium`（2026-11-21 起）。
 
 ### Chrome 扩展
 
@@ -105,9 +105,9 @@ settings.json              当前库的设置
 themes/*.json              自定义主题
 ```
 
-默认路径是 `%USERPROFILE%\StickerBox`；设置 `STICKERBOX_HOME` 可以换到任意目录。当前版本仍沿用 `StickerBox` 目录名，后续身份迁移会迁到 Picarium，并保留数据。
+默认路径是 `%USERPROFILE%\Picarium`；设置 `PICARIUM_HOME`（旧名 `STICKERBOX_HOME` 仍兼容）可以换到任意目录。
 
-备份：退出应用后复制整个库文件夹即可；恢复时放回原位，或用 `STICKERBOX_HOME` 指过去。
+备份：退出应用后复制整个库文件夹即可；恢复时放回原位，或用 `PICARIUM_HOME` 指过去。
 
 ## 隐私
 

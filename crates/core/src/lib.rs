@@ -1,4 +1,4 @@
-//! StickerBox core.
+//! Picarium core.
 //!
 //! 设计约束：
 //! 1. 不依赖任何 UI 框架、不依赖 Tauri、不依赖 Windows API。

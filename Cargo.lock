@@ -2405,6 +2405,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "picarium"
+version = "0.16.0"
+dependencies = [
+ "arboard",
+ "base64 0.21.7",
+ "chrono",
+ "fontdb",
+ "image",
+ "jni",
+ "ndk-context",
+ "picarium-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-global-shortcut",
+ "tiny_http",
+ "ttf-parser",
+ "webview2-com",
+ "windows",
+]
+
+[[package]]
+name = "picarium-core"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "image",
+ "pinyin",
+ "serde",
+ "serde_json",
+ "sha2",
+ "walkdir",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3127,44 +3165,6 @@ name = "static_vcruntime"
 version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff7589a1859b09232522bb9edf076ca7fcf14ded96685d3fa629db73023ffbb7"
-
-[[package]]
-name = "stickerbox"
-version = "0.16.0"
-dependencies = [
- "arboard",
- "base64 0.21.7",
- "chrono",
- "fontdb",
- "image",
- "jni",
- "ndk-context",
- "serde",
- "serde_json",
- "stickerbox-core",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-global-shortcut",
- "tiny_http",
- "ttf-parser",
- "webview2-com",
- "windows",
-]
-
-[[package]]
-name = "stickerbox-core"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "chrono",
- "image",
- "pinyin",
- "serde",
- "serde_json",
- "sha2",
- "walkdir",
-]
 
 [[package]]
 name = "string_cache"

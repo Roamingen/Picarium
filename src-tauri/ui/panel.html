@@ -29,7 +29,14 @@
 
   <script src="font-config.js"></script>
   <script>
-    document.documentElement.dataset.theme = localStorage.getItem('stickerbox-theme') || 'dark';
+// 旧版 localStorage 键名是 picarium-*，一次性迁到 picarium-*（旧键保留不删）
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith('picarium-')) {
+        const nk = 'picarium-' + k.slice(11);
+        if (localStorage.getItem(nk) === null) localStorage.setItem(nk, localStorage.getItem(k));
+      }
+    }
+        document.documentElement.dataset.theme = localStorage.getItem('picarium-theme') || 'dark';
     const { invoke, convertFileSrc } = window.__TAURI__.core;
     const $ = (id) => document.getElementById(id);
     const grid = $('grid');

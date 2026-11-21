@@ -4,7 +4,7 @@
 //! 注意安卓的形态和桌面不同：
 //! - 没有可用的图片剪贴板 → `ShareOut` 走系统分享面板，不模拟 Ctrl+V；
 //! - 「保存」写 MediaStore，「选图」走 Photo Picker（13+ 免权限）；
-//! - 收图只靠用户从别的 App「分享到 StickerBox」。
+//! - 收图只靠用户从别的 App「分享到 Picarium」。
 
 use std::path::{Path, PathBuf};
 
@@ -86,7 +86,7 @@ impl ShareOut for Android {
                 .new_string(mime)
                 .map_err(|e| format!("MIME 转字符串失败：{e}"))?;
             env.call_static_method(
-                "dev/stickerbox/desktop/ShareBridge",
+                "dev/picarium/desktop/ShareBridge",
                 "shareFiles",
                 "(Landroid/content/Context;[Ljava/lang/String;Ljava/lang/String;)V",
                 &[
@@ -109,7 +109,7 @@ impl Gallery for Android {
         let display = if name.trim().is_empty() {
             path.file_name()
                 .and_then(|s| s.to_str())
-                .unwrap_or("stickerbox.png")
+                .unwrap_or("picarium.png")
                 .to_string()
         } else {
             name.to_string()
@@ -126,7 +126,7 @@ impl Gallery for Android {
                 .new_string(mime)
                 .map_err(|e| format!("MIME 转字符串失败：{e}"))?;
             env.call_static_method(
-                "dev/stickerbox/desktop/ShareBridge",
+                "dev/picarium/desktop/ShareBridge",
                 "saveToGallery",
                 "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V",
                 &[
@@ -170,7 +170,7 @@ impl ShareTarget for Android {
         with_activity(|env, _context| {
             let result = env
                 .call_static_method(
-                    "dev/stickerbox/desktop/InboxBridge",
+                    "dev/picarium/desktop/InboxBridge",
                     "takePaths",
                     "()[Ljava/lang/String;",
                     &[],
@@ -218,14 +218,14 @@ fn pick_impl(from_files: bool) -> Result<Vec<PathBuf>, String> {
     with_activity(|env, context| {
         let result = if from_files {
             env.call_static_method(
-                "dev/stickerbox/desktop/PickerBridge",
+                "dev/picarium/desktop/PickerBridge",
                 "pickFiles",
                 "(Landroid/content/Context;)[Ljava/lang/String;",
                 &[JValue::Object(context)],
             )
         } else {
             env.call_static_method(
-                "dev/stickerbox/desktop/PickerBridge",
+                "dev/picarium/desktop/PickerBridge",
                 "pickImages",
                 "(Landroid/content/Context;I)[Ljava/lang/String;",
                 &[JValue::Object(context), JValue::Int(100)],

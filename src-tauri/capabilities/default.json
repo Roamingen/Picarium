@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "StickerBox 默认权限：主窗口、快贴面板与字体设置窗",
+  "description": "Picarium 默认权限：主窗口、快贴面板与字体设置窗",
   "windows": ["main", "panel", "font"],
   "permissions": ["core:default", "dialog:default"]
 }

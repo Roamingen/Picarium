@@ -1,8 +1,8 @@
 [package]
-name = "stickerbox-core"
+name = "picarium-core"
 version = "0.1.1"
 edition = "2021"
-description = "StickerBox core: content-addressed sticker library, no UI, no platform assumptions"
+description = "Picarium core: content-addressed sticker library, no UI, no platform assumptions"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

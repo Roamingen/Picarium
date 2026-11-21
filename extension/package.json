@@ -1,5 +1,5 @@
 {
-  "name": "stickerbox-extension",
+  "name": "picarium-extension",
   "private": true,
   "version": "0.6.0",
   "description": "Picarium 浏览器导入扩展（MV3 + TypeScript + esbuild）",

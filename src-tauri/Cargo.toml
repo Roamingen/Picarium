@@ -1,18 +1,18 @@
 [package]
-name = "stickerbox"
+name = "picarium"
 version = "0.16.0"
 edition = "2021"
-description = "StickerBox desktop shell (Tauri 2)"
+description = "Picarium desktop shell (Tauri 2)"
 
 [lib]
-name = "stickerbox_lib"
+name = "picarium_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-stickerbox-core = { path = "../crates/core" }
+picarium-core = { path = "../crates/core" }
 tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-dialog = "2"

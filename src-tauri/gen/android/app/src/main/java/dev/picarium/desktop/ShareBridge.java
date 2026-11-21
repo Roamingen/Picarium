@@ -24,7 +24,7 @@ public class ShareBridge {
     public static void shareFiles(Context context, String[] paths, String mime) throws Exception {
         if (paths == null || paths.length == 0) throw new Exception("没有要分享的文件");
         String authority = context.getPackageName() + ".fileprovider";
-        // 库根在 /data/data/<pkg>/StickerBox，不在 files/ 下；先拷到 cache/share 再交给 FileProvider。
+        // 库根在 /data/data/<pkg>/Picarium，不在 files/ 下；先拷到 cache/share 再交给 FileProvider。
         File shareDir = new File(context.getCacheDir(), "share");
         if (!shareDir.exists() && !shareDir.mkdirs()) throw new Exception("创建分享缓存目录失败");
         ArrayList<Uri> uris = new ArrayList<>();
@@ -63,7 +63,7 @@ public class ShareBridge {
         values.put(MediaStore.Images.Media.DISPLAY_NAME, name);
         values.put(MediaStore.Images.Media.MIME_TYPE, mime);
         if (Build.VERSION.SDK_INT >= 29) {
-            values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/StickerBox");
+            values.put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Picarium");
             values.put(MediaStore.Images.Media.IS_PENDING, 1);
         }
         ContentResolver resolver = context.getContentResolver();

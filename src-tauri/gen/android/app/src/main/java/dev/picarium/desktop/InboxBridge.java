@@ -15,17 +15,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 别的 App「分享到 StickerBox」：把 intent 里的图片拷进 cache/inbox/，
+ * 别的 App「分享到 Picarium」：把 intent 里的图片拷进 cache/inbox/，
  * Rust 侧启动时调用 takePaths() 取走（取走后清空，避免重复导入）。
  */
 public class InboxBridge {
     private static final List<String> pending = new ArrayList<>();
 
     public static synchronized void capture(Context context, Intent intent) {
-        android.util.Log.i("StickerBoxInbox", "capture intent=" + intent);
+        android.util.Log.i("PicariumInbox", "capture intent=" + intent);
         if (intent == null) return;
         String action = intent.getAction();
-        android.util.Log.i("StickerBoxInbox", "action=" + action);
+        android.util.Log.i("PicariumInbox", "action=" + action);
         if (!Intent.ACTION_SEND.equals(action) && !Intent.ACTION_SEND_MULTIPLE.equals(action)) return;
 
         List<Uri> uris = new ArrayList<>();
@@ -52,7 +52,7 @@ public class InboxBridge {
                     pending.add(dst.getAbsolutePath());
                 }
             } catch (Exception e) {
-                android.util.Log.w("StickerBoxInbox", "read " + uri + " failed", e);
+                android.util.Log.w("PicariumInbox", "read " + uri + " failed", e);
             }
         }
     }

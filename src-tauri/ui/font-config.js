@@ -1,4 +1,4 @@
-/* StickerBox 字体配置（PC 与快贴面板共用）
+/* Picarium 字体配置（PC 与快贴面板共用）
  * 只描述“选了什么”，不直接碰 DOM；应用样式由 app.js / panel.html 完成。
  * 存储结构：settings.json 的 fonts[role] = { latin, cjk, fallbacks, size, line, weight, letter, features, follow }
  */

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  一键起安卓模拟器（复用已在跑的），可选装 debug 包、拉起 StickerBox、截图。
+  一键起安卓模拟器（复用已在跑的），可选装 debug 包、拉起 Picarium、截图。
 
 .EXAMPLE
   pwsh -NoProfile -File scripts/android-emu.ps1

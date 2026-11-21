@@ -1,6 +1,13 @@
 window.__t0 = performance.now();
 const { invoke, convertFileSrc } = window.__TAURI__.core;
 const $ = (id) => document.getElementById(id);
+// 旧版 localStorage 键名是 picarium-*，一次性迁到 picarium-*（旧键保留不删）
+for (const k of Object.keys(localStorage)) {
+  if (k.startsWith('picarium-')) {
+    const nk = 'picarium-' + k.slice(11);
+    if (localStorage.getItem(nk) === null) localStorage.setItem(nk, localStorage.getItem(k));
+  }
+}
 
 const grid = $('grid');
 const empty = $('empty');
@@ -35,11 +42,11 @@ let trashSelected = new Set();
 let trashItems = [];
 let groupSorts = new Map(); // 组内排序：纯视图状态，不写 orders
 const GROUP_SORT_LABELS = { default: '默认', manual: '手动', added: '最新入库', oldest: '最旧入库', size: '大小', name: '名称', expire: '即将过期' };
-let starStyle = localStorage.getItem('stickerbox-star-style') || 'heart';
-let starColor = localStorage.getItem('stickerbox-star-color') || '#f5b301';
-let hoverDelay = Number(localStorage.getItem('stickerbox-hover-delay') || 350);
-let gridSize = localStorage.getItem('stickerbox-grid-size') || 'normal';
-let copyDefault = localStorage.getItem('stickerbox-copy-default') || 'bitmap';
+let starStyle = localStorage.getItem('picarium-star-style') || 'heart';
+let starColor = localStorage.getItem('picarium-star-color') || '#f5b301';
+let hoverDelay = Number(localStorage.getItem('picarium-hover-delay') || 350);
+let gridSize = localStorage.getItem('picarium-grid-size') || 'normal';
+let copyDefault = localStorage.getItem('picarium-copy-default') || 'bitmap';
 let startHidden = false;
 let startView = 'all';
 let winW = 1040;
@@ -72,9 +79,9 @@ let virtEnd = -1;
 let cursorAnimTimer = null;
 let cursorAnimCard = null;
 const VIRTUAL_MIN = 120;
-let deleteMode = localStorage.getItem('stickerbox-delete-mode') || 'recycle';
-let ghostX = Number(localStorage.getItem('stickerbox-ghost-x') || 0);
-let ghostY = Number(localStorage.getItem('stickerbox-ghost-y') || 0);
+let deleteMode = localStorage.getItem('picarium-delete-mode') || 'recycle';
+let ghostX = Number(localStorage.getItem('picarium-ghost-x') || 0);
+let ghostY = Number(localStorage.getItem('picarium-ghost-y') || 0);
 
 /* ---------- 图标（Lucide，ISC） ---------- */
 
@@ -146,7 +153,7 @@ function paintIcons() {
 
 /* ---------- 主题 ---------- */
 
-const THEME_KEY = 'stickerbox-theme';
+const THEME_KEY = 'picarium-theme';
 let themes = [];
 let appliedVars = [];
 
@@ -552,13 +559,13 @@ async function syncSettings() {
   applyFontSettings(s.fonts);
 
   if (s.deleteMode) deleteMode = s.deleteMode;
-  else if (localStorage.getItem('stickerbox-delete-mode')) seed.deleteMode = localStorage.getItem('stickerbox-delete-mode');
+  else if (localStorage.getItem('picarium-delete-mode')) seed.deleteMode = localStorage.getItem('picarium-delete-mode');
 
   if (typeof s.ghostX === 'number') ghostX = s.ghostX;
-  else if (localStorage.getItem('stickerbox-ghost-x') !== null) seed.ghostX = Number(localStorage.getItem('stickerbox-ghost-x'));
+  else if (localStorage.getItem('picarium-ghost-x') !== null) seed.ghostX = Number(localStorage.getItem('picarium-ghost-x'));
 
   if (typeof s.ghostY === 'number') ghostY = s.ghostY;
-  else if (localStorage.getItem('stickerbox-ghost-y') !== null) seed.ghostY = Number(localStorage.getItem('stickerbox-ghost-y'));
+  else if (localStorage.getItem('picarium-ghost-y') !== null) seed.ghostY = Number(localStorage.getItem('picarium-ghost-y'));
 
   await loadThemes();
   applyTheme(theme);
@@ -3545,7 +3552,7 @@ $('pin').addEventListener('click', async () => {
 
 // 侧栏收起 / 展开（和 DeepSeek Harness 一样的面板按钮）
 function applySidebarCollapsed() {
-  const on = localStorage.getItem('stickerbox-sidebar-collapsed') === '1';
+  const on = localStorage.getItem('picarium-sidebar-collapsed') === '1';
   document.body.classList.toggle('sidebar-collapsed', on);
   const btn = $('sidebar-toggle');
   if (btn) {
@@ -3557,7 +3564,7 @@ function applySidebarCollapsed() {
 function toggleSidebar() {
   const on = !document.body.classList.contains('sidebar-collapsed');
   document.body.classList.toggle('sidebar-collapsed', on);
-  localStorage.setItem('stickerbox-sidebar-collapsed', on ? '1' : '0');
+  localStorage.setItem('picarium-sidebar-collapsed', on ? '1' : '0');
   applySidebarCollapsed();
   setTimeout(() => {
     if (virtualOn()) renderVirtual(true);
@@ -3835,8 +3842,8 @@ $('set-auto').addEventListener('change', async (e) => {
 function saveGhostOffset() {
   ghostX = Number($('ghost-x').value) || 0;
   ghostY = Number($('ghost-y').value) || 0;
-  localStorage.setItem('stickerbox-ghost-x', String(ghostX));
-  localStorage.setItem('stickerbox-ghost-y', String(ghostY));
+  localStorage.setItem('picarium-ghost-x', String(ghostX));
+  localStorage.setItem('picarium-ghost-y', String(ghostY));
   saveSettings({ ghostX, ghostY });
 }
 $('ghost-x').addEventListener('change', saveGhostOffset);
@@ -3847,7 +3854,7 @@ document.addEventListener('dragstart', (e) => e.preventDefault(), true);
 
 $('set-delete-mode').addEventListener('change', (e) => {
   deleteMode = e.target.value;
-  localStorage.setItem('stickerbox-delete-mode', deleteMode);
+  localStorage.setItem('picarium-delete-mode', deleteMode);
   saveSettings({ deleteMode });
 });
 
@@ -4264,14 +4271,14 @@ $('set-virtualize').addEventListener('change', async (e) => {
 
 $('set-grid-size').addEventListener('change', (e) => {
   gridSize = e.target.value;
-  localStorage.setItem('stickerbox-grid-size', gridSize);
+  localStorage.setItem('picarium-grid-size', gridSize);
   applyGridSize();
   saveSettings({ gridSize });
 });
 
 $('set-copy-default').addEventListener('change', (e) => {
   copyDefault = e.target.value;
-  localStorage.setItem('stickerbox-copy-default', copyDefault);
+  localStorage.setItem('picarium-copy-default', copyDefault);
   $('e-copy-file').textContent = copyDefault === 'file' ? '复制静态图片' : '复制文件';
   saveSettings({ copyDefault });
 });
@@ -4283,14 +4290,14 @@ $('set-start-hidden').addEventListener('change', (e) => {
 
 $('set-glyph').addEventListener('change', async (e) => {
   starStyle = e.target.value;
-  localStorage.setItem('stickerbox-star-style', starStyle);
+  localStorage.setItem('picarium-star-style', starStyle);
   saveSettings({ starStyle });
   await refresh();
 });
 
 $('set-star-color').addEventListener('input', (e) => {
   starColor = e.target.value;
-  localStorage.setItem('stickerbox-star-color', starColor);
+  localStorage.setItem('picarium-star-color', starColor);
   applyStarColor();
 });
 $('set-star-color').addEventListener('change', (e) => {
@@ -4300,7 +4307,7 @@ $('set-star-color').addEventListener('change', (e) => {
 $('set-hover-delay').addEventListener('change', (e) => {
   hoverDelay = Math.max(0, Math.min(2000, Number(e.target.value) || 0));
   e.target.value = hoverDelay;
-  localStorage.setItem('stickerbox-hover-delay', String(hoverDelay));
+  localStorage.setItem('picarium-hover-delay', String(hoverDelay));
   saveSettings({ hoverDelay });
 });
 

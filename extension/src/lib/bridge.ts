@@ -1,6 +1,6 @@
 // 与 src-tauri/src/bridge.rs 的 TOKEN 必须一致；改两边一起改。
 export const BRIDGE_URL = "http://127.0.0.1:17800";
-export const TOKEN = "stickerbox-local-7f3c9a2e";
+export const TOKEN = "picarium-local-7f3c9a2e";
 
 export interface ImportPayload {
   ext: string;
@@ -19,7 +19,7 @@ export interface ImportResult {
   error?: string;
 }
 
-/** 探测本机 StickerBox 是否在跑；没开返回 null。 */
+/** 探测本机 Picarium 是否在跑；没开返回 null。 */
 export async function ping(): Promise<{ ok: boolean; version?: string } | null> {
   try {
     const res = await fetch(`${BRIDGE_URL}/ping`, { cache: "no-store" });
@@ -37,7 +37,7 @@ export async function importImage(payload: ImportPayload): Promise<ImportResult>
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-StickerBox-Token": TOKEN,
+        "X-Picarium-Token": TOKEN,
       },
       body: JSON.stringify(payload),
     });
@@ -60,7 +60,7 @@ export async function copyAsset(sha: string): Promise<{ ok: boolean; error?: str
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-StickerBox-Token": TOKEN,
+        "X-Picarium-Token": TOKEN,
       },
       body: JSON.stringify({ sha }),
     });
@@ -90,7 +90,7 @@ export async function copyRaw(payload: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-StickerBox-Token": TOKEN,
+        "X-Picarium-Token": TOKEN,
       },
       body: JSON.stringify(payload),
     });

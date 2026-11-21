@@ -75,7 +75,7 @@ if ($Bump) {
 
 if ($DryRun) {
     if ($doPc) { Write-Host "PC      $pcVersion  -> release/pc/Picarium-$pcVersion-win-x64.exe" }
-    if ($doAndroid) { Write-Host "Android $andVersion (code $(Get-VersionCode $andVersion))  -> release/android/StickerBox-$andVersion-arm64-v8a.apk" }
+    if ($doAndroid) { Write-Host "Android $andVersion (code $(Get-VersionCode $andVersion))  -> release/android/Picarium-$andVersion-arm64-v8a.apk" }
     if ($doExt) { Write-Host "Extension $extVersion  -> release/extension/Picarium-extension-$extVersion.zip" }
     Write-Host '（DryRun：未构建、未写文件）'
     return
@@ -112,20 +112,20 @@ if ($doPc) {
     Write-Host '== PC: cargo build --release ==' -ForegroundColor Cyan
     Push-Location $root
     try {
-        & cargo build --release -p stickerbox
+        & cargo build --release -p picarium
         if ($LASTEXITCODE -ne 0) { throw 'release 构建失败' }
     } finally {
         Pop-Location
     }
 
-    $exe = Join-Path $env:LOCALAPPDATA 'StickerBoxBuild/target/release/stickerbox.exe'
+    $exe = Join-Path $env:LOCALAPPDATA 'PicariumBuild/target/release/picarium.exe'
     if (-not (Test-Path $exe)) { throw "找不到 release 产物：$exe" }
     $dstDir = Join-Path $env:LOCALAPPDATA 'Picarium'
     $oldDstDir = Join-Path $env:LOCALAPPDATA 'StickerBox'
     $oldDst = Join-Path $oldDstDir 'StickerBox.exe'
     $dst = Join-Path $dstDir 'Picarium.exe'
     New-Item -ItemType Directory -Force -Path $dstDir | Out-Null
-    Get-Process -Name stickerbox, Picarium -ErrorAction SilentlyContinue | Stop-Process -Force
+    Get-Process -Name picarium, Picarium -ErrorAction SilentlyContinue | Stop-Process -Force
     Start-Sleep -Milliseconds 400
     Copy-Item -Force $exe $dst
     Write-Host "已安装：$dst" -ForegroundColor Green
@@ -226,7 +226,7 @@ if ($doAndroid) {
 
     $andOut = Join-Path $releaseRoot 'android'
     New-Item -ItemType Directory -Force -Path $andOut | Out-Null
-    $apkFile = Join-Path $andOut "StickerBox-$andVersion-arm64-v8a.apk"
+    $apkFile = Join-Path $andOut "Picarium-$andVersion-arm64-v8a.apk"
     Copy-Item -Force $apk.FullName $apkFile
 }
 
@@ -260,7 +260,7 @@ if ($pcFile) {
 if ($apkFile) {
     $meta['android'] = @{
         version = $andVersion
-        file    = "android/StickerBox-$andVersion-arm64-v8a.apk"
+        file    = "android/Picarium-$andVersion-arm64-v8a.apk"
         built   = $now
         sha256  = (Get-FileHash -Path $apkFile -Algorithm SHA256).Hash.ToLower()
     }

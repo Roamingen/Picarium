@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$exe = 'C:\Users\13066\AppData\Local\StickerBoxBuild\target\debug\stickerbox.exe'
+$exe = 'C:\Users\13066\AppData\Local\PicariumBuild\target\debug\picarium.exe'
 $python = 'python'
 $report = @()
 $failed = $false
@@ -26,26 +26,26 @@ function Step($name, [scriptblock]$body) {
 }
 
 function Stop-App {
-    Get-Process stickerbox -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    Get-Process picarium -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 400
 }
 
 Step '停止旧进程' { Stop-App }
 
 Step '构建' {
-    cargo build -p stickerbox 2>&1 | Out-String | Write-Host
+    cargo build -p picarium 2>&1 | Out-String | Write-Host
     if ($LASTEXITCODE -ne 0) { throw "cargo build 失败（退出码 $LASTEXITCODE）" }
     if (-not (Test-Path $exe)) { throw "找不到可执行文件：$exe" }
 }
 
 Step '核心单测' {
-    $out = cargo test -p stickerbox-core 2>&1 | Out-String
+    $out = cargo test -p picarium-core 2>&1 | Out-String
     Write-Host $out
     if ($LASTEXITCODE -ne 0) { throw "cargo test 失败" }
     if ($out -notmatch 'test result: ok') { throw "测试输出里没有 test result: ok" }
 }
 
-$temp = Join-Path $env:TEMP 'stickerbox-accept'
+$temp = Join-Path $env:TEMP 'picarium-accept'
 $lib = Join-Path $temp 'lib'
 $samples = Join-Path $temp 'samples'
 $reportFile = Join-Path $lib 'selftest-report.json'
@@ -63,7 +63,7 @@ Step '准备临时库' {
 }
 
 Step '导入示例' {
-    $env:STICKERBOX_HOME = $lib
+    $env:PICARIUM_HOME = $lib
     $scan = & $exe scan $samples 2>&1 | Out-String
     Write-Host $scan
     if (-not (Test-Path (Join-Path $lib 'index.json'))) { throw "扫描后没有生成 index.json" }
@@ -71,8 +71,8 @@ Step '导入示例' {
 
 Step '前端自测' {
     if (Test-Path $reportFile) { Remove-Item -Force $reportFile }
-    $env:STICKERBOX_HOME = $lib
-    $env:STICKERBOX_SELFTEST = 'accept'
+    $env:PICARIUM_HOME = $lib
+    $env:PICARIUM_SELFTEST = 'accept'
     # 自测时隐藏窗口，避免抢走用户的活动窗口
     Set-Content -Path (Join-Path $lib 'settings.json') -Value '{"startHidden": true}' -Encoding UTF8
     Start-Process -FilePath $exe -WindowStyle Hidden | Out-Null
@@ -81,7 +81,7 @@ Step '前端自测' {
         Start-Sleep -Milliseconds 500
     }
     Stop-App
-    Remove-Item Env:STICKERBOX_SELFTEST -ErrorAction SilentlyContinue
+    Remove-Item Env:PICARIUM_SELFTEST -ErrorAction SilentlyContinue
     if (-not (Test-Path $reportFile)) { throw "60 秒内没有生成 selftest-report.json" }
     $j = Get-Content $reportFile -Raw -Encoding UTF8 | ConvertFrom-Json
     Write-Host ("通过 {0}，失败 {1}" -f $j.passed, $j.failed)
@@ -95,14 +95,14 @@ function Shot($state, $outFile) {
     if (Test-Path $outFile) { Remove-Item -Force $outFile }
     # 截图时必须让窗口可见（自测那一步把 startHidden 打开了）
     Set-Content -Path (Join-Path $lib 'settings.json') -Value '{}' -Encoding UTF8
-    if ($state) { $env:STICKERBOX_UI_STATE = $state } else { Remove-Item Env:STICKERBOX_UI_STATE -ErrorAction SilentlyContinue }
-    $env:STICKERBOX_HOME = $lib
+    if ($state) { $env:PICARIUM_UI_STATE = $state } else { Remove-Item Env:PICARIUM_UI_STATE -ErrorAction SilentlyContinue }
+    $env:PICARIUM_HOME = $lib
     Start-Process -FilePath $exe | Out-Null
     Start-Sleep -Seconds 5
     $shotOut = pwsh -NoProfile -File (Join-Path $root '.tools\shot_main.ps1') $outFile
     Write-Host $shotOut
     Stop-App
-    Remove-Item Env:STICKERBOX_UI_STATE -ErrorAction SilentlyContinue
+    Remove-Item Env:PICARIUM_UI_STATE -ErrorAction SilentlyContinue
     if (-not (Test-Path $outFile)) { throw "截图失败：$outFile" }
     if ((Get-Item $outFile).Length -lt 10KB) { throw "截图疑似空白：$outFile" }
 }
