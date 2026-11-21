@@ -688,6 +688,77 @@ impl Library {
         self.root.join("trash")
     }
 
+    /// 回收站里「有文件、没元数据」的孤儿条目收养回来。
+    ///
+    /// 两种情况会留下孤儿：从 Windows 回收站还原（文件回到 trash/，但我们的
+    /// index.json 早清空了），以及老版本先清元数据、送系统回收站失败的路径。
+    /// 不收养的话界面永远显示 0 张，到期清理也永远看不到它们。
+    fn adopt_orphans(&self, items: &mut Vec<TrashItem>) {
+        let dir = self.trash_path();
+        let Ok(rd) = fs::read_dir(&dir) else { return };
+        let mut changed = false;
+        for entry in rd.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let Some(ext) = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|s| s.to_ascii_lowercase())
+            else {
+                continue;
+            };
+            if !IMAGE_EXTS.contains(&ext.as_str()) {
+                continue;
+            }
+            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            if !is_sha_like(stem) || items.iter().any(|i| i.asset.sha == stem) {
+                continue;
+            }
+
+            let meta = entry.metadata().ok();
+            let bytes = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+            let stamp = meta
+                .as_ref()
+                .and_then(|m| m.modified().ok())
+                .map(|t| chrono::DateTime::<Utc>::from(t).to_rfc3339())
+                .unwrap_or_else(|| Utc::now().to_rfc3339());
+            let name = format!("未命名-{}", &stem[..stem.len().min(8)]);
+            let (py, py_abbr) = pinyin_of(&name);
+            items.push(TrashItem {
+                asset: Asset {
+                    sha: stem.to_string(),
+                    ext,
+                    bytes,
+                    width: 0,
+                    height: 0,
+                    animated: false,
+                    name: name.clone(),
+                    source: String::new(),
+                    source_ref: String::new(),
+                    added_at: stamp.clone(),
+                    tags: Vec::new(),
+                    py,
+                    py_abbr,
+                    groups: Vec::new(),
+                    starred: false,
+                    used_at: String::new(),
+                    readings: Arc::new(readings_of(&name)),
+                    path: String::new(),
+                },
+                deleted_at: stamp,
+            });
+            changed = true;
+        }
+        if changed {
+            // 写回元数据，下次启动就不用再扫；失败也不影响本次显示。
+            let _ = self.write_trash(items);
+        }
+    }
+
     fn read_trash(&self) -> Vec<TrashItem> {
         let path = self.trash_path().join("index.json");
         let mut items: Vec<TrashItem> = fs::read_to_string(path)
@@ -699,6 +770,8 @@ impl Library {
         items.sort_by(|a, b| b.deleted_at.cmp(&a.deleted_at));
         let mut seen = std::collections::HashSet::new();
         items.retain(|i| seen.insert(i.asset.sha.clone()));
+        self.adopt_orphans(&mut items);
+        items.sort_by(|a, b| b.deleted_at.cmp(&a.deleted_at));
         items
     }
 
@@ -740,8 +813,18 @@ impl Library {
                 let path = self
                     .trash_path()
                     .join(format!("{}.{}", item.asset.sha, item.asset.ext));
-                let _ = fs::remove_file(path);
-                removed += 1;
+                // 文件真删掉了（或本来就不在）才丢元数据；删不掉就留着，
+                // 免得又变成孤儿文件、界面显示 0 张。
+                let gone = if path.exists() {
+                    fs::remove_file(&path).is_ok()
+                } else {
+                    true
+                };
+                if gone {
+                    removed += 1;
+                } else {
+                    kept.push(item);
+                }
             } else {
                 kept.push(item);
             }
@@ -854,6 +937,27 @@ impl Library {
             .collect();
         self.write_trash(&[])?;
         Ok(paths)
+    }
+
+    /// 回收站里某一条对应的文件路径（不修改元数据）。
+    pub fn trash_file_path(&self, sha: &str) -> Option<PathBuf> {
+        self.trash()
+            .into_iter()
+            .find(|i| i.asset.sha == sha)
+            .map(|i| {
+                self.trash_path()
+                    .join(format!("{}.{}", i.asset.sha, i.asset.ext))
+            })
+    }
+
+    /// 从回收站元数据里移除指定条目（文件由调用方先处理完）。
+    pub fn drop_trash_items(&mut self, shas: &[String]) -> Result<()> {
+        if shas.is_empty() {
+            return Ok(());
+        }
+        let mut items = self.read_trash();
+        items.retain(|i| !shas.iter().any(|s| s == &i.asset.sha));
+        self.write_trash(&items)
     }
 
     /// 批量收藏 / 取消收藏
@@ -1852,6 +1956,10 @@ fn blob_path_for(root: &Path, sha: &str, ext: &str) -> PathBuf {
         .join(format!("{sha}.{ext}"))
 }
 
+fn is_sha_like(s: &str) -> bool {
+    s.len() >= 32 && s.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 fn hex(bytes: &[u8]) -> String {
     const TABLE: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(bytes.len() * 2);
@@ -1904,7 +2012,11 @@ mod tests {
         assert_eq!(lib.trash().len(), 0);
 
         lib.remove(&sha).unwrap();
-        assert_eq!(lib.purge_trash().unwrap().len(), 1);
+        let paths = lib.purge_trash().unwrap();
+        assert_eq!(paths.len(), 1);
+        for p in &paths {
+            std::fs::remove_file(p).unwrap();
+        }
         assert_eq!(lib.trash().len(), 0);
 
         std::fs::remove_dir_all(&base).ok();
@@ -1979,9 +2091,73 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 
+    /// 从系统回收站还原回来的文件、或老版本清元数据失败留下的文件，
+    /// 都应该被收养进回收站列表（否则界面永远 0 张，到期也清不掉）。
     #[test]
-    fn create_group_is_idempotent() {
-        let base = std::env::temp_dir().join(format!("sb-group-idem-{}", std::process::id()));
+    fn orphan_trash_files_are_adopted() {
+        let base = std::env::temp_dir().join(format!("sb-adopt-{}", std::process::id()));
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        let sha = "ab".repeat(32);
+        std::fs::create_dir_all(lib.trash_path()).unwrap();
+        std::fs::write(lib.trash_path().join(format!("{sha}.png")), b"not-a-real-image").unwrap();        std::fs::write(lib.trash_path().join("index.json"), b"[]").unwrap();
+
+        let items = lib.trash();
+        assert_eq!(items.len(), 1, "孤儿文件应该被收养");
+        assert_eq!(items[0].asset.sha, sha);
+        assert_eq!(items[0].asset.ext, "png");
+        assert_eq!(items[0].asset.bytes, 16);
+        assert!(items[0].asset.name.starts_with("未命名-"));
+
+        // 元数据已经写回，第二次不会再收养一遍
+        let txt = std::fs::read_to_string(lib.trash_path().join("index.json")).unwrap();
+        assert!(txt.contains(&sha));
+        assert_eq!(lib.trash().len(), 1);
+
+        // 非 sha 名字的杂文件不收养
+        std::fs::write(lib.trash_path().join("readme.png"), b"x").unwrap();
+        assert_eq!(lib.trash().len(), 1);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// 到期清理时文件已经不在（用户手动删了）也要把元数据收掉。
+    #[test]
+    fn purge_expired_handles_missing_files() {
+        let base = std::env::temp_dir().join(format!("sb-purge-missing-{}", std::process::id()));
+        let src = base.join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([1, 2, 3, 255]))
+            .save(src.join("a.png"))
+            .unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([4, 5, 6, 255]))
+            .save(src.join("b.png"))
+            .unwrap();
+
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        lib.scan_folder(&src).unwrap();
+        let shas: Vec<String> = lib.assets().iter().map(|a| a.sha.clone()).collect();
+        lib.remove(&shas[0]).unwrap();
+        lib.remove(&shas[1]).unwrap();
+        let mut items = lib.trash();
+        assert_eq!(items.len(), 2);
+        for it in items.iter_mut() {
+            it.deleted_at = (Utc::now() - chrono::Duration::days(10)).to_rfc3339();
+        }
+        lib.write_trash(&items).unwrap();
+        // 其中一条文件被用户手动删了
+        let gone = lib.trash().remove(0);
+        std::fs::remove_file(
+            lib.trash_path()
+                .join(format!("{}.{}", gone.asset.sha, gone.asset.ext)),
+        )
+        .unwrap();
+
+        assert_eq!(lib.purge_expired_trash().unwrap(), 2);
+        assert!(lib.trash().is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn create_group_is_idempotent() {        let base = std::env::temp_dir().join(format!("sb-group-idem-{}", std::process::id()));
         let mut lib = Library::open(&base).unwrap();
         assert!(lib.create_group("同一组").unwrap());
         assert!(!lib.create_group("同一组").unwrap());

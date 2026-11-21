@@ -884,25 +884,34 @@ pub fn trash_delete(
     permanent: Option<bool>,
 ) -> Result<(), String> {
     let path = {
-        let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-        lib.delete_forever(&sha).map_err(|e| format!("{e:#}"))?
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.trash_file_path(&sha)
     };
-    if let Some(p) = path {
-        #[cfg(windows)]
-        {
-            if permanent.unwrap_or(false) {
-                let _ = std::fs::remove_file(&p);
-            } else if let Err(e) = crate::recycle::move_to_recycle_bin(&[p]) {
-                eprintln!("[trash] {e}");
+    let Some(p) = path else {
+        return Err("回收站里没有这张图".to_string());
+    };
+    // 先把文件处理掉，成功后再删元数据：否则一旦系统回收站失败，
+    // 文件留在 trash/ 却没有记录，界面显示 0 张、到期也清不掉。
+    #[cfg(windows)]
+    {
+        if permanent.unwrap_or(false) {
+            if p.exists() {
+                std::fs::remove_file(&p).map_err(|e| format!("删除文件失败：{e}"))?;
             }
-        }
-        #[cfg(not(windows))]
-        {
-            let _ = permanent;
-            let _ = std::fs::remove_file(&p);
+        } else if let Err(e) = crate::recycle::move_to_recycle_bin(&[p]) {
+            return Err(format!("送进系统回收站失败：{e}"));
         }
     }
-    Ok(())
+    #[cfg(not(windows))]
+    {
+        let _ = permanent;
+        if p.exists() {
+            std::fs::remove_file(&p).map_err(|e| format!("删除文件失败：{e}"))?;
+        }
+    }
+    let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+    lib.drop_trash_items(&[sha])
+        .map_err(|e| format!("{e:#}"))
 }
 
 #[tauri::command]
@@ -910,29 +919,49 @@ pub fn trash_purge(
     state: tauri::State<'_, AppState>,
     permanent: Option<bool>,
 ) -> Result<usize, String> {
-    let paths = {
-        let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
-        lib.purge_trash().map_err(|e| format!("{e:#}"))?
+    let items = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.trash()
     };
-    let n = paths.len();
-    #[cfg(windows)]
-    {
-        if permanent.unwrap_or(false) {
-            for p in &paths {
-                let _ = std::fs::remove_file(p);
+    let total = items.len();
+    let mut done: Vec<String> = Vec::new();
+    for item in &items {
+        let p = {
+            let lib = state.lib.lock().map_err(|e| e.to_string())?;
+            lib.trash_path()
+                .join(format!("{}.{}", item.asset.sha, item.asset.ext))
+        };
+        #[cfg(windows)]
+        {
+            if permanent.unwrap_or(false) {
+                if !p.exists() || std::fs::remove_file(&p).is_ok() {
+                    done.push(item.asset.sha.clone());
+                }
+            } else if !p.exists() || crate::recycle::move_to_recycle_bin(&[p]).is_ok() {
+                done.push(item.asset.sha.clone());
             }
-        } else if let Err(e) = crate::recycle::move_to_recycle_bin(&paths) {
-            eprintln!("[trash] {e}");
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = permanent;
+            if !p.exists() || std::fs::remove_file(&p).is_ok() {
+                done.push(item.asset.sha.clone());
+            }
         }
     }
-    #[cfg(not(windows))]
     {
-        let _ = permanent;
-        for p in &paths {
-            let _ = std::fs::remove_file(p);
-        }
+        let mut lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.drop_trash_items(&done)
+            .map_err(|e| format!("{e:#}"))?;
     }
-    Ok(n)
+    if done.len() < total {
+        return Err(format!(
+            "有 {} 张没能删除（可能被占用），已删除 {} 张",
+            total - done.len(),
+            done.len()
+        ));
+    }
+    Ok(done.len())
 }
 
 /// 删除一张图（移进回收站）
