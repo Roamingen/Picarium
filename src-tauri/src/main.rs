@@ -14,6 +14,9 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
+/// 上次指针指向的库打不开时记下来，前端启动后弹「库不可用」对话框。
+static POINTER_FAILURE: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+
 /// 依次尝试候选目录，返回第一个能用的。全都不行就打印清晰原因后退出，而不是 panic。
 ///
 /// 优先级：`PICARIUM_HOME`（环境变量，测试/开发）> 配置目录里的指针 > 候选目录。
@@ -22,15 +25,26 @@ fn open_library() -> Library {
         std::env::var_os("PICARIUM_HOME").or_else(|| std::env::var_os("STICKERBOX_HOME"));
     if env_home.is_none() {
         if let Some(p) = picarium_lib::config::load_pointer() {
-            match Library::open(&p) {
+            // Library::open 会把不存在的目录当成新库建出来；指针路径不存
+            // 在时（移动硬盘没插、文件夹被删）必须先拦住，否则会静默建
+            // 一个空库，让用户以为数据丢了。
+            let opened: Result<Library, String> = if p.is_dir() {
+                Library::open(&p).map_err(|e| e.to_string())
+            } else {
+                Err("目录不存在".to_string())
+            };
+            match opened {
                 Ok(lib) => {
                     eprintln!("[library] pointer {}", p.display());
                     return lib;
                 }
-                Err(e) => eprintln!(
-                    "[library] 指针路径打不开 {}：{e}；退回候选目录（指针保持不变）",
-                    p.display()
-                ),
+                Err(e) => {
+                    let _ = POINTER_FAILURE.set(Some(p.to_string_lossy().to_string()));
+                    eprintln!(
+                        "[library] 指针路径打不开 {}：{e}；退回候选目录（指针保持不变）",
+                        p.display()
+                    )
+                }
             }
         }
     }
@@ -674,6 +688,158 @@ fn open_config_folder() -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// 在资源管理器里打开任意目录（搬家预览里的「打开目标/旧位置」）。
+#[tauri::command]
+fn open_folder(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.is_dir() {
+        return Err(format!("目录不存在：{path}"));
+    }
+    std::process::Command::new("explorer")
+        .arg(&path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+/// 启动时检查到的搬家中断信息（供前端提示）。
+static MOVE_RECOVERY: std::sync::OnceLock<Option<picarium_lib::library_move::Recovery>> =
+    std::sync::OnceLock::new();
+
+#[tauri::command]
+fn move_recovery() -> Option<picarium_lib::library_move::Recovery> {
+    MOVE_RECOVERY.get().cloned().flatten()
+}
+
+/// 指针里的库打不开时返回那个路径（前端弹「库不可用」对话框）。
+#[tauri::command]
+fn pointer_failure() -> Option<String> {
+    POINTER_FAILURE.get().cloned().flatten()
+}
+
+/// 库不可用时的「用默认库」：挑第一个能打开的候选目录写指针。
+#[tauri::command]
+fn use_default_library() -> Result<String, String> {
+    for root in candidate_roots() {
+        if Library::open(&root).is_ok() {
+            picarium_lib::config::save_pointer(&root).map_err(|e| format!("写库指针失败：{e}"))?;
+            return Ok(root.to_string_lossy().to_string());
+        }
+    }
+    Err("没有找到能打开的默认库".into())
+}
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+/// 搬家（把当前库整体换到 `to`）。进度通过 `move-progress` 事件回报。
+#[tauri::command]
+async fn move_library(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    to: String,
+    mode: String,
+    keep_old: bool,
+) -> Result<serde_json::Value, String> {
+    let from = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.root().to_path_buf()
+    };
+    let to_path = PathBuf::from(&to);
+    // 先做一次快速校验，错误直接回给前端（不用等线程）。
+    picarium_lib::library_move::validate(&from, &to_path)?;
+
+    // 搬家期间别让剪贴板/导入写库。
+    let paused = state.paused.clone();
+    let was_paused = paused.swap(true, Ordering::Relaxed);
+    let app2 = app.clone();
+    let from2 = from.clone();
+    let mode2 = mode.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let mut emit = |p: picarium_lib::library_move::Progress| {
+            let payload = serde_json::json!({
+                "phase": p.phase,
+                "files": p.files,
+                "bytes": p.bytes,
+                "totalFiles": p.total_files,
+                "totalBytes": p.total_bytes,
+            });
+            let _ = app2.emit("move-progress", payload);
+        };
+        picarium_lib::library_move::run(
+            &from2,
+            &to_path,
+            &mode2,
+            keep_old,
+            &mut emit,
+            &|| picarium_lib::library_move::CANCEL.load(Ordering::Relaxed),
+        )
+    })
+    .await;
+    paused.store(was_paused, Ordering::Relaxed);
+
+    match result {
+        Ok(Ok(outcome)) => Ok(serde_json::json!({
+            "to": outcome.to.to_string_lossy(),
+            "from": outcome.from.to_string_lossy(),
+            "mode": outcome.mode,
+            "removedOld": outcome.removed_old,
+            "keptOld": outcome.kept_old,
+        })),
+        Ok(Err(e)) => Err(e),
+        Err(e) => Err(format!("搬家线程失败：{e}")),
+    }
+}
+
+#[tauri::command]
+fn cancel_move() {
+    picarium_lib::library_move::request_cancel();
+}
+
+/// 搬家前的预检查（前端确认框要用：同盘移动还是跨盘复制、文件数、大小）。
+#[tauri::command]
+fn move_check(state: State<'_, AppState>, to: String) -> Result<serde_json::Value, String> {
+    let from = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.root().to_path_buf()
+    };
+    let to_path = PathBuf::from(&to);
+    let (files, bytes) = picarium_lib::library_move::validate(&from, &to_path)?;
+    let same = picarium_lib::library_move::same_drive(&from, &to_path);
+    let free = picarium_lib::library_move::free_bytes(&to_path);
+    Ok(serde_json::json!({
+        "from": from.to_string_lossy(),
+        "sameDrive": same,
+        "files": files,
+        "bytes": bytes,
+        "free": free,
+    }))
+}
+
+/// 删除旧位置（搬家后确认新库没问题时用；必须二次确认，只删库形状的目录）。
+#[tauri::command]
+fn remove_old_location(state: State<'_, AppState>, path: String) -> Result<(), String> {
+    let current = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.root().to_path_buf()
+    };
+    let p = PathBuf::from(&path);
+    if picarium_lib::config::same_dir(&p, &current) {
+        return Err("这是当前正在用的库，不能删除".into());
+    }
+    if !p.is_dir() {
+        return Err("目录不存在".into());
+    }
+    let looks_like_lib = p.join("index.json").is_file() || p.join("blobs").is_dir();
+    if !looks_like_lib {
+        return Err("这个目录不像 Picarium 库，为安全起见不删除".into());
+    }
+    std::fs::remove_dir_all(&p).map_err(|e| format!("删除失败：{e}"))
+}
+
+
 #[tauri::command]
 fn hide_panel(window: tauri::WebviewWindow) -> Result<(), String> {
     window.hide().map_err(|e| e.to_string())
@@ -934,6 +1100,9 @@ fn main() {
     #[cfg(windows)]
     picarium_lib::state::migrate_default_library();
 
+    // 上次搬家是否被中断？先恢复再打开库（可能顺手把指针切到已完成的改名）。
+    let _ = MOVE_RECOVERY.set(picarium_lib::library_move::recover_startup());
+
     let lib = open_library();
 
     // 首次升级：把库根里的旧 settings.json/themes 复制到配置目录并写指针。
@@ -1022,6 +1191,15 @@ fn main() {
             set_window_size,
             set_hotkey,
             open_asset,
+            open_folder,
+            move_recovery,
+            pointer_failure,
+            use_default_library,
+            quit_app,
+            move_library,
+            move_check,
+            cancel_move,
+            remove_old_location,
             picarium_lib::commands::source_stats,
             set_clip_hotkey,
             selftest_mode,

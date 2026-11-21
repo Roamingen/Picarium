@@ -2406,7 +2406,7 @@ dependencies = [
 
 [[package]]
 name = "picarium"
-version = "0.17.1"
+version = "0.18.0"
 dependencies = [
  "arboard",
  "base64 0.21.7",

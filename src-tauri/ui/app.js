@@ -3736,6 +3736,7 @@ async function openSettings() {
   fillThemeOptions();
   $('set-root').textContent = s.root;
   await refreshLibraryLocations();
+  renderOldLocationRow();
   $('set-clip').checked = s.clipboardEnabled;
   $('set-auto').checked = s.autostart;
   $('set-theme').value = theme;
@@ -3950,6 +3951,197 @@ async function pickOpenLibrary() {
 
 $('lib-new').addEventListener('click', pickNewLibrary);
 $('lib-open').addEventListener('click', pickOpenLibrary);
+
+/* ---------- 搬家（换库位置） ---------- */
+
+const MOVE_OLD_KEY = 'picarium-move-old';
+
+function moveOldInfo() {
+  try {
+    const v = JSON.parse(localStorage.getItem(MOVE_OLD_KEY) || 'null');
+    return v && v.path ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function setMoveOldInfo(info) {
+  try {
+    if (info && info.path) localStorage.setItem(MOVE_OLD_KEY, JSON.stringify(info));
+    else localStorage.removeItem(MOVE_OLD_KEY);
+  } catch {}
+}
+
+function renderOldLocationRow() {
+  const row = $('lib-old-row');
+  if (!row) return;
+  const info = moveOldInfo();
+  row.hidden = !info;
+  if (info) $('lib-old-path').textContent = info.path;
+}
+
+async function removeOldLocation() {
+  const info = moveOldInfo();
+  if (!info) return;
+  const ok = await confirmDialog(
+    `删除旧位置？\n${info.path}\n里面的文件会被永久删除，且不能用回收站恢复。确认新库已经正常打开再删。`
+  );
+  if (!ok) return;
+  try {
+    await invoke('remove_old_location', { path: info.path });
+    setMoveOldInfo(null);
+    renderOldLocationRow();
+    toast('已删除旧位置');
+  } catch (e) {
+    toast('删除失败：' + e);
+  }
+}
+
+function movePhaseText(phase) {
+  return {
+    prepare: '准备…',
+    copy: '复制文件…',
+    verify: '校验…',
+    switch: '切换库指针…',
+    cleanup: '删除旧位置…',
+  }[phase] || phase;
+}
+
+function moveDetailText(p) {
+  const f = `${p.files} / ${p.totalFiles} 个文件`;
+  return `${f} · ${fmtSize(p.bytes)} / ${fmtSize(p.totalBytes)}`;
+}
+
+let moveInFlight = false;
+
+async function runMove(to, mode, keepOld) {
+  $('move-confirm-dlg').hidden = true;
+  $('move-dlg').hidden = false;
+  $('move-phase').textContent = '准备…';
+  $('move-fill').style.width = '0%';
+  $('move-detail').textContent = '';
+  moveInFlight = true;
+  const onProgress = (e) => {
+    const p = e && e.payload ? e.payload : e;
+    if (!p) return;
+    $('move-phase').textContent = movePhaseText(p.phase);
+    $('move-detail').textContent = moveDetailText(p);
+    const pct = p.totalBytes ? Math.min(100, (p.bytes / p.totalBytes) * 100) : 0;
+    $('move-fill').style.width = pct.toFixed(1) + '%';
+  };
+  let unlisten = null;
+  try {
+    unlisten = await window.__TAURI__.event.listen('move-progress', onProgress);
+  } catch {}
+  try {
+    const res = await invoke('move_library', { to, mode, keepOld });
+    $('move-dlg').hidden = true;
+    const oldPath = res && res.keptOld ? res.from : null;
+    if (res && (res.keptOld || !res.removedOld)) {
+      setMoveOldInfo({ path: res.from, at: Date.now() });
+    }
+    renderOldLocationRow();
+    if (res && res.removedOld) {
+      setMoveOldInfo(null);
+      renderOldLocationRow();
+    }
+    showRestartDialog(res && res.to ? res.to : to);
+    if (oldPath) toast('旧位置还留着：' + oldPath);
+  } catch (e) {
+    $('move-dlg').hidden = true;
+    const msg = String(e);
+    toast(msg.includes('取消') ? '已取消搬家，旧库没有动' : '搬家失败：' + msg);
+  } finally {
+    moveInFlight = false;
+    if (unlisten) unlisten();
+  }
+}
+
+async function startMoveFlow() {
+  let to;
+  try {
+    to = await pickDirectory('选择库的新位置（空目录）');
+  } catch (e) {
+    return toast('打开选择器失败：' + e);
+  }
+  if (!to) return;
+  let check;
+  try {
+    check = await invoke('library_dir_check', { path: to });
+  } catch (e) {
+    return toast('检查目录失败：' + e);
+  }
+  if (!check.isAbsolute) return toast('请选择绝对路径');
+  if (check.exists && !check.empty) return toast('目标目录不是空的，请选空目录');
+  let info;
+  try {
+    info = await invoke('move_check', { to });
+  } catch (e) {
+    return toast(String(e));
+  }
+  const mode = info.sameDrive ? 'move' : 'copy';
+  const action = info.sameDrive
+    ? '同盘：直接移动（瞬间完成，旧位置随后删除）'
+    : '跨盘：先复制并校验，成功后再切换指针（旧位置随后删除）';
+  $('move-confirm-text').textContent = `${action}\n需要 ${info.files} 个文件、${fmtSize(info.bytes)}。`;
+  $('move-confirm-path').textContent = to;
+  $('move-keep-old').checked = false;
+  $('move-confirm-dlg').dataset.to = to;
+  $('move-confirm-dlg').dataset.mode = mode;
+  $('move-confirm-dlg').hidden = false;
+}
+
+$('lib-move').addEventListener('click', startMoveFlow);
+$('move-cancel').addEventListener('click', () => ($('move-confirm-dlg').hidden = true));
+$('move-confirm-dlg').addEventListener('click', (e) => {
+  if (e.target === $('move-confirm-dlg')) $('move-confirm-dlg').hidden = true;
+});
+$('move-start').addEventListener('click', () => {
+  const to = $('move-confirm-dlg').dataset.to;
+  const mode = $('move-confirm-dlg').dataset.mode || 'copy';
+  runMove(to, mode, $('move-keep-old').checked);
+});
+$('move-abort').addEventListener('click', async () => {
+  if (!moveInFlight) return;
+  try {
+    await invoke('cancel_move');
+    $('move-phase').textContent = '正在取消…';
+  } catch {}
+});
+$('lib-old-open').addEventListener('click', async () => {
+  const info = moveOldInfo();
+  if (!info) return;
+  try {
+    await invoke('open_folder', { path: info.path });
+  } catch (e) {
+    toast('打开失败：' + e);
+  }
+});
+$('lib-old-remove').addEventListener('click', removeOldLocation);
+
+async function checkMoveRecovery() {
+  let rec = null;
+  try {
+    rec = await invoke('move_recovery');
+  } catch {
+    return;
+  }
+  if (!rec) {
+    renderOldLocationRow();
+    return;
+  }
+  if (rec.kind === 'partial_cleaned') {
+    toast(`上次搬家被中断，已清理目标位置的半成品（${rec.to}）`);
+  } else if (rec.kind === 'switched' || rec.kind === 'completed') {
+    setMoveOldInfo({ path: rec.from, at: Date.now() });
+    toast(`上次搬家已完成，旧位置还留着：${rec.from}`);
+  } else if (rec.kind === 'aborted') {
+    toast('上次搬家没有完成，旧库仍在使用');
+  }
+  renderOldLocationRow();
+}
+
+window.__picariumMove = { checkMoveRecovery, runMove, startMoveFlow };
 $('set-copy-root').addEventListener('click', async () => {
   const text = $('set-root').textContent || '';
   try {
@@ -3971,6 +4163,28 @@ $('restart-now').addEventListener('click', () => invoke('restart_app'));
 $('restart-dlg').addEventListener('click', (e) => {
   if (e.target === $('restart-dlg')) $('restart-dlg').hidden = true;
 });
+
+/* ---------- 库不可用（指针打不开） ---------- */
+$('lib-fail-retry').addEventListener('click', () => invoke('restart_app'));
+$('lib-fail-pick').addEventListener('click', async () => {
+  try {
+    const dir = await pickDirectory('选择已有的 Picarium 库');
+    if (!dir) return;
+    await invoke('library_use', { path: dir, create: false });
+    await invoke('restart_app');
+  } catch (e) {
+    toast('切换失败：' + e);
+  }
+});
+$('lib-fail-default').addEventListener('click', async () => {
+  try {
+    await invoke('use_default_library');
+    await invoke('restart_app');
+  } catch (e) {
+    toast('启用默认库失败：' + e);
+  }
+});
+$('lib-fail-quit').addEventListener('click', () => invoke('quit_app'));
 
 $('hotkey-edit').addEventListener('click', () => startHotkeyCapture('panel'));
 $('help-close')?.addEventListener('click', closeHelp);
@@ -4087,6 +4301,7 @@ const SETTING_TAB_BY_LABEL = {
   其他库: 'data',
   最近库: 'data',
   搬家: 'data',
+  旧位置: 'data',
   彻底删除时: 'data',
   回收站保留: 'data',
   设置备份: 'data',
@@ -4112,6 +4327,7 @@ function applySettingsTab(name) {
   $('tab-keys').hidden = name !== 'keys';
   const box = $('settings').querySelector('.modal');
   if (box) box.scrollTop = 0;
+  renderOldLocationRow();
 }
 
 document.querySelectorAll('.set-tab').forEach((tab) => {
@@ -6875,7 +7091,20 @@ async function runAcceptSuite() {
       JSON.stringify(loc.recent)
     );
     check('最近库列表渲染当前项', !!document.querySelector('#recent-libs .recent-lib .rl-tag'), 'tag');
-    check('搬家按钮暂不可用', $('lib-move').disabled === true);
+    check('搬家按钮可用', $('lib-move').disabled === false);
+    check('旧位置行默认隐藏', $('lib-old-row').hidden === true);
+    const rec = await invoke('move_recovery');
+    check('搬家中断命令可用', rec === null || typeof rec === 'object', String(rec));
+    check('库不可用弹窗默认隐藏', $('lib-fail-dlg').hidden === true);
+    const pf = await invoke('pointer_failure');
+    check('指针故障查询可用', pf === null || typeof pf === 'string', String(pf));
+    let moveRejected = '';
+    try {
+      await invoke('move_check', { to: loc.root });
+    } catch (e) {
+      moveRejected = String(e);
+    }
+    check('搬家预检查拒绝当前库', moveRejected.includes('当前库'), moveRejected);
     const chkLib = await invoke('library_dir_check', { path: loc.root });
     check('目录检查识别 Picarium 库', chkLib.isLibrary === true && chkLib.isAbsolute === true, JSON.stringify(chkLib));
     const missingDir = loc.root.replace(/[\\/][^\\/]+$/, '') + '\\__picarium_missing__';
@@ -7380,6 +7609,12 @@ window.addEventListener('unhandledrejection', (e) => {
   showFooterTip();
   syncClear();
   await Promise.all([refresh(), loadGroups(), showStats()]);
+  await checkMoveRecovery();
+  const pointerFail = await invoke('pointer_failure').catch(() => null);
+  if (pointerFail) {
+    $('lib-fail-path').textContent = pointerFail;
+    $('lib-fail-dlg').hidden = false;
+  }
 
   const resolved = resolveStartView();
   if (resolved !== '__all__') await selectGroup(resolved);

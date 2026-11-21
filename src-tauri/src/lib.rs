@@ -16,6 +16,9 @@ pub mod commands;
 /// 全局配置目录（设置/主题/库指针）。
 pub mod config;
 
+/// 搬家：把整个库换到另一个位置（进度、校验、中断恢复）。
+pub mod library_move;
+
 /// 浏览器桥：本地 HTTP 服务，只桌面挂（安卓用分享进入，不需要）。
 #[cfg(not(mobile))]
 pub mod bridge;

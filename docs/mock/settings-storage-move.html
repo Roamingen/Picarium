@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>搬家（库换位置）· 预览 · 批 3</title>
+<style>
+  :root[data-theme='dark']{
+    --bg:#14161a; --modal:#191d24; --surface-2:#232833; --line:#2a2f38; --line-2:#333a47;
+    --hover:#2a3140; --fg:#e8eaed; --dim:#8b93a1; --dim-2:#5d6573;
+    --accent:#6ea8fe; --accent-fg:#dce7ff; --btn:#222833; --chip:#27303f;
+    --danger:#ff9aa2; --danger-strong:#ff6b78; --ok:#7dd3a0; --warn:#f0b35e;
+    --shadow:rgba(0,0,0,.55); --mask:rgba(0,0,0,.5); --sel-tint:rgba(110,168,254,.12);
+  }
+  :root[data-theme='light']{
+    --bg:#f5f6f8; --modal:#ffffff; --surface-2:#eef0f4; --line:#e2e5ea; --line-2:#d6dae1;
+    --hover:#eceef3; --fg:#24272d; --dim:#6b7280; --dim-2:#98a0ac;
+    --accent:#3b82f6; --accent-fg:#1d4ed8; --btn:#f1f3f6; --chip:#eceef3;
+    --danger:#c2364a; --danger-strong:#d23c52; --ok:#21855a; --warn:#a36414;
+    --shadow:rgba(20,30,50,.18); --mask:rgba(20,30,50,.35); --sel-tint:rgba(59,130,246,.1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0; min-height:100vh; padding:24px 20px 60px; background:var(--bg); color:var(--fg);
+       font:13px/1.6 "Segoe UI","Microsoft YaHei UI",sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px}
+  .head{width:800px; display:flex; align-items:flex-start; gap:12px}
+  .head .txt{flex:1; color:var(--dim); font-size:12.5px}
+  .head b{display:block; color:var(--fg); font-size:15px; font-weight:600; margin-bottom:5px}
+  .themebtn{font:inherit; font-size:12px; padding:5px 10px; border-radius:8px; cursor:pointer;
+            background:var(--btn); color:var(--dim); border:1px solid var(--line-2)}
+  .themebtn:hover{color:var(--fg); background:var(--hover)}
+  .stagebar{width:800px; display:flex; gap:6px; flex-wrap:wrap}
+  .stagebar button{font:inherit; font-size:11.5px; padding:4px 10px; border-radius:8px; cursor:pointer;
+                   background:var(--btn); color:var(--dim); border:1px solid var(--line-2)}
+  .stagebar button.on{background:var(--sel-tint); color:var(--accent); border-color:var(--accent)}
+  .stagebar button:hover{color:var(--fg)}
+
+  .panel{width:800px}
+  .card{background:var(--modal); border:1px solid var(--line); border-radius:12px;
+        box-shadow:0 18px 50px var(--shadow); padding:16px 18px}
+  .card + .card{margin-top:14px}
+  .kicker{font-size:11px; letter-spacing:.04em; color:var(--dim-2); text-transform:uppercase}
+  h2{margin:2px 0 4px; font-size:16px}
+  p{margin:0 0 10px; color:var(--dim); font-size:12.5px}
+  .mono{font-family:Consolas,"Cascadia Mono",monospace; font-size:12px; word-break:break-all}
+  .btn{font:inherit; font-size:12px; padding:5px 11px; border-radius:8px; cursor:pointer;
+       background:var(--btn); color:var(--fg); border:1px solid var(--line-2)}
+  .btn:hover{background:var(--hover)}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{filter:brightness(1.05)}
+  .btn.danger{color:var(--danger-strong); border-color:var(--line-2)}
+  .btn.danger:hover{border-color:var(--danger-strong); background:var(--chip)}
+  .btn.small{font-size:11.5px; padding:3px 9px}
+  .btn:disabled{opacity:.45; cursor:default}
+  .row{display:flex; align-items:center; gap:12px}
+  .row + .row{border-top:1px solid color-mix(in srgb, var(--line) 60%, transparent); padding-top:10px; margin-top:10px}
+  .row .grow{flex:1; min-width:0}
+  .label{font-size:13px}
+  .dim{font-size:11.5px; color:var(--dim-2)}
+  .badge{font-size:10.5px; padding:1px 7px; border-radius:999px; color:var(--accent);
+         border:1px solid color-mix(in srgb, var(--accent) 45%, transparent); background:var(--sel-tint)}
+  .badge.ok{color:var(--ok); border-color:color-mix(in srgb, var(--ok) 45%, transparent); background:transparent}
+  .badge.warn{color:var(--warn); border-color:color-mix(in srgb, var(--warn) 45%, transparent); background:transparent}
+  .badge.bad{color:var(--danger); border-color:color-mix(in srgb, var(--danger) 45%, transparent); background:transparent}
+
+  .dlg{background:var(--modal); border:1px solid var(--line); border-radius:12px;
+       box-shadow:0 20px 60px var(--shadow); padding:16px 18px; max-width:620px}
+  .dlg h3{margin:0 0 6px; font-size:14.5px; font-weight:600}
+  .dlg p{margin:0 0 10px; color:var(--dim); font-size:12.5px}
+  .dlg .path{padding:8px 10px; border-radius:8px; background:var(--surface-2); border:1px solid var(--line-2);
+             font-family:Consolas,"Cascadia Mono",monospace; font-size:11.5px; word-break:break-all; margin-bottom:12px}
+  .dlg .actions{display:flex; gap:8px; justify-content:flex-end; margin-top:14px}
+  .dlg .note{font-size:11.5px; color:var(--dim-2); margin-top:8px; line-height:1.6}
+  .dlg .checkline{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--dim); margin:10px 0 2px}
+  .dlg .choice{display:flex; flex-direction:column; gap:8px; margin:10px 0}
+  .opt{display:flex; gap:10px; align-items:flex-start; padding:9px 11px; border:1px solid var(--line-2); border-radius:9px; cursor:pointer}
+  .opt.on{border-color:var(--accent); background:var(--sel-tint)}
+  .opt input{margin-top:3px}
+  .opt b{display:block; font-weight:600; font-size:12.5px; color:var(--fg)}
+  .opt .dim{margin-top:2px; display:block}
+
+  .prog{height:8px; border-radius:99px; background:var(--surface-2); overflow:hidden; margin:8px 0}
+  .prog > i{display:block; height:100%; width:0; background:var(--accent); border-radius:99px; transition:width .3s ease}
+  .steps{display:flex; flex-direction:column; gap:6px; margin:12px 0}
+  .step{display:flex; gap:8px; align-items:center; font-size:12px; color:var(--dim-2)}
+  .step .dot{width:16px; height:16px; border-radius:50%; border:1px solid var(--line-2); display:flex;
+             align-items:center; justify-content:center; font-size:10px}
+  .step.done{color:var(--fg)}
+  .step.done .dot{background:var(--ok); border-color:var(--ok); color:#08210f}
+  .step.cur{color:var(--accent)}
+  .step.cur .dot{border-color:var(--accent); color:var(--accent)}
+  .muted-box{padding:10px 12px; border-radius:9px; background:var(--surface-2); border:1px solid var(--line-2); font-size:12px; color:var(--dim)}
+  .warn-box{padding:10px 12px; border-radius:9px; border:1px solid color-mix(in srgb, var(--warn) 45%, var(--line-2));
+            background:color-mix(in srgb, var(--warn) 10%, transparent); font-size:12px}
+  .bad-box{padding:10px 12px; border-radius:9px; border:1px solid color-mix(in srgb, var(--danger) 45%, var(--line-2));
+           background:color-mix(in srgb, var(--danger) 10%, transparent); font-size:12px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="txt">
+      <b>搬家（库换位置）· 预览 · 批 3</b>
+      场景：把当前库整体搬到新位置。安全不变式是「指针永远指向一份完整的库」：复制 → 校验 → 切指针 → 才删旧；任何一步失败，旧库原样可用。
+    </div>
+    <button class="themebtn" id="theme">切换浅色</button>
+  </div>
+
+  <div class="stagebar" id="stages">
+    <button data-s="entry" class="on">① 入口</button>
+    <button data-s="pick">② 选目标目录</button>
+    <button data-s="confirm">③ 确认方式</button>
+    <button data-s="progress">④ 进度</button>
+    <button data-s="fail">⑤ 失败</button>
+    <button data-s="done">⑥ 完成重启</button>
+    <button data-s="broken">⑦ 库不可用</button>
+    <button data-s="recover">⑧ 中途关掉软件</button>
+    <button data-s="leftover">⑨ 旧位置残留</button>
+  </div>
+
+  <div class="panel">
+    <!-- ① 入口 -->
+    <section class="card" data-stage="entry">
+      <div class="kicker">设置 › 数据 › 存储位置</div>
+      <h2>当前库</h2>
+      <p class="mono">C:\Users\13066\Picarium</p>
+      <p>1,248 张 · 2.31 GB</p>
+      <div class="row">
+        <div class="grow">
+          <div class="label">搬家到其他位置</div>
+          <div class="dim">把整个库移到别的盘或目录；同盘秒完成，跨盘复制并校验。旧位置不会先删。</div>
+        </div>
+        <button class="btn primary" data-toast="打开目录选择器">搬家到其他位置…</button>
+      </div>
+      <div class="row">
+        <div class="grow">
+          <div class="label">其他库 / 最近库</div>
+          <div class="dim">只是换一个库用，不搬文件——那是「切换」，不是搬家。</div>
+        </div>
+        <button class="btn" data-toast="打开其他库">打开其他库…</button>
+      </div>
+    </section>
+
+    <!-- ② 选目标 -->
+    <section class="card hidden" data-stage="pick">
+      <div class="kicker">选择目标位置</div>
+      <h2>选中的目录会先做检查</h2>
+      <p>下面把四种典型结果放在一起；真实交互里一次只弹一个对话框，选中后逐项校验。</p>
+
+      <div class="dlg">
+        <h3>搬到哪里？</h3>
+        <div class="path">D:\Picarium</div>
+        <div class="muted-box">
+          <b>空目录，可用</b><span class="badge ok" style="margin-left:8px">通过</span><br />
+          目标盘剩余 412 GB，本次需要 2.31 GB。
+        </div>
+
+        <div class="muted-box" style="margin-top:10px">
+          <b>这里已经是一个库</b><span class="badge warn" style="margin-left:8px">改成切换</span><br />
+          D:\Picarium 里有 index.json（892 张）。搬家会把目标覆盖，所以不能搬到这里；可以改成「切换到 D:\Picarium」，旧库原样保留。
+        </div>
+
+        <div class="bad-box" style="margin-top:10px">
+          <b>目标在库里面</b><span class="badge bad" style="margin-left:8px">不可用</span><br />
+          C:\Users\13066\Picarium\backup 是当前库的子目录，搬进去会自己复制自己。
+        </div>
+
+        <div class="bad-box" style="margin-top:10px">
+          <b>空间不足</b><span class="badge bad" style="margin-left:8px">不可用</span><br />
+          E: 只剩 1.2 GB，这个库 2.31 GB；至少还差 1.11 GB。
+        </div>
+
+        <div class="actions">
+          <button class="btn" data-toast="关闭">取消</button>
+          <button class="btn" data-toast="改走切换流程">改成切换</button>
+          <button class="btn primary" data-toast="进入确认">下一步</button>
+        </div>
+        <div class="note">检查在选完目录后立刻做：目录是否存在、是否已有库、是否在库内、是否可写、目标盘空间是否够。</div>
+      </div>
+    </section>
+
+    <!-- ③ 确认方式 -->
+    <section class="card hidden" data-stage="confirm">
+      <div class="kicker">确认搬家方式</div>
+      <h2>同盘和跨盘不一样</h2>
+      <p>默认值跟着目标盘变化：同盘默认「直接移动」，跨盘默认「复制后切换」。</p>
+
+      <div class="dlg">
+        <h3>从 C:\Users\13066\Picarium 搬到 D:\Picarium</h3>
+        <p>2.31 GB，1,248 个文件 · 跨盘，预计 40–90 秒</p>
+        <div class="choice">
+          <label class="opt on">
+            <input type="checkbox" checked />
+            <span>
+              <b>复制后切换（推荐）</b>
+              <span class="dim">复制全部 → 校验 → 切指针 → 再问是否删旧；中途失败旧库不受影响。</span>
+            </span>
+          </label>
+          <label class="opt">
+            <input type="checkbox" />
+            <span>
+              <b>直接移动</b>
+              <span class="dim">跨盘时等同「复制 + 校验 + 删旧」；同盘时是瞬间改名。没校验完成前不删旧。</span>
+            </span>
+          </label>
+        </div>
+        <label class="checkline"><input type="checkbox" checked /> 搬完保留旧位置（相当于备份）</label>
+        <div class="actions">
+          <button class="btn" data-toast="关闭">取消</button>
+          <button class="btn primary" data-toast="开始复制">开始搬家</button>
+        </div>
+        <div class="note">勾「保留旧位置」时，旧库只多占空间，不影响使用；不勾才会在校验通过后删掉旧位置。</div>
+      </div>
+    </section>
+
+    <!-- ④ 进度 -->
+    <section class="card hidden" data-stage="progress">
+      <div class="kicker">搬家进行中</div>
+      <h2 id="pg-title">正在复制到 D:\Picarium</h2>
+      <p class="dim" id="pg-sub">1,248 个文件 · 已复制 1.32 / 2.31 GB</p>
+      <div class="prog"><i id="pg-bar" style="width:57%"></i></div>
+      <div class="row" style="border:none;padding:0;margin:0">
+        <span class="dim" id="pg-left">712 / 1,248 个文件</span>
+        <span class="grow"></span>
+        <span class="dim" id="pg-right">57%</span>
+      </div>
+      <div class="steps">
+        <div class="step done"><span class="dot">✓</span> 准备：暂停导入与剪贴板监听</div>
+        <div class="step cur"><span class="dot">•</span> 复制 blobs / thumbs / trash / index.json</div>
+        <div class="step"><span class="dot"></span> 校验文件数与总字节（可加 sha 抽样）</div>
+        <div class="step"><span class="dot"></span> 写 config.json 指针</div>
+        <div class="step"><span class="dot"></span> 删除旧位置（未勾保留时）</div>
+        <div class="step"><span class="dot"></span> 提示重启应用</div>
+      </div>
+      <div class="warn-box">搬家期间会暂停导入；「取消」会停在安全点：清理目标半成品，旧库继续可用。</div>
+      <div class="actions" style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px">
+        <button class="btn" data-toast="会在当前文件完成后停下并清理">取消</button>
+        <button class="btn" disabled>下一步</button>
+      </div>
+    </section>
+
+    <!-- ⑤ 失败 -->
+    <section class="card hidden" data-stage="fail">
+      <div class="kicker">失败</div>
+      <h2>旧库没动，可以重试</h2>
+      <div class="bad-box">
+        <b>复制中断：无法写入 D:\Picarium\blobs\3f\…（磁盘已满）</b><br />
+        目标位置留下了一部分文件，指针仍是 C:\Users\13066\Picarium，当前库照常使用。
+      </div>
+      <div class="muted-box" style="margin-top:10px">校验没通过前不写指针、不删旧库；这是设计上的回滚点。</div>
+      <div class="actions" style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px">
+        <button class="btn" data-toast="删除目标半成品">清理目标并重试</button>
+        <button class="btn" data-toast="保留 D:\Picarium 供排查">保留目标文件</button>
+        <button class="btn primary" data-toast="关闭">好</button>
+      </div>
+    </section>
+
+    <!-- ⑥ 完成 -->
+    <section class="card hidden" data-stage="done">
+      <div class="kicker">完成</div>
+      <h2>搬家完成，需要重启应用</h2>
+      <p>新库：D:\Picarium（2.31 GB · 1,248 张，校验通过）。旧位置 C:\Users\13066\Picarium 按你的选择保留/已删除。</p>
+      <div class="dlg">
+        <h3>需要重启应用</h3>
+        <p>切换后要重启应用才会加载新库（不是重启电脑）。</p>
+        <div class="path">D:\Picarium</div>
+        <div class="actions">
+          <button class="btn" data-toast="稍后">稍后</button>
+          <button class="btn primary" data-toast="正在重启应用…">立即重启应用</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑧ 中断恢复 -->
+    <section class="card hidden" data-stage="recover">
+      <div class="kicker">下次启动 · 自动检测</div>
+      <h2>上次搬家没做完</h2>
+      <p>搬家过程会写一份日志（在 <code>config.json</code> 里，每一步落盘）。中途关软件、强制结束、断电，下次启动立刻能发现，不会假装成功。</p>
+      <div class="dlg">
+        <h3>发现未完成的搬家</h3>
+        <p>2026-11-21 20:31 从 <span class="mono">C:\Users\13066\Picarium</span> 搬到 <span class="mono">D:\Picarium</span>，停在「复制 712 / 1,248」。</p>
+        <div class="muted-box">
+          指针还没切换，<b>当前仍在使用旧库</b>，数据是完整的。目标位置只有一部分副本。
+        </div>
+        <div class="actions">
+          <button class="btn primary" data-toast="清理目标位置的半成品">清理目标文件（推荐）</button>
+          <button class="btn" data-toast="保留，稍后自己检查">保留目标文件</button>
+          <button class="btn" data-toast="在资源管理器中打开">打开目标文件夹</button>
+        </div>
+        <div class="note">
+          选目标时只允许空目录/新目录，所以清理只会删这次搬家新建的文件，不会碰你原来的东西。
+          不做「续传」：副本不完整，续传的边界更脆弱，直接清掉重来最稳。
+        </div>
+      </div>
+      <div class="warn-box" style="margin-top:12px">
+        搬家期间关闭窗口：旧库始终可用；下次启动会弹这个恢复提示。进度不会保留。
+      </div>
+    </section>
+
+    <!-- ⑨ 旧位置残留 -->
+    <section class="card hidden" data-stage="leftover">
+      <div class="kicker">已切换成功 · 旧位置还在</div>
+      <h2>新库已生效，旧库还占着空间</h2>
+      <p>发生在「指针已切换、还没来得及删旧位置」时中断；也可能是因为你勾了「保留旧位置」。</p>
+      <div class="dlg">
+        <h3>旧位置还在</h3>
+        <p>现在用的是 <span class="mono">D:\Picarium</span>（2.31 GB，校验通过）。旧位置 <span class="mono">C:\Users\13066\Picarium</span> 仍占用 2.31 GB。</p>
+        <div class="actions">
+          <button class="btn" data-toast="在资源管理器中打开旧位置">打开旧位置</button>
+          <button class="btn" data-toast="确认后删除旧位置">删除旧位置…</button>
+          <button class="btn primary" data-toast="保持现状">先留着</button>
+        </div>
+        <div class="note">
+          删除旧位置永远需要你手动确认（二次确认，显示将释放的空间）；App 不会自动删。
+          不删也不影响使用，只是多占一份空间。
+        </div>
+      </div>
+    </section>
+
+    <!-- ⑦ 库不可用 -->
+    <section class="card hidden" data-stage="broken">
+      <div class="kicker">启动 / 运行中</div>
+      <h2>库路径打不开</h2>
+      <p>常见于移动硬盘没插、网络盘断开、目录被改名或删除。此时不会自动清空指针，也不会悄悄建新库。</p>
+      <div class="dlg">
+        <h3>打不开 E:\Picarium</h3>
+        <p>路径不存在或没有权限。当前没有可用的库，需要选一个。</p>
+        <div class="path">E:\Picarium</div>
+        <div class="actions">
+          <button class="btn" data-toast="重新检查">重试</button>
+          <button class="btn" data-toast="打开选择器">选择其他库…</button>
+          <button class="btn" data-toast="用默认库：%USERPROFILE%\Picarium">用默认库</button>
+          <button class="btn danger" data-toast="退出 Picarium">退出</button>
+        </div>
+        <div class="note">重试成功就直接继续；选其他库只写指针；用默认库会在默认位置开一个空库（不删旧指针指向的文件）。</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="stagebar" style="justify-content:center">
+    <span class="dim">点上面的按钮切换状态；弹窗里的按钮只做演示，不会真的搬家。</span>
+  </div>
+
+<script>
+  const $ = (s, el = document) => el.querySelector(s);
+  const themeBtn = $('#theme');
+  themeBtn.addEventListener('click', () => {
+    const root = document.documentElement;
+    const light = root.dataset.theme === 'light';
+    root.dataset.theme = light ? 'dark' : 'light';
+    themeBtn.textContent = light ? '切换浅色' : '切换深色';
+  });
+  function show(name) {
+    document.querySelectorAll('[data-stage]').forEach((el) => {
+      el.classList.toggle('hidden', el.dataset.stage !== name);
+    });
+    document.querySelectorAll('#stages button').forEach((b) => {
+      b.classList.toggle('on', b.dataset.s === name);
+    });
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('#stages button');
+    if (b) show(b.dataset.s);
+    const t = e.target.closest('[data-toast]');
+    if (t) {
+      t.style.outline = '2px solid var(--accent)';
+      setTimeout(() => (t.style.outline = ''), 600);
+    }
+    const opt = e.target.closest('.opt');
+    if (opt) {
+      const group = opt.parentElement.querySelectorAll('.opt');
+      group.forEach((o) => o.classList.toggle('on', o === opt));
+      group.forEach((o) => (o.querySelector('input').checked = o === opt));
+    }
+  });
+</script>
+</body>
+</html>

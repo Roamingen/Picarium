@@ -164,6 +164,43 @@ pub fn forget_recent(path: &str) -> std::io::Result<()> {
     write_atomic(&pointer_path(), &text)
 }
 
+/// 读整个指针文件；不存在或坏掉返回 `None`。
+pub fn pointer_json() -> Option<serde_json::Value> {
+    let text = std::fs::read_to_string(pointer_path()).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+/// 原样写回指针文件（原子）。搬家的 `move` 日志也走这里。
+pub fn write_pointer_json(v: &serde_json::Value) -> std::io::Result<()> {
+    let text = serde_json::to_string_pretty(v).unwrap_or_else(|_| "{}".to_string());
+    write_atomic(&pointer_path(), &text)
+}
+
+/// 读搬家日志（没有返回 `None`）。
+pub fn move_journal() -> Option<serde_json::Value> {
+    pointer_json()?
+        .get("move")
+        .cloned()
+        .filter(|v| v.is_object())
+}
+
+/// 写/清搬家日志，其余字段（libraryPath/recent）原样保留。
+pub fn set_move_journal(journal: Option<&serde_json::Value>) -> std::io::Result<()> {
+    let mut v = pointer_json().unwrap_or_else(|| serde_json::json!({ "schema": 1 }));
+    let Some(obj) = v.as_object_mut() else {
+        return Ok(());
+    };
+    match journal {
+        Some(j) => {
+            obj.insert("move".to_string(), j.clone());
+        }
+        None => {
+            obj.remove("move");
+        }
+    }
+    write_pointer_json(&v)
+}
+
 fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, text)?;

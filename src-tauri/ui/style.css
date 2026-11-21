@@ -3546,6 +3546,35 @@ input[type="checkbox"]:checked {
 /* 确认弹窗：盖在设置面板之上 */
 #confirm.modal-mask { z-index: 130; }
 #restart-dlg.modal-mask { z-index: 130; }
+#move-confirm-dlg.modal-mask, #move-dlg.modal-mask { z-index: 130; }
+#lib-fail-dlg.modal-mask { z-index: 140; }
+#lib-fail-dlg .modal { min-width: 470px; max-width: 540px; }
+#lib-fail-dlg .modal-actions button { white-space: nowrap; }
+
+/* 搬家：确认框里的复选框行 + 进度条 */
+.check-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--fg-dim);
+  user-select: none;
+  cursor: pointer;
+}
+.mv-bar {
+  height: 8px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.mv-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  transition: width 0.12s linear;
+}
 
 /* 库指针打不开时的提示条（设置 › 数据） */
 .lib-banner {

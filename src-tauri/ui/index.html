@@ -201,6 +201,52 @@
     </div>
   </div>
 
+  <div id="move-confirm-dlg" class="modal-mask" hidden>
+    <div class="modal small">
+      <div class="modal-head"><span class="modal-title">搬家到新位置</span></div>
+      <div class="confirm-text" id="move-confirm-text">…</div>
+      <div class="dlg-path dim" id="move-confirm-path"></div>
+      <label class="check-line" style="margin-top:10px">
+        <input type="checkbox" id="move-keep-old" />
+        <span>保留旧位置（多占一份空间，作为备份）</span>
+      </label>
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button id="move-cancel" class="btn" type="button">取消</button>
+        <button id="move-start" class="btn primary" type="button">开始搬家</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="move-dlg" class="modal-mask" hidden>
+    <div class="modal small">
+      <div class="modal-head"><span class="modal-title">正在搬家</span></div>
+      <div class="confirm-text" id="move-phase">准备…</div>
+      <div class="mv-bar"><div id="move-fill" class="mv-fill"></div></div>
+      <div class="dlg-path dim" id="move-detail"></div>
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button id="move-abort" class="btn" type="button">取消搬家</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="lib-fail-dlg" class="modal-mask" hidden>
+    <div class="modal small">
+      <div class="modal-head"><span class="modal-title">库打不开</span></div>
+      <div class="confirm-text">上次使用的库现在打不开，可能是移动硬盘没插、文件夹被删或改名了。</div>
+      <div id="lib-fail-path" class="dlg-path dim"></div>
+      <div class="confirm-text dim">当前只是临时用别的库，库指针没有改。选一个操作：</div>
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button id="lib-fail-quit" class="btn" type="button">退出</button>
+        <button id="lib-fail-default" class="btn" type="button">用默认库</button>
+        <button id="lib-fail-pick" class="btn" type="button">选择其他库…</button>
+        <button id="lib-fail-retry" class="btn primary" type="button">重试</button>
+      </div>
+    </div>
+  </div>
+
   <div id="cardmenu" class="menu cm ctx-menu" role="menu" hidden></div>
 
   <div id="gmenu" class="menu ctx-menu" role="menu" hidden></div>
@@ -320,9 +366,20 @@
       <div class="set-row">
         <div class="set-text">
           <div class="set-label">搬家</div>
-          <div class="dim set-value">把整个库迁到新位置，带进度条（下一批开放）</div>
+          <div class="dim set-value">把整个库整体迁到新位置（同盘直接移动，跨盘复制后切换）；带进度条，中途可以取消。</div>
         </div>
-        <button id="lib-move" class="btn small" type="button" disabled>搬家…</button>
+        <button id="lib-move" class="btn small" type="button">搬家…</button>
+      </div>
+      <div id="lib-old-row" class="set-row" hidden>
+        <div class="set-text">
+          <div class="set-label">旧位置</div>
+          <div id="lib-old-path" class="dim set-value"></div>
+          <div class="dim set-value">新库已经生效，旧位置只是多占空间；确认没问题后再删。</div>
+        </div>
+        <div class="set-btns">
+          <button id="lib-old-open" class="btn small" type="button">打开旧位置</button>
+          <button id="lib-old-remove" class="btn small danger" type="button">删除旧位置…</button>
+        </div>
       </div>
       <div class="set-row set-import-row">
         <div class="set-text">
