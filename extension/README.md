@@ -12,6 +12,14 @@ npm run typecheck  # 可选
 npm test           # 可选：URL 归一化/格式嗅探/base64/按钮几何单测
 ```
 
+## 出包（分发用 zip）
+
+```powershell
+pwsh -NoProfile -File scripts/pack-extension.ps1
+```
+
+产物 `release/extension/Picarium-extension-<版本>.zip`：zip 根目录就是扩展内容（`manifest.json` 在根，解压后把**解压出的目录**加载进 `chrome://extensions`，不是 `extension/dist`）。版本以 `extension/manifest.json` 为准，和 `package.json` 不一致会直接报错；`-NoBuild` 可跳过重新构建、只用现有 `dist/`。`release/` 已 gitignore，zip 不入库。
+
 ## 加载
 
 1. 先启动桌面端 Picarium（桥只在桌面端启动）。
