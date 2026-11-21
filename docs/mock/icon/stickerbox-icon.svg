@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="104 103 1046 1046">
+  <title>StickerBox icon</title>
+  <defs>
+    <linearGradient id="bg" x1="104" y1="103" x2="1150" y2="1149" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#63A9FB"/><stop offset=".35" stop-color="#4180FA"/>
+      <stop offset=".62" stop-color="#2A64F3"/><stop offset=".85" stop-color="#1C53EA"/><stop offset="1" stop-color="#1547D8"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="440" x2="0" y2="960" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4D93FE"/><stop offset=".55" stop-color="#3F84FD"/><stop offset="1" stop-color="#2C6EF9"/>
+    </linearGradient>
+    <linearGradient id="wb" x1="0" y1="443" x2="0" y2="530" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C2DAFE"/><stop offset="1" stop-color="#B0CFFC"/>
+    </linearGradient>
+    <linearGradient id="p2" x1="0" y1="690" x2="0" y2="850" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E2EEFE"/><stop offset="1" stop-color="#C6DBFD"/>
+    </linearGradient>
+    <linearGradient id="p3" x1="0" y1="660" x2="0" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#CFE3FE"/><stop offset=".5" stop-color="#DCEBFE"/><stop offset="1" stop-color="#FDFEFF"/>
+    </linearGradient>
+    <linearGradient id="under" x1="760" y1="658" x2="676" y2="750" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5587FD"/><stop offset=".35" stop-color="#5E8EFD"/><stop offset=".72" stop-color="#84A9FE"/><stop offset="1" stop-color="#A9C6FE"/>
+    </linearGradient>
+    <linearGradient id="bub" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7BA3FE"/><stop offset="1" stop-color="#CFE0FA"/>
+    </linearGradient>
+    <clipPath id="jar"><path d="M354 410C354.0 417.0 359.2 437.0 354 452C348.8 467.0 331.7 483.7 323 500C314.3 516.3 307.8 533.3 302 550C296.2 566.7 291.7 583.3 288 600C284.3 616.7 281.5 633.3 280 650C278.5 666.7 277.8 683.3 279 700C280.2 716.7 282.5 733.3 287 750C291.5 766.7 297.8 783.3 306 800C314.2 816.7 323.3 833.3 336 850C348.7 866.7 361.8 884.7 382 900C402.2 915.3 432.0 933.2 457 942C482.0 950.8 503.5 950.8 532 953C560.5 955.2 596.0 955.0 628 955C660.0 955.0 695.5 955.2 724 953C752.5 950.8 774.0 950.8 799 942C824.0 933.2 853.8 915.3 874 900C894.2 884.7 907.3 866.7 920 850C932.7 833.3 941.8 816.7 950 800C958.2 783.3 964.5 766.7 969 750C973.5 733.3 975.8 716.7 977 700C978.2 683.3 977.5 666.7 976 650C974.5 633.3 971.7 616.7 968 600C964.3 583.3 959.8 566.7 954 550C948.2 533.3 941.7 516.3 933 500C924.3 483.7 907.2 467.0 902 452C896.8 437.0 902.0 417.0 902 410"/></clipPath>
+    <clipPath id="sq"><path d="M553.2 563.5Q576 551 600.4 560.0L821.6 641.0Q846 650 823.2 662.6L678.8 742.4Q656 755 631.6 746.1L409.4 664.9Q385 656 407.8 643.5Z"/></clipPath>
+  </defs>
+
+  <rect x="104" y="103" width="1046" height="1046" rx="187" ry="187" fill="url(#bg)"/>
+
+  <g clip-path="url(#jar)">
+    <rect x="290" y="440" width="680" height="540" fill="url(#water)"/>
+    <path d="M300 440L950 440L950 528C936 516 920 502 900 491C878 479 846 480 814 489C772 501 730 517 690 520C648 523 604 514 562 503C520 492 472 486 445 490C404 496 348 522 300 532Z" fill="url(#wb)"/>
+    <circle cx="847" cy="554" r="39" fill="url(#bub)"/>
+    <circle cx="874" cy="691" r="17" fill="url(#bub)"/>
+    <path d="M553.2 691.5Q576 679 600.4 688.0L821.6 769.0Q846 778 823.2 790.6L678.8 870.4Q656 883 631.6 874.1L409.4 792.9Q385 784 407.8 771.5Z" fill="none" stroke="url(#water)" stroke-width="52" stroke-linejoin="round"/>
+    <path d="M553.2 691.5Q576 679 600.4 688.0L821.6 769.0Q846 778 823.2 790.6L678.8 870.4Q656 883 631.6 874.1L409.4 792.9Q385 784 407.8 771.5Z" fill="url(#p3)"/>
+    <path d="M553.2 634.5Q576 622 600.4 631.0L821.6 712.0Q846 721 823.2 733.6L678.8 813.4Q656 826 631.6 817.1L409.4 735.9Q385 727 407.8 714.5Z" fill="none" stroke="url(#water)" stroke-width="52" stroke-linejoin="round"/>
+    <path d="M553.2 634.5Q576 622 600.4 631.0L821.6 712.0Q846 721 823.2 733.6L678.8 813.4Q656 826 631.6 817.1L409.4 735.9Q385 727 407.8 714.5Z" fill="url(#p2)"/>
+    <path d="M553.2 563.5Q576 551 600.4 560.0L821.6 641.0Q846 650 823.2 662.6L678.8 742.4Q656 755 631.6 746.1L409.4 664.9Q385 656 407.8 643.5Z" fill="none" stroke="url(#water)" stroke-width="52" stroke-linejoin="round"/>
+    <path d="M553.2 563.5Q576 551 600.4 560.0L821.6 641.0Q846 650 823.2 662.6L678.8 742.4Q656 755 631.6 746.1L409.4 664.9Q385 656 407.8 643.5Z" fill="#FFFFFF"/>
+    <g clip-path="url(#sq)">
+      <path d="M698.0 665.2Q704 644 725.2 650.0L788.8 668.0Q810 674 790.8 684.7L693.2 739.3Q674 750 680.0 728.8Z" fill="url(#under)"/>
+      <path d="" fill="#FFFFFF"/>
+    </g>
+  </g>
+  <path d="M354 410C354.0 417.0 359.2 437.0 354 452C348.8 467.0 331.7 483.7 323 500C314.3 516.3 307.8 533.3 302 550C296.2 566.7 291.7 583.3 288 600C284.3 616.7 281.5 633.3 280 650C278.5 666.7 277.8 683.3 279 700C280.2 716.7 282.5 733.3 287 750C291.5 766.7 297.8 783.3 306 800C314.2 816.7 323.3 833.3 336 850C348.7 866.7 361.8 884.7 382 900C402.2 915.3 432.0 933.2 457 942C482.0 950.8 503.5 950.8 532 953C560.5 955.2 596.0 955.0 628 955C660.0 955.0 695.5 955.2 724 953C752.5 950.8 774.0 950.8 799 942C824.0 933.2 853.8 915.3 874 900C894.2 884.7 907.3 866.7 920 850C932.7 833.3 941.8 816.7 950 800C958.2 783.3 964.5 766.7 969 750C973.5 733.3 975.8 716.7 977 700C978.2 683.3 977.5 666.7 976 650C974.5 633.3 971.7 616.7 968 600C964.3 583.3 959.8 566.7 954 550C948.2 533.3 941.7 516.3 933 500C924.3 483.7 907.2 467.0 902 452C896.8 437.0 902.0 417.0 902 410" fill="none" stroke="#FFFFFF" stroke-width="46" stroke-linejoin="round" stroke-linecap="round"/>
+  <path fill="#FFFFFF" fill-rule="evenodd"
+        d="M381 327h490a58 58 0 0 1 0 116H381a58 58 0 0 1 0-116Z
+           M395 369h463a18 18 0 0 1 0 37H395a18 18 0 0 1 0-37Z"/>
+</svg>

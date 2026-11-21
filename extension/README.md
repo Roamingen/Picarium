@@ -7,7 +7,7 @@
 ```bash
 cd extension
 npm install
-npm run build      # 产物在 dist/（含 manifest.json）
+npm run build      # 产物在 dist/（含 manifest.json 与图标 icon16/32/48/128.png）
 npm run typecheck  # 可选
 npm test           # 可选：URL 归一化/格式嗅探/base64/按钮几何单测
 ```
