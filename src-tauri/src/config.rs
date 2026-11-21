@@ -112,6 +112,39 @@ pub fn save_pointer(lib_root: &Path) -> std::io::Result<()> {
     write_atomic(&pointer_path(), &text)
 }
 
+/// 最近库列表（按指针文件里的顺序，最多 10 条）。
+pub fn recent() -> Vec<String> {
+    std::fs::read_to_string(pointer_path())
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .and_then(|v| v.get("recent").and_then(|r| r.as_array()).cloned())
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// 从最近库列表里移除一项（当前库请在调用方拦截）。
+pub fn forget_recent(path: &str) -> std::io::Result<()> {
+    let text = match std::fs::read_to_string(pointer_path()) {
+        Ok(t) => t,
+        Err(_) => return Ok(()),
+    };
+    let mut v: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(v) => v,
+        Err(_) => return Ok(()),
+    };
+    let Some(list) = v.get_mut("recent").and_then(|r| r.as_array_mut()) else {
+        return Ok(());
+    };
+    list.retain(|x| x.as_str() != Some(path));
+    let text = serde_json::to_string_pretty(&v).unwrap_or_else(|_| "{}".to_string());
+    write_atomic(&pointer_path(), &text)
+}
+
 fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, text)?;

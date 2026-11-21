@@ -3545,6 +3545,7 @@ input[type="checkbox"]:checked {
 
 /* 确认弹窗：盖在设置面板之上 */
 #confirm.modal-mask { z-index: 130; }
+#restart-dlg.modal-mask { z-index: 130; }
 .confirm-title {
   font-size: 13.5px;
   font-weight: 600;
@@ -4186,3 +4187,38 @@ footer.statusbar #empty-trash { height: 24px; padding: 0 8px; font-size: 11px; }
   .topbar-main { padding-left: 14px; }
   .topbar-main .search-wrap { flex: 1 1 auto; width: auto; }
 }
+
+/* 设置 › 数据 › 存储位置（多库） */
+.set-row-block { align-items: flex-start; }
+.recent-libs { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.recent-lib {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+}
+.recent-lib .rl-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-family: ui-monospace, Consolas, monospace;
+}
+.recent-lib .rl-tag {
+  flex: none;
+  font-size: 11px;
+  color: var(--dim);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  padding: 0 7px;
+}
+.recent-lib .rl-tag.warn { color: var(--danger); border-color: var(--danger-border); }
+.recent-lib .rl-act { flex: none; display: flex; gap: 6px; }
+.recent-lib .rl-act .btn { padding: 2px 8px; font-size: 12px; }
+.recent-libs .rl-empty { color: var(--dim); font-size: 12px; }
+.dlg-path { margin: 6px 0 2px; word-break: break-all; font-size: 12px; }

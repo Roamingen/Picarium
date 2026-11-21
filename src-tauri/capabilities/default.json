@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Picarium 默认权限：主窗口、快贴面板与字体设置窗",
   "windows": ["main", "panel", "font"],
-  "permissions": ["core:default", "dialog:default"]
+  "permissions": ["core:default", "dialog:default", "dialog:allow-open"]
 }

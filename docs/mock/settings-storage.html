@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<title>设置 › 数据 › 存储位置（预览）</title>
+<style>
+  :root[data-theme='dark']{
+    --bg:#14161a; --modal:#191d24; --surface-2:#232833; --line:#2a2f38; --line-2:#333a47; --line-3:#303642;
+    --hover:#2a3140; --active:#26354d; --fg:#e8eaed; --dim:#8b93a1; --dim-2:#5d6573;
+    --accent:#6ea8fe; --accent-fg:#dce7ff; --btn:#222833; --chip:#27303f;
+    --danger:#ff9aa2; --danger-strong:#ff6b78; --ok:#7dd3a0; --warn:#f0b35e;
+    --shadow:rgba(0,0,0,.55); --mask:rgba(0,0,0,.45); --sel-tint:rgba(110,168,254,.12);
+    --radius:10px;
+  }
+  :root[data-theme='light']{
+    --bg:#f5f6f8; --modal:#ffffff; --surface-2:#eef0f4; --line:#e2e5ea; --line-2:#d6dae1; --line-3:#dde1e7;
+    --hover:#eceef3; --active:#e3edff; --fg:#24272d; --dim:#6b7280; --dim-2:#98a0ac;
+    --accent:#3b82f6; --accent-fg:#1d4ed8; --btn:#f1f3f6; --chip:#eceef3;
+    --danger:#c2364a; --danger-strong:#d23c52; --ok:#21855a; --warn:#a36414;
+    --shadow:rgba(20,30,50,.18); --mask:rgba(20,30,50,.28); --sel-tint:rgba(59,130,246,.1);
+    --radius:10px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; min-height:100vh; padding:26px 20px 60px; background:var(--bg); color:var(--fg);
+       font:13px/1.6 "Segoe UI","Microsoft YaHei UI",sans-serif; display:flex; flex-direction:column; align-items:center; gap:14px}
+  .head{width:760px; display:flex; align-items:flex-start; gap:12px}
+  .head .txt{flex:1; color:var(--dim); font-size:12.5px}
+  .head b{display:block; color:var(--fg); font-size:15px; font-weight:600; margin-bottom:5px}
+  .themebtn{font:inherit; font-size:12px; padding:5px 10px; border-radius:8px; cursor:pointer;
+            background:var(--btn); color:var(--dim); border:1px solid var(--line-2)}
+  .themebtn:hover{color:var(--fg); background:var(--hover)}
+
+  /* 设置弹窗 */
+  .modal{width:760px; background:var(--modal); border:1px solid var(--line); border-radius:12px;
+         box-shadow:0 18px 50px var(--shadow); overflow:hidden}
+  .modal-head{display:flex; align-items:center; gap:10px; padding:14px 18px 10px}
+  .modal-title{font-size:15px; font-weight:600}
+  .modal-head .sp{flex:1}
+  .btn{font:inherit; font-size:12px; padding:5px 11px; border-radius:8px; cursor:pointer;
+       background:var(--btn); color:var(--fg); border:1px solid var(--line-2)}
+  .btn:hover{background:var(--hover)}
+  .btn.small{font-size:11.5px; padding:3px 9px}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{filter:brightness(1.05)}
+  .btn.danger{color:var(--danger-strong); border-color:var(--line-2)}
+  .btn.danger:hover{background:var(--chip); border-color:var(--danger-strong)}
+  .btn:disabled{opacity:.45; cursor:default}
+
+  .set-tabs{display:flex; gap:2px; padding:0 14px; border-bottom:1px solid var(--line)}
+  .set-tab{font:inherit; font-size:12.5px; padding:8px 12px; cursor:pointer; color:var(--dim);
+           background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-1px}
+  .set-tab:hover{color:var(--fg)}
+  .set-tab.active{color:var(--accent); border-bottom-color:var(--accent)}
+
+  .body{padding:4px 18px 16px; max-height:620px; overflow:auto}
+  .sec{display:flex; align-items:center; gap:8px; padding:14px 0 2px; color:var(--dim);
+       font-size:11.5px; letter-spacing:.02em}
+  .sec::after{content:""; flex:1; height:1px; background:var(--line)}
+  .badge{font-size:10.5px; padding:0 6px; border-radius:999px; color:var(--accent);
+         border:1px solid color-mix(in srgb, var(--accent) 45%, transparent); background:var(--sel-tint)}
+  .badge.later{color:var(--warn); border-color:color-mix(in srgb, var(--warn) 45%, transparent); background:transparent}
+
+  .set-row{display:flex; align-items:center; gap:14px; padding:9px 0}
+  .set-row + .set-row{border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent)}
+  .set-row.column{flex-direction:column; align-items:stretch; gap:8px}
+  .set-text{flex:1; min-width:0}
+  .set-label{font-size:13px}
+  .set-value{font-size:12px; color:var(--dim); margin-top:1px}
+  .dim{color:var(--dim-2); font-size:11.5px}
+  .mono{font-family:Consolas,"Cascadia Mono",monospace; font-size:12px; word-break:break-all}
+  .btns{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end}
+
+  .recent{display:flex; flex-direction:column; gap:6px}
+  .lib{display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:9px;
+       border:1px solid var(--line-2); background:color-mix(in srgb, var(--surface-2) 55%, transparent)}
+  .lib.cur{border-color:color-mix(in srgb, var(--accent) 55%, transparent); background:var(--sel-tint)}
+  .lib .p{flex:1; min-width:0}
+  .lib .p2{display:block; font-size:11.5px; color:var(--dim-2); margin-top:1px}
+  .tag{font-size:10.5px; padding:1px 7px; border-radius:999px; color:var(--accent);
+       border:1px solid color-mix(in srgb, var(--accent) 45%, transparent)}
+  .tag.miss{color:var(--danger); border-color:color-mix(in srgb, var(--danger) 50%, transparent)}
+
+  /* 库不可用状态 */
+  .banner{display:none; gap:10px; align-items:flex-start; margin:8px 0 2px; padding:10px 12px;
+          border-radius:9px; border:1px solid color-mix(in srgb, var(--danger) 40%, var(--line-2));
+          background:color-mix(in srgb, var(--danger) 8%, transparent); color:var(--danger)}
+  .banner.show{display:flex}
+  .banner b{display:block; color:var(--danger); font-weight:600; font-size:12.5px; margin-bottom:2px}
+  .banner .dim{color:color-mix(in srgb, var(--danger) 70%, var(--dim-2))}
+  .banner .btns{margin-left:auto}
+
+  .footnote{width:760px; color:var(--dim-2); font-size:11.5px; line-height:1.7}
+  .footnote code{background:var(--surface-2); padding:1px 5px; border-radius:4px; color:var(--dim)}
+  .footnote .demo{display:flex; gap:10px; align-items:center; margin-top:6px; flex-wrap:wrap}
+  .footnote .demo button{font:inherit; font-size:11.5px; padding:3px 9px; border-radius:7px; cursor:pointer;
+                         background:var(--btn); color:var(--dim); border:1px dashed var(--line-2)}
+  .footnote .demo button:hover{color:var(--fg)}
+
+  /* 弹层 */
+  .dlg-mask{position:fixed; inset:0; background:var(--mask); display:none; align-items:center; justify-content:center; z-index:20}
+  .dlg-mask.show{display:flex}
+  .dlg{width:440px; background:var(--modal); border:1px solid var(--line); border-radius:12px;
+       box-shadow:0 20px 60px var(--shadow); padding:16px 18px}
+  .dlg h3{margin:0 0 6px; font-size:14px; font-weight:600}
+  .dlg p{margin:0 0 10px; color:var(--dim); font-size:12.5px}
+  .dlg .path{padding:8px 10px; border-radius:8px; background:var(--surface-2); border:1px solid var(--line-2);
+             font-family:Consolas,"Cascadia Mono",monospace; font-size:11.5px; word-break:break-all; margin-bottom:12px}
+  .dlg .actions{display:flex; gap:8px; justify-content:flex-end; margin-top:14px}
+  .dlg .note{font-size:11.5px; color:var(--dim-2); margin-top:8px}
+
+  .prog{height:8px; border-radius:99px; background:var(--surface-2); overflow:hidden; margin:6px 0 8px}
+  .prog > i{display:block; height:100%; width:0; background:var(--accent); border-radius:99px; transition:width .35s ease}
+  .prog-text{display:flex; justify-content:space-between; font-size:11.5px; color:var(--dim-2)}
+  .move-foot{display:flex; align-items:center; gap:8px; margin-top:10px}
+  .move-foot .grow{flex:1}
+  .checkline{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--dim); margin:8px 0}
+
+  kbd{display:inline-block; padding:0 5px; border:1px solid var(--line-2); border-bottom-width:2px;
+      border-radius:4px; background:var(--surface-2); font:11px/1.7 inherit}
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="txt">
+      <b>设置 › 数据 › 存储位置（预览 · 批 2）</b>
+      库（图片数据）和配置已经拆开：换库只换 <code>index.json + blobs/</code>，主题、设置这些留在 <code>%APPDATA%\Picarium</code>，不会跟着库走。
+    </div>
+    <button class="themebtn" id="theme">切换浅色</button>
+  </div>
+
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">设置</span>
+      <span class="sp"></span>
+      <button class="btn small">保存并关闭</button>
+    </div>
+    <div class="set-tabs">
+      <button class="set-tab">常规</button>
+      <button class="set-tab">外观</button>
+      <button class="set-tab">按键</button>
+      <button class="set-tab active">数据</button>
+    </div>
+
+    <div class="body">
+      <div class="sec">存储位置 <span class="badge">新</span></div>
+
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">当前库</div>
+          <div class="set-value mono" id="cur-path">C:\Users\13066\Picarium</div>
+          <div class="dim" id="cur-meta">1,248 张图片 · 2.31 GB · 上次使用 2 分钟前</div>
+        </div>
+        <div class="btns">
+          <button class="btn small" data-toast="已在资源管理器中打开">打开文件夹</button>
+          <button class="btn small" data-toast="已复制路径">复制路径</button>
+        </div>
+      </div>
+
+      <div class="banner" id="broken">
+        <div>
+          <b>库路径打不开</b>
+          <div class="dim">E:\Picarium 可能所在的移动硬盘没有插上（或权限不足）。可以插好后重试，或者改用其他库。</div>
+        </div>
+        <div class="btns">
+          <button class="btn small" data-toast="正在重试…">重试</button>
+          <button class="btn small" data-toast="打开选择目录对话框（批 2 实现）">选择其他库…</button>
+          <button class="btn small" data-toast="将使用默认库，重启后生效">用默认库</button>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">其他库</div>
+          <div class="dim">新建一个空库，或打开别处已有的库；当前库不会被删除。</div>
+        </div>
+        <div class="btns">
+          <button class="btn small" data-toast="选择目录后创建空库（批 2 实现）">新建库…</button>
+          <button class="btn small" data-toast="选择已有库目录（批 2 实现）">打开其他库…</button>
+        </div>
+      </div>
+
+      <div class="set-row column">
+        <div class="set-text">
+          <div class="set-label">最近库</div>
+          <div class="dim set-value">点「切换」后弹窗提示重启；列表记录最近 10 个，路径失效的会标出来。</div>
+        </div>
+        <div class="recent" id="recent">
+          <div class="lib cur">
+            <div class="p">
+              <span class="mono">C:\Users\13066\Picarium</span>
+              <span class="p2">1,248 张 · 2.31 GB · 今天 16:58 使用</span>
+            </div>
+            <span class="tag">当前</span>
+          </div>
+          <div class="lib">
+            <div class="p">
+              <span class="mono">D:\表情库\Picarium</span>
+              <span class="p2">892 张 · 1.12 GB · 昨天 22:14 使用</span>
+            </div>
+            <button class="btn small" data-switch="D:\表情库\Picarium">切换</button>
+          </div>
+          <div class="lib">
+            <div class="p">
+              <span class="mono">E:\Picarium</span>
+              <span class="p2">最近未使用 · 路径不可用</span>
+            </div>
+            <span class="tag miss">不可用</span>
+            <button class="btn small" data-toast="从列表移除">移除</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">搬家</div>
+          <div class="dim">把当前库整体移动到新位置（复制 → 校验 → 切换指针），带进度条；完成后重启。搬完前旧位置原样保留，失败可回退。</div>
+        </div>
+        <div class="btns">
+          <button class="btn small danger" id="move">搬家到其他位置…</button>
+        </div>
+      </div>
+
+      <div class="sec">库数据</div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">彻底删除时</div>
+          <div class="dim">「彻底删除 / 清空回收站」如何处理文件</div>
+        </div>
+        <button class="btn small">移入系统回收站 ▾</button>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">回收站保留</div>
+          <div class="dim">到期后下次启动清理；改小时先告诉你有几张要清</div>
+        </div>
+        <button class="btn small">30 天 ▾</button>
+      </div>
+      <div class="set-row">
+        <div class="set-text">
+          <div class="set-label">设置备份</div>
+          <div class="dim">导出到配置目录（不再是库目录），或从 JSON 文件导入</div>
+        </div>
+        <div class="btns">
+          <button class="btn small">导出</button>
+          <button class="btn small">导入…</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footnote">
+    <div><b>说明</b>：①「其他库 / 最近库」是批 2 的实现范围；②「搬家」进度条排在批 3，这里先把入口和弹窗样式定下来；③ 配置跟着用户走：换库后主题、快捷键、窗口位置都不变。</div>
+    <div class="demo">
+      预览其它状态：
+      <button id="show-broken">库不可用（批 3 兜底）</button>
+      <button id="show-restart">切换库后的重启弹窗</button>
+      <button id="show-move">搬家进度条</button>
+    </div>
+  </div>
+
+  <!-- 重启提示 -->
+  <div class="dlg-mask" id="dlg-restart">
+    <div class="dlg">
+      <h3>已切换库，需要重启</h3>
+      <p>新库将在重启后生效，当前窗口会关闭并重新打开。没有保存的东西请先处理。</p>
+      <div class="path" id="restart-path">D:\表情库\Picarium</div>
+      <div class="actions">
+        <button class="btn" data-close>稍后重启</button>
+        <button class="btn primary" data-toast="正在重启 Picarium…">立即重启</button>
+      </div>
+      <div class="note">重启后如果新库打不开，会回到上一个库并提示原因，不会卡在启动失败。</div>
+    </div>
+  </div>
+
+  <!-- 搬家进度 -->
+  <div class="dlg-mask" id="dlg-move">
+    <div class="dlg" style="width:470px">
+      <h3>搬家到新位置 <span class="badge later">批 3</span></h3>
+      <p>把当前库整体复制到新位置，校验通过后再切换并重启；旧位置原样保留，可随时回退。</p>
+      <div class="path">E:\Picarium</div>
+      <div class="prog"><i id="progbar"></i></div>
+      <div class="prog-text"><span id="progmsg">正在复制… 712 / 1,248 个文件</span><span id="progpct">57%</span></div>
+      <div class="move-foot">
+        <label class="checkline"><input type="checkbox" checked /> 搬完删除旧位置</label>
+        <span class="grow"></span>
+        <button class="btn" data-close>取消</button>
+        <button class="btn primary" data-toast="完成后将提示重启">完成后重启</button>
+      </div>
+      <div class="note">空间不足、目标目录不可写、复制中断都会停在进度条并保留旧库。</div>
+    </div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const themeBtn = $('theme');
+  themeBtn.addEventListener('click', () => {
+    const root = document.documentElement;
+    const light = root.dataset.theme === 'light';
+    root.dataset.theme = light ? 'dark' : 'light';
+    themeBtn.textContent = light ? '切换浅色' : '切换深色';
+  });
+
+  let toastTimer = null;
+  function toast(msg) {
+    let el = document.getElementById('toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'toast';
+      el.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);' +
+        'background:var(--btn);color:var(--fg);border:1px solid var(--line-2);border-radius:8px;' +
+        'padding:7px 14px;font-size:12px;box-shadow:0 8px 24px var(--shadow);z-index:40;opacity:0;transition:opacity .18s';
+      document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.opacity = '1';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.style.opacity = '0'; }, 1800);
+  }
+  document.querySelectorAll('[data-toast]').forEach((b) => {
+    b.addEventListener('click', () => toast(b.dataset.toast));
+  });
+
+  const mask = (id, show) => $(id).classList.toggle('show', show);
+  document.querySelectorAll('.dlg-mask').forEach((m) => {
+    m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('show'); });
+  });
+  document.querySelectorAll('[data-close]').forEach((b) => {
+    b.addEventListener('click', () => b.closest('.dlg-mask').classList.remove('show'));
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelectorAll('.dlg-mask.show').forEach((m) => m.classList.remove('show'));
+  });
+
+  document.querySelectorAll('[data-switch]').forEach((b) => {
+    b.addEventListener('click', () => {
+      $('restart-path').textContent = b.dataset.switch;
+      mask('dlg-restart', true);
+    });
+  });
+  $('show-restart').addEventListener('click', () => mask('dlg-restart', true));
+  $('show-broken').addEventListener('click', () => {
+    const el = $('broken');
+    el.classList.toggle('show');
+    $('cur-path').textContent = el.classList.contains('show') ? 'E:\\Picarium（不可用）' : 'C:\\Users\\13066\\Picarium';
+  });
+
+  // 搬家进度演示：打开后从 57% 走到 100%
+  let timer = null;
+  function startMove() {
+    mask('dlg-move', true);
+    let p = 57;
+    $('progbar').style.width = p + '%';
+    $('progpct').textContent = p + '%';
+    clearInterval(timer);
+    timer = setInterval(() => {
+      p = Math.min(100, p + 1);
+      $('progbar').style.width = p + '%';
+      $('progpct').textContent = p + '%';
+      if (p >= 100) {
+        clearInterval(timer);
+        $('progmsg').textContent = '复制完成 · 校验通过 · 等待重启';
+        $('progpct').textContent = '100%';
+      } else {
+        $('progmsg').textContent = `正在复制… ${Math.round(1248 * p / 100)} / 1,248 个文件`;
+      }
+    }, 90);
+  }
+  $('move').addEventListener('click', startMove);
+  $('show-move').addEventListener('click', startMove);
+</script>
+</body>
+</html>

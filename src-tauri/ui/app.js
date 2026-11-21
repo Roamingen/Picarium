@@ -3735,6 +3735,7 @@ async function openSettings() {
   await loadThemes();
   fillThemeOptions();
   $('set-root').textContent = s.root;
+  await refreshLibraryLocations();
   $('set-clip').checked = s.clipboardEnabled;
   $('set-auto').checked = s.autostart;
   $('set-theme').value = theme;
@@ -3791,6 +3792,153 @@ $('settings').addEventListener('click', (e) => {
   if (e.target === $('settings')) $('settings').hidden = true;
 });
 $('set-open').addEventListener('click', () => invoke('open_library_folder'));
+
+/* ---------- 设置 › 存储位置（多库） ---------- */
+
+async function pickDirectory(title) {
+  const p = await invoke('plugin:dialog|open', {
+    options: { directory: true, multiple: false, title },
+  });
+  return typeof p === 'string' ? p : null;
+}
+
+function renderRecentLibs(list) {
+  const box = $('recent-libs');
+  box.textContent = '';
+  if (!list || !list.length) {
+    const empty = document.createElement('div');
+    empty.className = 'rl-empty';
+    empty.textContent = '还没有其他库';
+    box.appendChild(empty);
+    return;
+  }
+  for (const item of list) {
+    const row = document.createElement('div');
+    row.className = 'recent-lib';
+    const path = document.createElement('div');
+    path.className = 'rl-path';
+    path.textContent = item.path;
+    path.title = item.path;
+    row.appendChild(path);
+    if (item.current) {
+      const tag = document.createElement('span');
+      tag.className = 'rl-tag';
+      tag.textContent = '当前';
+      row.appendChild(tag);
+    } else if (!item.exists) {
+      const tag = document.createElement('span');
+      tag.className = 'rl-tag warn';
+      tag.textContent = '找不到';
+      row.appendChild(tag);
+    }
+    const act = document.createElement('div');
+    act.className = 'rl-act';
+    if (!item.current && item.exists) {
+      const use = document.createElement('button');
+      use.type = 'button';
+      use.className = 'btn small';
+      use.textContent = '切换';
+      use.addEventListener('click', () => useLibrary(item.path, false));
+      act.appendChild(use);
+    }
+    if (!item.current) {
+      const forget = document.createElement('button');
+      forget.type = 'button';
+      forget.className = 'btn small';
+      forget.textContent = '移除';
+      forget.addEventListener('click', async () => {
+        try {
+          await invoke('library_forget', { path: item.path });
+          await refreshLibraryLocations();
+        } catch (e) {
+          toast('移除失败：' + e);
+        }
+      });
+      act.appendChild(forget);
+    }
+    if (act.childElementCount) row.appendChild(act);
+    box.appendChild(row);
+  }
+}
+
+async function refreshLibraryLocations() {
+  try {
+    const info = await invoke('library_locations');
+    $('set-root').textContent = info.root;
+    $('set-root-meta').textContent = `${info.assets} 张 · ${fmtSize(info.bytes)}`;
+    renderRecentLibs(info.recent);
+    return info;
+  } catch (e) {
+    toast('读取库信息失败：' + e);
+    return null;
+  }
+}
+
+function showRestartDialog(path) {
+  $('restart-dlg-path').textContent = path;
+  $('restart-dlg').hidden = false;
+}
+
+async function useLibrary(path, create) {
+  let check;
+  try {
+    check = await invoke('library_dir_check', { path });
+  } catch (e) {
+    return toast('检查目录失败：' + e);
+  }
+  if (!check.isAbsolute) return toast('请选择绝对路径');
+  if (create) {
+    if (check.isLibrary) return toast('这个目录已经是库了');
+    if (check.exists && !check.empty) return toast('目录不是空的：请选空目录，或改用「打开其他库」');
+  } else if (!check.exists || !check.isLibrary) {
+    return toast('这个目录不是 Picarium 库（没有 index.json）');
+  }
+  const verb = create ? '在这里新建库' : '切换到这个库';
+  const ok = await confirmDialog(`${verb}：${path}（切换后需要重启才会生效）`);
+  if (!ok) return;
+  try {
+    await invoke('library_use', { path, create });
+    await refreshLibraryLocations();
+    showRestartDialog(path);
+  } catch (e) {
+    toast('切换失败：' + e);
+  }
+}
+
+async function pickNewLibrary() {
+  try {
+    const dir = await pickDirectory('选择新建库的位置（空目录）');
+    if (dir) await useLibrary(dir, true);
+  } catch (e) {
+    toast('打开选择器失败：' + e);
+  }
+}
+
+async function pickOpenLibrary() {
+  try {
+    const dir = await pickDirectory('选择已有 Picarium 库');
+    if (dir) await useLibrary(dir, false);
+  } catch (e) {
+    toast('打开选择器失败：' + e);
+  }
+}
+
+$('lib-new').addEventListener('click', pickNewLibrary);
+$('lib-open').addEventListener('click', pickOpenLibrary);
+$('set-copy-root').addEventListener('click', async () => {
+  const text = $('set-root').textContent || '';
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('已复制库路径');
+  } catch {
+    toast('复制失败：' + text);
+  }
+});
+$('restart-later').addEventListener('click', () => ($('restart-dlg').hidden = true));
+$('restart-now').addEventListener('click', () => invoke('restart_app'));
+$('restart-dlg').addEventListener('click', (e) => {
+  if (e.target === $('restart-dlg')) $('restart-dlg').hidden = true;
+});
 
 $('hotkey-edit').addEventListener('click', () => startHotkeyCapture('panel'));
 $('help-close')?.addEventListener('click', closeHelp);
@@ -3904,6 +4052,9 @@ const SETTING_TAB_BY_LABEL = {
   光标环配色: 'appearance',
   滚动留白: 'appearance',
   表情库位置: 'data',
+  其他库: 'data',
+  最近库: 'data',
+  搬家: 'data',
   彻底删除时: 'data',
   回收站保留: 'data',
   设置备份: 'data',
@@ -6678,6 +6829,40 @@ async function runAcceptSuite() {
     await sleep(40);
     applySettingsTab('general');
 
+    // 存储位置：多库命令 + 设置页渲染（批 2）
+    await openSettings();
+    await sleep(120);
+    applySettingsTab('data');
+    await sleep(80);
+    const loc = await invoke('library_locations');
+    check('存储页读到当前库', !!loc.root && loc.root === $('set-root').textContent, `root=${loc.root}`);
+    check('存储页显示库大小', /张 ·/.test($('set-root-meta').textContent), $('set-root-meta').textContent);
+    check(
+      '最近库包含当前库并标记',
+      Array.isArray(loc.recent) && loc.recent.some((r) => r.current === true),
+      JSON.stringify(loc.recent)
+    );
+    check('最近库列表渲染当前项', !!document.querySelector('#recent-libs .recent-lib .rl-tag'), 'tag');
+    check('搬家按钮暂不可用', $('lib-move').disabled === true);
+    const chkLib = await invoke('library_dir_check', { path: loc.root });
+    check('目录检查识别 Picarium 库', chkLib.isLibrary === true && chkLib.isAbsolute === true, JSON.stringify(chkLib));
+    const missingDir = loc.root.replace(/[\\/][^\\/]+$/, '') + '\\__picarium_missing__';
+    const chkMissing = await invoke('library_dir_check', { path: missingDir });
+    check('目录检查识别不存在的目录', chkMissing.exists === false, JSON.stringify(chkMissing));
+    let rejected = '';
+    try {
+      await invoke('library_use', { path: missingDir, create: false });
+    } catch (e) {
+      rejected = String(e);
+    }
+    check('切换到不存在的库会被拒绝', /不存在|不是 Picarium/.test(rejected), rejected);
+    showRestartDialog('C:\\demo\\lib');
+    await sleep(40);
+    check('切库后弹重启提示', !$('restart-dlg').hidden && $('restart-dlg-path').textContent === 'C:\\demo\\lib');
+    $('restart-later').click();
+    check('重启提示可稍后', $('restart-dlg').hidden === true);
+    applySettingsTab('general');
+
     // 设置搜索：放大镜入口 / 结果分组 / 跳转 / Esc 两级退出
     $('set-search-open').click();
     await sleep(60);
@@ -7235,6 +7420,11 @@ window.addEventListener('unhandledrejection', (e) => {
     await new Promise((r) => setTimeout(r, 300));
     const row = $('p-blacklist');
     if (row) row.scrollIntoView({ block: 'center' });
+  }
+  if (ui === 'settings:data-restart') {
+    await openSettings();
+    applySettingsTab('data');
+    showRestartDialog('D:\\Pictures\\Picarium');
   }
   if (ui === 'filters') openFilterPanel();
   if (ui === 'filters:on') {

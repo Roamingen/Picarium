@@ -537,6 +537,94 @@ pub fn library_stats(state: State<'_, AppState>) -> Result<serde_json::Value, St
     serde_json::to_value(lib.stats()).map_err(|e| e.to_string())
 }
 
+/// 设置页「存储位置」需要的信息：当前库、大小、最近库（含是否还存在）。
+#[tauri::command]
+pub fn library_locations(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    let (root, assets, bytes) = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        let stats = lib.stats();
+        (lib.root().to_path_buf(), stats.assets, stats.bytes)
+    };
+    let cur = root.to_string_lossy().to_string();
+    let recent: Vec<serde_json::Value> = crate::config::recent()
+        .into_iter()
+        .map(|p| {
+            serde_json::json!({
+                "path": p,
+                "exists": std::path::Path::new(&p).is_dir(),
+                "current": p == cur,
+            })
+        })
+        .collect();
+    Ok(serde_json::json!({
+        "root": cur,
+        "assets": assets,
+        "bytes": bytes,
+        "recent": recent,
+    }))
+}
+
+/// 检查用户选的目录：已存在的库 / 空目录 / 不是库 / 父目录不存在。
+#[tauri::command]
+pub fn library_dir_check(path: String) -> Result<serde_json::Value, String> {
+    let raw = path.trim();
+    if raw.is_empty() {
+        return Err("路径为空".to_string());
+    }
+    let root = std::path::PathBuf::from(raw);
+    let exists = root.is_dir();
+    let is_library = root.join("index.json").is_file();
+    let empty = exists
+        && std::fs::read_dir(&root)
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(false);
+    let parent_ok = root
+        .parent()
+        .map(|p| p.is_dir())
+        .unwrap_or(false);
+    Ok(serde_json::json!({
+        "exists": exists,
+        "isLibrary": is_library,
+        "empty": empty,
+        "parentOk": parent_ok,
+        "isAbsolute": root.is_absolute(),
+    }))
+}
+
+/// 切换 / 新建库：写指针（最近库自动更新），下次启动生效。
+#[tauri::command]
+pub fn library_use(path: String, create: bool) -> Result<serde_json::Value, String> {
+    let raw = path.trim();
+    if raw.is_empty() {
+        return Err("路径为空".to_string());
+    }
+    let root = std::path::PathBuf::from(raw);
+    if !root.is_absolute() {
+        return Err("需要绝对路径".to_string());
+    }
+    if create {
+        std::fs::create_dir_all(&root).map_err(|e| format!("创建目录失败：{e}"))?;
+    } else if !root.is_dir() {
+        return Err("目录不存在".to_string());
+    } else if !root.join("index.json").is_file() {
+        return Err("这个目录不是 Picarium 库（没有 index.json）".to_string());
+    }
+    crate::config::save_pointer(&root).map_err(|e| format!("保存库指针失败：{e}"))?;
+    Ok(serde_json::json!({ "path": root.to_string_lossy() }))
+}
+
+/// 从最近库列表移除（不删文件）。
+#[tauri::command]
+pub fn library_forget(path: String) -> Result<(), String> {
+    crate::config::forget_recent(path.trim()).map_err(|e| format!("写入库指针失败：{e}"))
+}
+
+/// 重启应用（切库 / 搬库后统一走这里）。
+#[tauri::command]
+pub fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 pub fn settings_file() -> Result<std::path::PathBuf, String> {
     Ok(crate::config::settings_path())
 }

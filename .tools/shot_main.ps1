@@ -37,7 +37,7 @@ $out = $args[0]
 $port = if ($args.Count -gt 1) { $args[1] } else { '9222' }
 if (-not $out) { 'usage: shot_main.ps1 <out.png> [cdpPort]'; exit 1 }
 
-$p = Get-Process stickerbox -ErrorAction SilentlyContinue | Select-Object -First 1
+$p = Get-Process picarium, stickerbox -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $p) { 'no process'; exit 1 }
 
 # 只挑主窗口：class 必须是 Tauri Window，且有标题栏（快贴面板无边框）
