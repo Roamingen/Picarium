@@ -7,6 +7,7 @@ $tmp = Join-Path $env:TEMP 'picarium-perf'
 $samples = Join-Path $tmp 'samples'
 $lib = Join-Path $tmp 'lib'
 $reportFile = Join-Path $lib 'selftest-report.json'
+$cfg = Join-Path $tmp 'config'
 $python = (Get-Command python).Source
 
 function Stop-App {
@@ -24,6 +25,8 @@ $sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Host "生成耗时 $([int]$sw.Elapsed.TotalSeconds)s"
 
 $env:PICARIUM_HOME = $lib
+$env:PICARIUM_CONFIG_HOME = $cfg
+New-Item -ItemType Directory -Force -Path $cfg | Out-Null
 Write-Host "== 导入 ==" -ForegroundColor Cyan
 $scan = & $exe scan $samples
 Write-Host $scan
@@ -39,7 +42,7 @@ try {
 }
 
 if (Test-Path $reportFile) { Remove-Item -Force $reportFile }
-Set-Content -Path (Join-Path $lib 'settings.json') -Value '{"startHidden": true}' -Encoding UTF8
+Set-Content -Path (Join-Path $cfg 'settings.json') -Value '{"startHidden": true}' -Encoding UTF8
 
 Write-Host "== 预热（生成缩略图缓存，不计入）==" -ForegroundColor Cyan
 Remove-Item Env:PICARIUM_SELFTEST -ErrorAction SilentlyContinue

@@ -15,7 +15,25 @@ use tauri::{Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// 依次尝试候选目录，返回第一个能用的。全都不行就打印清晰原因后退出，而不是 panic。
+///
+/// 优先级：`PICARIUM_HOME`（环境变量，测试/开发）> 配置目录里的指针 > 候选目录。
 fn open_library() -> Library {
+    let env_home =
+        std::env::var_os("PICARIUM_HOME").or_else(|| std::env::var_os("STICKERBOX_HOME"));
+    if env_home.is_none() {
+        if let Some(p) = picarium_lib::config::load_pointer() {
+            match Library::open(&p) {
+                Ok(lib) => {
+                    eprintln!("[library] pointer {}", p.display());
+                    return lib;
+                }
+                Err(e) => eprintln!(
+                    "[library] 指针路径打不开 {}：{e}；退回候选目录（指针保持不变）",
+                    p.display()
+                ),
+            }
+        }
+    }
     let mut tried = Vec::new();
     for root in candidate_roots() {
         match Library::open(&root) {
@@ -115,8 +133,8 @@ fn toggle_clipboard(app: &tauri::AppHandle) {
     let next = !enabled_now;
     st.paused.store(!next, Ordering::Relaxed);
 
-    if let Ok(lib) = st.lib.lock() {
-        let path = lib.root().join("settings.json");
+    {
+        let path = picarium_lib::config::settings_path();
         let mut cur = read_settings_value(&path);
         merge_json(&mut cur, &serde_json::json!({ "clipboardEnabled": next }));
         if let Ok(text) = serde_json::to_string_pretty(&cur) {
@@ -291,7 +309,7 @@ fn set_hotkey(
         let mut h = state.hotkey.lock().map_err(|e| e.to_string())?;
         *h = accel.clone();
     }
-    let path = settings_file(&state)?;
+    let path = settings_file()?;
     let mut cur = read_settings_value(&path);
     merge_json(&mut cur, &serde_json::json!({ "hotkey": accel }));
     if let Some(obj) = cur.as_object_mut() {
@@ -322,7 +340,7 @@ fn set_clip_hotkey(
         let mut h = state.clip_hotkey.lock().map_err(|e| e.to_string())?;
         *h = accel.clone();
     }
-    let path = settings_file(&state)?;
+    let path = settings_file()?;
     let mut cur = read_settings_value(&path);
     merge_json(&mut cur, &serde_json::json!({ "clipHotkey": accel }));
     if let Some(obj) = cur.as_object_mut() {
@@ -538,7 +556,7 @@ fn apply_side_effects(state: &State<'_, AppState>, patch: &serde_json::Value) {
 
 #[tauri::command]
 fn patch_settings(state: State<'_, AppState>, patch: serde_json::Value) -> Result<(), String> {
-    let path = settings_file(&state)?;
+    let path = settings_file()?;
     let mut cur = read_settings_value(&path);
     merge_json(&mut cur, &patch);
     // 运行时字段不落盘
@@ -556,8 +574,8 @@ fn patch_settings(state: State<'_, AppState>, patch: serde_json::Value) -> Resul
 }
 
 #[tauri::command]
-fn export_settings(state: State<'_, AppState>) -> Result<String, String> {
-    let path = settings_file(&state)?;
+fn export_settings(_state: State<'_, AppState>) -> Result<String, String> {
+    let path = settings_file()?;
     let out = path.with_file_name("settings-export.json");
     let v = read_settings_value(&path);
     let json = serde_json::to_string_pretty(&v).map_err(|e| e.to_string())?;
@@ -569,7 +587,7 @@ fn export_settings(state: State<'_, AppState>) -> Result<String, String> {
 fn import_settings(state: State<'_, AppState>, json: String) -> Result<(), String> {
     let patch: serde_json::Value =
         serde_json::from_str(&json).map_err(|_| "不是合法的 JSON".to_string())?;
-    let path = settings_file(&state)?;
+    let path = settings_file()?;
     let mut cur = read_settings_value(&path);
     merge_json(&mut cur, &patch);
     if let Some(obj) = cur.as_object_mut() {
@@ -585,7 +603,7 @@ fn import_settings(state: State<'_, AppState>, json: String) -> Result<(), Strin
 #[tauri::command]
 fn set_clipboard_enabled(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
     state.paused.store(!enabled, Ordering::Relaxed);
-    let path = settings_file(&state)?;
+    let path = settings_file()?;
     let mut cur = read_settings_value(&path);
     merge_json(
         &mut cur,
@@ -603,11 +621,11 @@ fn set_clipboard_enabled(state: State<'_, AppState>, enabled: bool) -> Result<()
 }
 
 #[tauri::command]
-fn set_autostart(state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
+fn set_autostart(_state: State<'_, AppState>, enabled: bool) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     autostart_apply(enabled, &exe.to_string_lossy())
         .map_err(|e| format!("设置开机自启失败：{e}"))?;
-    let path = settings_file(&state)?;
+    let path = settings_file()?;
     let mut cur = read_settings_value(&path);
     merge_json(&mut cur, &serde_json::json!({ "autostart": enabled }));
     if let Some(obj) = cur.as_object_mut() {
@@ -885,14 +903,22 @@ fn main() {
     #[cfg(windows)]
     migrate_app_data();
 
+    // 全局配置目录（设置/主题/库指针）：默认 %APPDATA%\Picarium，
+    // 测试脚本用 PICARIUM_CONFIG_HOME 隔离到临时目录。
+    picarium_lib::config::init_dir(picarium_lib::config::default_dir());
+
     // 默认库目录从 StickerBox 改名到 Picarium；改名失败时继续用旧库。
     #[cfg(windows)]
     picarium_lib::state::migrate_default_library();
 
     let lib = open_library();
 
+    // 首次升级：把库根里的旧 settings.json/themes 复制到配置目录并写指针。
+    // 复制失败会退回旧布局（设置继续读库根），不会丢配置。
+    picarium_lib::config::ensure_for_library(lib.root());
+
     // 启动时恢复「剪贴板捕获」开关
-    let settings_path = lib.root().join("settings.json");
+    let settings_path = picarium_lib::config::settings_path();
     let boot_settings: serde_json::Value = std::fs::read_to_string(&settings_path)
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
@@ -917,7 +943,7 @@ fn main() {
 
     let paused = Arc::new(AtomicBool::new(false));
     {
-        let path = lib.root().join("settings.json");
+        let path = picarium_lib::config::settings_path();
         if let Ok(txt) = std::fs::read_to_string(&path) {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(&txt) {
                 if v.get("clipboardEnabled").and_then(|x| x.as_bool()) == Some(false) {

@@ -30,11 +30,7 @@ const BUILTIN_THEMES: &[(&str, &str)] = &[
 ];
 
 #[tauri::command]
-pub fn themes_list(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
-    let root = {
-        let lib = state.lib.lock().map_err(|e| e.to_string())?;
-        lib.root().to_path_buf()
-    };
+pub fn themes_list(_state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
     let mut out = Vec::new();
     for (id, text) in BUILTIN_THEMES {
         if let Ok(mut v) = serde_json::from_str::<serde_json::Value>(text) {
@@ -45,7 +41,7 @@ pub fn themes_list(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>,
             }
         }
     }
-    let dir = root.join("themes");
+    let dir = crate::config::themes_dir();
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -541,9 +537,8 @@ pub fn library_stats(state: State<'_, AppState>) -> Result<serde_json::Value, St
     serde_json::to_value(lib.stats()).map_err(|e| e.to_string())
 }
 
-pub fn settings_file(state: &State<'_, AppState>) -> Result<std::path::PathBuf, String> {
-    let lib = state.lib.lock().map_err(|e| e.to_string())?;
-    Ok(lib.root().join("settings.json"))
+pub fn settings_file() -> Result<std::path::PathBuf, String> {
+    Ok(crate::config::settings_path())
 }
 
 pub fn read_settings_value(path: &std::path::Path) -> serde_json::Value {
@@ -555,14 +550,16 @@ pub fn read_settings_value(path: &std::path::Path) -> serde_json::Value {
 
 #[tauri::command]
 pub fn get_settings(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
-    let path = settings_file(&state)?;
+    let path = settings_file()?;
     let mut v = read_settings_value(&path);
-    let root = path
-        .parent()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default();
+    let lib_root = {
+        let lib = state.lib.lock().map_err(|e| e.to_string())?;
+        lib.root().to_string_lossy().to_string()
+    };
+    let config_root = crate::config::config_dir().to_string_lossy().to_string();
     if let Some(obj) = v.as_object_mut() {
-        obj.insert("root".into(), serde_json::json!(root));
+        obj.insert("root".into(), serde_json::json!(lib_root));
+        obj.insert("configDir".into(), serde_json::json!(config_root));
         obj.insert(
             "clipboardEnabled".into(),
             serde_json::json!(!state.paused.load(Ordering::Relaxed)),
@@ -586,11 +583,11 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<serde_json::Value, Str
 }
 
 #[tauri::command]
-pub fn set_fonts(state: State<'_, AppState>, fonts: serde_json::Value) -> Result<(), String> {
+pub fn set_fonts(_state: State<'_, AppState>, fonts: serde_json::Value) -> Result<(), String> {
     if !fonts.is_object() {
         return Err("字体设置必须是对象".into());
     }
-    let path = settings_file(&state)?;
+    let path = settings_file()?;
     let mut cur = read_settings_value(&path);
     let Some(obj) = cur.as_object_mut() else {
         return Err("设置文件格式无效".into());

@@ -66,9 +66,10 @@ scripts/            accept.ps1 / perf.ps1 / install-release.ps1
 docs/               设计、路线、验收、交接
 ```
 
-- 数据：`index.json` + `blobs/ab/cd/<sha>.<ext>` + `thumbs/` + `trash/` + `settings.json`
+- 数据：`index.json` + `blobs/ab/cd/<sha>.<ext>` + `thumbs/` + `trash/`（库根只有数据）
+- 全局配置：`%APPDATA%\Picarium\`（`config.json` 库指针 + `settings.json` + `themes/`；安卓在应用私有目录 `PicariumConfig/`；测试用 `PICARIUM_CONFIG_HOME` 隔离）
 - 前端状态：`app.js` 单文件（约 4k 行），无构建步骤
-- 主题：内置深/浅 + Catppuccin 四套 + `themes/*.json` 自定义
+- 主题：内置深/浅 + Catppuccin 四套 + `%APPDATA%\Picarium\themes/*.json` 自定义
 - 图标：内嵌 Lucide SVG（`ICONS` 映射）
 - 当前验收：**165 条前端断言 + 22 条 core 测试 + 5 条浏览器桥单测 + 11 条扩展单测**；性能：3000 张首屏约 0.7s / 70 节点
 

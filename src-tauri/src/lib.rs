@@ -13,6 +13,9 @@ pub mod clipboard;
 /// 只读命令层：桌面和安卓共用。
 pub mod commands;
 
+/// 全局配置目录（设置/主题/库指针）。
+pub mod config;
+
 /// 浏览器桥：本地 HTTP 服务，只桌面挂（安卓用分享进入，不需要）。
 #[cfg(not(mobile))]
 pub mod bridge;
@@ -39,8 +42,17 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let roots = state::candidate_roots(app.handle());
+            // 安卓：配置放在库旁边的应用私有目录，不随库改名。
+            let cfg = roots
+                .first()
+                .and_then(|p| p.parent())
+                .map(|p| p.join("PicariumConfig"))
+                .unwrap_or_else(config::default_dir);
+            config::init_dir(cfg);
             let lib = state::open_library_from(&roots)
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            // 首次升级：旧布局的 settings/themes 是复制过来的，库里保留原文件。
+            config::ensure_for_library(lib.root());
             app.manage(state::AppState::new(lib));
             Ok(())
         })

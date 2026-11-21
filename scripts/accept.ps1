@@ -49,13 +49,17 @@ $temp = Join-Path $env:TEMP 'picarium-accept'
 $lib = Join-Path $temp 'lib'
 $samples = Join-Path $temp 'samples'
 $reportFile = Join-Path $lib 'selftest-report.json'
+# 全局配置（settings.json / themes / 库指针）单独隔离，别碰真实 %APPDATA%\Picarium
+$cfg = Join-Path $temp 'config'
 
 Step '准备临时库' {
     if (Test-Path $temp) { Remove-Item -Recurse -Force $temp }
     New-Item -ItemType Directory -Path $temp | Out-Null
     & $python (Join-Path $root '.tools\make_accept_samples.py') $samples 240 | Out-Null
-    # 一个自定义主题，验证 themes/*.json 能被读到
-    $themeDir = Join-Path $lib 'themes'
+    # 一个自定义主题，验证 themes/*.json 能被读到（现在读全局配置目录）
+    $env:PICARIUM_CONFIG_HOME = $cfg
+    New-Item -ItemType Directory -Force -Path $cfg | Out-Null
+    $themeDir = Join-Path $cfg 'themes'
     New-Item -ItemType Directory -Force -Path $themeDir | Out-Null
     '{"name":"验收主题","dark":true,"colors":{"--bg":"#123456","--surface":"#101820","--fg":"#eeeeee","--accent":"#ff8800"}}' |
         Set-Content -Path (Join-Path $themeDir 'accept-theme.json') -Encoding UTF8
@@ -73,8 +77,8 @@ Step '前端自测' {
     if (Test-Path $reportFile) { Remove-Item -Force $reportFile }
     $env:PICARIUM_HOME = $lib
     $env:PICARIUM_SELFTEST = 'accept'
-    # 自测时隐藏窗口，避免抢走用户的活动窗口
-    Set-Content -Path (Join-Path $lib 'settings.json') -Value '{"startHidden": true}' -Encoding UTF8
+    # 自测时隐藏窗口，避免抢走用户的活动窗口；设置写到临时配置目录
+    Set-Content -Path (Join-Path $cfg 'settings.json') -Value '{"startHidden": true}' -Encoding UTF8
     Start-Process -FilePath $exe -WindowStyle Hidden | Out-Null
     $deadline = (Get-Date).AddSeconds(60)
     while ((Get-Date) -lt $deadline -and -not (Test-Path $reportFile)) {
@@ -94,7 +98,7 @@ function Shot($state, $outFile) {
     Stop-App
     if (Test-Path $outFile) { Remove-Item -Force $outFile }
     # 截图时必须让窗口可见（自测那一步把 startHidden 打开了）
-    Set-Content -Path (Join-Path $lib 'settings.json') -Value '{}' -Encoding UTF8
+    Set-Content -Path (Join-Path $cfg 'settings.json') -Value '{}' -Encoding UTF8
     if ($state) { $env:PICARIUM_UI_STATE = $state } else { Remove-Item Env:PICARIUM_UI_STATE -ErrorAction SilentlyContinue }
     $env:PICARIUM_HOME = $lib
     Start-Process -FilePath $exe | Out-Null
