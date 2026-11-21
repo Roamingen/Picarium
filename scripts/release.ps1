@@ -1,10 +1,11 @@
-# 一键出包：升版本（可选）→ 构建 PC / 安卓 → 拷进固定 release 目录 → 记 versions.json
+# 一键出包：升版本（可选）→ 构建 PC / 安卓 / 扩展 → 拷进固定 release 目录 → 记 versions.json
 # 用法：
 #   pwsh -NoProfile -File scripts/release.ps1 -Target all -Bump minor
 #   pwsh -NoProfile -File scripts/release.ps1 -Target pc            # 只更新本机 PC，不升版本
+#   pwsh -NoProfile -File scripts/release.ps1 -Target extension     # 只出扩展 zip
 #   pwsh -NoProfile -File scripts/release.ps1 -DryRun                # 只打印计划
 param(
-    [ValidateSet('pc', 'android', 'all')][string]$Target = 'all',
+    [ValidateSet('pc', 'android', 'extension', 'all')][string]$Target = 'all',
     [ValidateSet('minor', 'patch')][string]$Bump,
     [switch]$DryRun,
     [switch]$BumpOnly
@@ -15,6 +16,8 @@ $root = Split-Path -Parent $PSScriptRoot
 $pcConf = Join-Path $root 'src-tauri/tauri.conf.json'
 $andConf = Join-Path $root 'src-tauri/tauri.android.conf.json'
 $cargoToml = Join-Path $root 'src-tauri/Cargo.toml'
+$extManifest = Join-Path $root 'extension/manifest.json'
+$extPkg = Join-Path $root 'extension/package.json'
 $releaseRoot = Join-Path $root 'release'
 $metaPath = Join-Path $releaseRoot 'versions.json'
 
@@ -55,17 +58,25 @@ function Write-CargoVersion([string]$version) {
 
 $pcVersion = Read-Version $pcConf
 $andVersion = Read-Version $andConf
+$extVersion = Read-Version $extManifest
+$extVersionInPkg = Read-Version $extPkg
+if ($extVersion -ne $extVersionInPkg) {
+    throw "extension/manifest.json 的 version=$extVersion 与 package.json 的 $extVersionInPkg 不一致"
+}
 $doPc = $Target -in 'pc', 'all'
 $doAndroid = $Target -in 'android', 'all'
+$doExt = $Target -in 'extension', 'all'
 
 if ($Bump) {
     if ($doPc) { $pcVersion = Next-Version $pcVersion $Bump }
     if ($doAndroid) { $andVersion = Next-Version $andVersion $Bump }
+    if ($doExt) { $extVersion = Next-Version $extVersion $Bump }
 }
 
 if ($DryRun) {
     if ($doPc) { Write-Host "PC      $pcVersion  -> release/pc/Picarium-$pcVersion-win-x64.exe" }
     if ($doAndroid) { Write-Host "Android $andVersion (code $(Get-VersionCode $andVersion))  -> release/android/StickerBox-$andVersion-arm64-v8a.apk" }
+    if ($doExt) { Write-Host "Extension $extVersion  -> release/extension/Picarium-extension-$extVersion.zip" }
     Write-Host '（DryRun：未构建、未写文件）'
     return
 }
@@ -82,11 +93,17 @@ if ($BumpOnly) {
         Write-Version $andConf $andVersion -WithCode
         Write-Host "安卓版本已写为 $andVersion / code $(Get-VersionCode $andVersion)（未构建）"
     }
+    if ($doExt) {
+        Write-Version $extManifest $extVersion
+        Write-Version $extPkg $extVersion
+        Write-Host "扩展版本已写为 $extVersion（manifest.json + package.json，未出包）"
+    }
     return
 }
 
 $pcFile = $null
 $apkFile = $null
+$extFile = $null
 
 # ---------- PC ----------
 if ($doPc) {
@@ -213,6 +230,18 @@ if ($doAndroid) {
     Copy-Item -Force $apk.FullName $apkFile
 }
 
+# ---------- 扩展 ----------
+if ($doExt) {
+    if ($Bump) {
+        Write-Version $extManifest $extVersion
+        Write-Version $extPkg $extVersion
+    }
+    Write-Host '== Extension: npm run build + zip ==' -ForegroundColor Cyan
+    & (Join-Path $PSScriptRoot 'pack-extension.ps1')
+    $extFile = Join-Path $releaseRoot "extension/Picarium-extension-$extVersion.zip"
+    if (-not (Test-Path $extFile)) { throw "扩展产物不存在：$extFile" }
+}
+
 # ---------- 记录 ----------
 $meta = @{}
 if (Test-Path $metaPath) {
@@ -236,6 +265,14 @@ if ($apkFile) {
         sha256  = (Get-FileHash -Path $apkFile -Algorithm SHA256).Hash.ToLower()
     }
 }
+if ($extFile) {
+    $meta['extension'] = @{
+        version = $extVersion
+        file    = "extension/Picarium-extension-$extVersion.zip"
+        built   = $now
+        sha256  = (Get-FileHash -Path $extFile -Algorithm SHA256).Hash.ToLower()
+    }
+}
 New-Item -ItemType Directory -Force -Path $releaseRoot | Out-Null
 $meta | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 -Path $metaPath
 
@@ -243,6 +280,7 @@ Write-Host ''
 Write-Host '== 出包完成 ==' -ForegroundColor Green
 if ($pcFile) { Write-Host "PC      $pcVersion  $pcFile" }
 if ($apkFile) { Write-Host "Android $andVersion  $apkFile" }
+if ($extFile) { Write-Host "Extension $extVersion  $extFile" }
 Write-Host "记录：$metaPath"
 if ($apkFile) {
     Write-Host '提示：首次出安卓包后跑 aapt2 dump badging 核对 versionName/versionCode。' -ForegroundColor Yellow

@@ -158,16 +158,18 @@ npx tauri android build --apk --target aarch64 --ci        # release（已配签
 - 版本真源（脚本只读这里，别散记）：
   - PC：`src-tauri/tauri.conf.json` 的 `version`；`src-tauri/Cargo.toml` 的 `version` 由脚本同步成同一个数（设置页显示的是 Cargo 版本）
   - 安卓：`src-tauri/tauri.android.conf.json` 的 `version`；`bundle.android.versionCode` 显式给码，公式 `major*1000000 + minor*1000 + patch`
-- **当前版本：PC `0.15.0` / 安卓 `0.5.0`（2026-11-21）**——升完版本号要同步改这一行。
+  - 扩展：`extension/manifest.json` 的 `version`（Chrome 读它）；`extension/package.json` 必须同步同一个数，`release.ps1` 会校验
+- **当前版本：PC `0.15.0` / 安卓 `0.5.0` / 扩展 `0.5.3`（2026-11-21）**——升完版本号要同步改这一行。
 - 固定产物目录（本机，已 gitignore，不入库）：
   - `release/pc/Picarium-<ver>-win-x64.exe`
   - `release/android/StickerBox-<ver>-arm64-v8a.apk`
-  - `release/versions.json`：两端版本、构建时间、sha256
+  - `release/extension/Picarium-extension-<ver>.zip`
+  - `release/versions.json`：pc / android / extension 各段版本、构建时间、sha256
 - 一条命令出包（只在交付 / 装自己机器时跑，平时别跑 release）：
 
   ```powershell
   pwsh -NoProfile -File scripts/release.ps1 -Target all -Bump minor
   ```
 
-  `-Target pc|android|all`；不带 `-Bump` 就按当前版本重出；`-DryRun` 只打印计划不出包；`-BumpOnly` 只升号写配置、不构建（功能落地先升号时用）。PC 步骤 = release 构建 + 覆盖 `%LOCALAPPDATA%\Picarium\Picarium.exe` + 迁移桌面快捷方式/修 HKCU 开机自启 + 清空旧 `%LOCALAPPDATA%\StickerBox`；`install-release.ps1` 保留成「只更新本机」的快捷方式（内部转调 release.ps1 -Target pc）。
+  `-Target pc|android|extension|all`；不带 `-Bump` 就按当前版本重出；`-DryRun` 只打印计划不出包；`-BumpOnly` 只升号写配置、不构建（功能落地先升号时用）。PC 步骤 = release 构建 + 覆盖 `%LOCALAPPDATA%\Picarium\Picarium.exe` + 迁移桌面快捷方式/修 HKCU 开机自启 + 清空旧 `%LOCALAPPDATA%\StickerBox`；`install-release.ps1` 保留成「只更新本机」的快捷方式（内部转调 release.ps1 -Target pc）。
 - 安卓只打 `aarch64`，不做 universal；首次出安卓包后核对 `aapt2 dump badging` 里的 versionName/versionCode 是否等于配置值。
