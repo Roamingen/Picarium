@@ -26,6 +26,7 @@
 
   /* ---------- 面板本体 ---------- */
   .panel{
+    --card-min:104px;
     width:820px; height:560px; display:flex; flex-direction:column; background:var(--bg);
     border:1px solid var(--line-3); border-radius:12px; overflow:hidden; box-shadow:0 24px 60px var(--shadow);
   }
@@ -61,7 +62,7 @@
 
   .grid{
     flex:1; overflow-y:auto; padding:12px 14px 8px; display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(104px,1fr)); gap:8px; align-content:start;
+    grid-template-columns:repeat(auto-fill,minmax(var(--card-min),1fr)); gap:8px; align-content:start;
   }
   .card{aspect-ratio:1; min-width:0; padding:3px; border:2px solid transparent; border-radius:10px; background:var(--surface); cursor:pointer; overflow:hidden; position:relative}
   .card .ph{width:100%; height:100%; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#0b0d10; font-weight:600; font-size:15px; opacity:.92}
@@ -85,10 +86,24 @@
     <b>快贴面板 v2 · 预览</b>
     <span>搜索 15px · 自适应列宽 · 键位提示跟随绑定 · #标签 @分组</span>
     <span class="sp"></span>
+    <span>窗口宽度</span>
+    <div class="seg" id="wseg">
+      <button data-w="720">720</button>
+      <button data-w="820" class="on">820</button>
+      <button data-w="920">920</button>
+    </div>
+    <span id="cols"></span>
+    <span>网格</span>
+    <div class="seg" id="gseg">
+      <button data-g="compact">紧凑</button>
+      <button data-g="normal" class="on">标准</button>
+      <button data-g="large">大图</button>
+    </div>
     <span>导航键</span>
     <div class="seg" id="seg">
       <button data-k="arrows">方向键</button>
       <button data-k="vim">方向键 + Ctrl HJKL</button>
+      <button data-k="swapped">Ctrl+K 优先</button>
     </div>
   </div>
 
@@ -109,7 +124,7 @@
   </div>
 
   <div class="tip">
-    <b>说明</b>：底栏提示由同一份键位表渲染 —— 设置里改四个方向的键，这里自动跟着变；Ctrl+HJKL 默认开。试试输入 <kbd>#浏</kbd>：前缀匹配会同时命中「浏览」和「浏览器」。信息键默认 <kbd>Ctrl+Shift+K</kbd>（设置里可改），按下弹出的信息条和主界面 hover 完全同款：名称 / 尺寸体积 / 格式与导入时间 / 来源 / 分组 / 标签。
+    <b>说明</b>：底栏只取每个方向设置里的第一条绑定，改绑后自动跟着变；默认是方向键，所以切到 Ctrl HJKL 后底栏仍是 ↑↓←→，选「Ctrl+K 优先」可看改绑效果。窗口宽度可拖（这里用 720/820/920 模拟），列数由 auto-fill 自动算，不再固定 6 列。网格大小用紧凑/标准/大图模拟（88 / 104 / 150px），设置里新增「快贴网格大小」。搜索框 15px、图标 18px。试试输入 <kbd>#浏</kbd>：前缀匹配会同时命中「浏览」和「浏览器」。信息键默认 <kbd>Ctrl+Shift+K</kbd>（设置里可改），按下弹出的信息条和主界面 hover 完全同款：名称 / 尺寸体积 / 格式与导入时间 / 来源 / 分组 / 标签。
   </div>
 
 <script>
@@ -128,17 +143,24 @@ const ITEMS = Array.from({ length: 42 }, (_, i) => ({
 const $ = (id) => document.getElementById(id);
 const q = $('q'), grid = $('grid'), tokensEl = $('tokens'), suggestEl = $('suggest');
 const count = $('count'), empty = $('empty'), foot = $('foot');
+const panelEl = document.querySelector('.panel');
+const colsEl = $('cols');
 let keymap = 'vim';   // Ctrl+HJKL 默认开
+let cardSize = 'normal';
+const CARD_SIZES = { compact: '88px', normal: '104px', large: '150px' };
 let cursor = 0;
 let shown = [];
 let sugIndex = 0;
 let sugItems = [];
 
-/* ---- 键位表：提示文案和实际按键都从这里来 ---- */
-const KEYS = {
-  arrows: { nav: [['↑↓←→', '选择']], ctrl: [] },
-  vim: { nav: [['↑↓←→', '选择'], ['Ctrl HJKL', '选择']], ctrl: [['h', -1, 0], ['l', 1, 0], ['k', 0, -1], ['j', 0, 1]] },
+/* ---- 键位表：底栏提示和实际导航都从这里来 ---- */
+const KEYMAPS = {
+  arrows: { up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'] },
+  vim: { up: ['ArrowUp', 'Ctrl+K'], down: ['ArrowDown', 'Ctrl+J'], left: ['ArrowLeft', 'Ctrl+H'], right: ['ArrowRight', 'Ctrl+L'] },
+  swapped: { up: ['Ctrl+K', 'ArrowUp'], down: ['Ctrl+J', 'ArrowDown'], left: ['Ctrl+H', 'ArrowLeft'], right: ['Ctrl+L', 'ArrowRight'] },
 };
+const KEY_SYM = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' };
+const keySym = (k) => KEY_SYM[k] || (k.length === 1 ? k.toUpperCase() : k);
 const ARROW = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 
 function kbdify(s) {
@@ -148,8 +170,8 @@ function kbdify(s) {
 
 function footer() {
   const parts = [];
-  const dirs = [['↑', 'ArrowUp'], ['↓', 'ArrowDown'], ['←', 'ArrowLeft'], ['→', 'ArrowRight']];
-  parts.push(`<span>${dirs.map(([sym]) => `<kbd>${sym}</kbd>`).join('')} 选择</span>`);
+  const nav = ['up', 'down', 'left', 'right'].map((d) => `<kbd>${keySym(KEYMAPS[keymap][d][0])}</kbd>`).join('');
+  parts.push(`<span>${nav} 选择</span>`);
   parts.push('<span><kbd>Enter</kbd> 复制</span>');
   parts.push('<span><kbd>Esc</kbd> 关闭</span>');
   parts.push('<span class="sp"></span>');
@@ -206,6 +228,12 @@ function chips(f) {
   tokensEl.classList.toggle('show', rows.length > 0);
 }
 
+function updateCols() {
+  const cols = getComputedStyle(grid).gridTemplateColumns;
+  const n = cols.split(' ').filter(Boolean).length;
+  colsEl.textContent = `当前 ${n} 列`;
+}
+
 function render() {
   const f = parse(q.value);
   shown = ITEMS.filter((it) => matches(it, f));
@@ -220,6 +248,7 @@ function render() {
      </div>`).join('');
   const active = grid.children[cursor];
   if (active) active.scrollIntoView({ block: 'nearest' });
+  updateCols();
 }
 
 /* ---- #/@ 补全 ---- */
@@ -268,7 +297,7 @@ q.addEventListener('keydown', (e) => {
   if (suggestEl.classList.contains('show') && e.key === 'Tab') { e.preventDefault(); pickSug(sugIndex); return; }
   if (suggestEl.classList.contains('show') && e.key === 'Enter') { e.preventDefault(); pickSug(sugIndex); return; }
   if (ARROW[e.key]) { e.preventDefault(); move(...ARROW[e.key]); return; }
-  if (e.ctrlKey && keymap === 'vim') {
+  if (e.ctrlKey && keymap !== 'arrows') {
     const map = { h: [-1, 0], l: [1, 0], k: [0, -1], j: [0, 1] };
     if (map[e.key]) { e.preventDefault(); move(...map[e.key]); }
   }
@@ -282,6 +311,19 @@ grid.addEventListener('click', (e) => {
   if (c) { cursor = Number(c.dataset.i); render(); }
 });
 document.querySelectorAll('#seg button').forEach((b) => b.addEventListener('click', () => { keymap = b.dataset.k; footer(); q.focus(); }));
+document.querySelectorAll('#wseg button').forEach((b) => b.addEventListener('click', () => {
+  panelEl.style.width = b.dataset.w + 'px';
+  document.querySelectorAll('#wseg button').forEach((x) => x.classList.toggle('on', x === b));
+  requestAnimationFrame(updateCols);
+  q.focus();
+}));
+document.querySelectorAll('#gseg button').forEach((b) => b.addEventListener('click', () => {
+  cardSize = b.dataset.g;
+  panelEl.style.setProperty('--card-min', CARD_SIZES[cardSize]);
+  document.querySelectorAll('#gseg button').forEach((x) => x.classList.toggle('on', x === b));
+  requestAnimationFrame(updateCols);
+  q.focus();
+}));
 
 footer();
 render();

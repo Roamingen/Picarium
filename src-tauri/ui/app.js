@@ -51,8 +51,9 @@ let startHidden = false;
 let startView = 'all';
 let winW = 1040;
 let winH = 700;
-let panelW = 720;
-let panelH = 520;
+let panelW = 820;
+let panelH = 560;
+let panelGridSize = 'normal';
 let panelX = 0;
 let panelY = 0;
 let panelSort = 'recent';
@@ -513,6 +514,7 @@ async function syncSettings() {
   if (typeof s.windowHeight === 'number') winH = s.windowHeight;
   if (typeof s.panelWidth === 'number') panelW = s.panelWidth;
   if (typeof s.panelHeight === 'number') panelH = s.panelHeight;
+  if (s.panelGridSize && GRID_SIZES[s.panelGridSize]) panelGridSize = s.panelGridSize;
   if (typeof s.panelX === 'number') panelX = s.panelX;
   if (typeof s.panelY === 'number') panelY = s.panelY;
   if (s.panelSort) panelSort = s.panelSort;
@@ -3732,6 +3734,9 @@ function enhanceSelects() {
 
 async function openSettings() {
   const s = await invoke('get_settings');
+  if (typeof s.panelWidth === 'number') panelW = s.panelWidth;
+  if (typeof s.panelHeight === 'number') panelH = s.panelHeight;
+  if (s.panelGridSize && GRID_SIZES[s.panelGridSize]) panelGridSize = s.panelGridSize;
   await loadThemes();
   fillThemeOptions();
   $('set-root').textContent = s.root;
@@ -3753,6 +3758,7 @@ async function openSettings() {
   $('win-h').value = winH;
   $('panel-w').value = panelW;
   $('panel-h').value = panelH;
+  $('set-panel-grid-size').value = panelGridSize;
   $('panel-pos-x').value = panelX;
   $('panel-pos-y').value = panelY;
   $('set-panel-sort').value = panelSort;
@@ -4624,7 +4630,7 @@ $('win-apply').addEventListener('click', async () => {
 });
 
 $('panel-apply').addEventListener('click', async () => {
-  const r = await applyWindowSize('panel', Number($('panel-w').value) || 720, Number($('panel-h').value) || 520, 'panelWidth', 'panelHeight');
+  const r = await applyWindowSize('panel', Number($('panel-w').value) || 820, Number($('panel-h').value) || 560, 'panelWidth', 'panelHeight');
   if (r) {
     panelW = r.width;
     panelH = r.height;
@@ -4673,6 +4679,11 @@ $('set-grid-size').addEventListener('change', (e) => {
   localStorage.setItem('picarium-grid-size', gridSize);
   applyGridSize();
   saveSettings({ gridSize });
+});
+
+$('set-panel-grid-size').addEventListener('change', (e) => {
+  panelGridSize = e.target.value;
+  saveSettings({ panelGridSize });
 });
 
 $('set-copy-default').addEventListener('change', (e) => {

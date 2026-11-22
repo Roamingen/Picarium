@@ -23,12 +23,14 @@
         "label": "panel",
         "url": "panel.html",
         "title": "Picarium",
-        "width": 720,
-        "height": 520,
+        "width": 820,
+        "height": 560,
         "decorations": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "resizable": false,
+        "resizable": true,
+        "minWidth": 480,
+        "minHeight": 320,
         "visible": false,
         "center": true
       }

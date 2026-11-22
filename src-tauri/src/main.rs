@@ -205,7 +205,17 @@ fn copy_assets_files(state: State<'_, AppState>, shas: Vec<String>) -> Result<us
     Ok(paths.len())
 }
 
-fn clamp_to_monitor(win: &tauri::WebviewWindow, width: u32, height: u32) -> (u32, u32) {
+fn window_min_size(label: &str) -> (f64, f64) {
+    if label == "panel" { (480.0, 320.0) } else { (640.0, 420.0) }
+}
+
+fn clamp_to_monitor(
+    win: &tauri::WebviewWindow,
+    width: u32,
+    height: u32,
+    min_w: f64,
+    min_h: f64,
+) -> (u32, u32) {
     let mut max_w = 1920.0;
     let mut max_h = 1080.0;
     if let Ok(Some(m)) = win.current_monitor() {
@@ -213,8 +223,8 @@ fn clamp_to_monitor(win: &tauri::WebviewWindow, width: u32, height: u32) -> (u32
         max_w = m.size().width as f64 / s;
         max_h = m.size().height as f64 / s;
     }
-    let w = (width as f64).clamp(640.0, (max_w - 40.0).max(640.0)) as u32;
-    let h = (height as f64).clamp(420.0, (max_h - 80.0).max(420.0)) as u32;
+    let w = (width as f64).clamp(min_w, (max_w - 40.0).max(min_w)) as u32;
+    let h = (height as f64).clamp(min_h, (max_h - 80.0).max(min_h)) as u32;
     (w, h)
 }
 
@@ -228,7 +238,8 @@ fn set_window_size(
     let win = app
         .get_webview_window(&label)
         .ok_or_else(|| "窗口不存在".to_string())?;
-    let (w, h) = clamp_to_monitor(&win, width, height);
+    let (min_w, min_h) = window_min_size(&label);
+    let (w, h) = clamp_to_monitor(&win, width, height, min_w, min_h);
     win.set_size(tauri::LogicalSize::new(w, h))
         .map_err(|e| e.to_string())?;
     Ok(serde_json::json!({ "width": w, "height": h }))
@@ -248,7 +259,7 @@ fn set_panel_position(app: tauri::AppHandle, x: i32, y: i32) -> Result<serde_jso
         let size = win
             .outer_size()
             .map(|z| (z.width as f64 / s, z.height as f64 / s))
-            .unwrap_or((720.0, 520.0));
+            .unwrap_or((820.0, 560.0));
         // 以屏幕中心为原点：0,0 = 正中间
         cx = ((w - size.0) / 2.0 + x as f64).clamp(0.0, (w - size.0).max(0.0)) as i32;
         cy = ((h - size.1) / 2.0 + y as f64).clamp(0.0, (h - size.1).max(0.0)) as i32;
@@ -1339,7 +1350,7 @@ fn main() {
                         let (pw, ph) = win
                             .outer_size()
                             .map(|z| (z.width as f64 / sc, z.height as f64 / sc))
-                            .unwrap_or((720.0, 520.0));
+                            .unwrap_or((820.0, 560.0));
                         // 以屏幕中心为原点：0,0 = 正中间
                         cx = ((mw - pw) / 2.0 + cx as f64).clamp(0.0, (mw - pw).max(0.0)) as i32;
                         cy = ((mh - ph) / 2.0 + cy as f64).clamp(0.0, (mh - ph).max(0.0)) as i32;
@@ -1351,7 +1362,7 @@ fn main() {
             // 恢复上次的窗口尺寸，并按当前显示器上限裁剪
             for (label, key_w, key_h, def_w, def_h) in [
                 ("main", "windowWidth", "windowHeight", 1040, 700),
-                ("panel", "panelWidth", "panelHeight", 720, 520),
+                ("panel", "panelWidth", "panelHeight", 820, 560),
             ] {
                 if let Some(win) = app.get_webview_window(label) {
                     let w = boot_settings
@@ -1362,7 +1373,8 @@ fn main() {
                         .get(key_h)
                         .and_then(|v| v.as_u64())
                         .unwrap_or(def_h) as u32;
-                    let (w, h) = clamp_to_monitor(&win, w, h);
+                    let (min_w, min_h) = window_min_size(label);
+                    let (w, h) = clamp_to_monitor(&win, w, h, min_w, min_h);
                     let _ = win.set_size(tauri::LogicalSize::new(w, h));
                 }
             }

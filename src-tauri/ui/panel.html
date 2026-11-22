@@ -48,6 +48,7 @@
     let items = [];
     let cursor = 0;
     let panelSort = 'recent';
+    let panelGridSize = 'normal';
     let recentLimit = 60;
     let hoverDelay = 350;
     let cursorSpeed = 2.4;
@@ -65,6 +66,7 @@
 
     const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
     const PANEL_SLOTS = ['up', 'down', 'left', 'right', 'info'];
+    const PANEL_GRID_SIZES = { compact: '88px', normal: '104px', large: '150px' };
     const VIM_KEY = { up: 'Ctrl+K', down: 'Ctrl+J', left: 'Ctrl+H', right: 'Ctrl+L' };
     const KEY_SYM = { ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', Space: 'Space' };
 
@@ -440,6 +442,7 @@
         if (typeof st.hoverDelay === 'number') hoverDelay = st.hoverDelay;
         if (typeof st.cursorSpeed === 'number' && Number.isFinite(st.cursorSpeed)) cursorSpeed = st.cursorSpeed;
         if (Array.isArray(st.cursorColors) && st.cursorColors.length) cursorColors = st.cursorColors.slice(0, 8);
+        if (st.panelGridSize && PANEL_GRID_SIZES[st.panelGridSize]) panelGridSize = st.panelGridSize;
         if (st.panelKeys && typeof st.panelKeys === 'object') {
           for (const slot of PANEL_SLOTS) {
             if (!Array.isArray(st.panelKeys[slot])) continue;
@@ -458,6 +461,7 @@
         }
         if (st.theme) document.documentElement.dataset.theme = st.theme;
       } catch (_) {}
+      document.documentElement.style.setProperty('--panel-card-min', PANEL_GRID_SIZES[panelGridSize]);
       applyCursorRing();
       paintFooter();
     }
@@ -473,6 +477,17 @@
       await search('');
       input.focus();
       input.select();
+    });
+
+    let panelSizeTimer = null;
+    window.addEventListener('resize', () => {
+      clearTimeout(panelSizeTimer);
+      panelSizeTimer = setTimeout(() => {
+        const width = Math.round(window.innerWidth);
+        const height = Math.round(window.innerHeight);
+        if (!width || !height) return;
+        invoke('patch_settings', { patch: { panelWidth: width, panelHeight: height } }).catch(() => {});
+      }, 300);
     });
 
     (async () => {
