@@ -48,6 +48,7 @@ let hoverDelay = Number(localStorage.getItem('picarium-hover-delay') || 350);
 let gridSize = localStorage.getItem('picarium-grid-size') || 'normal';
 let copyDefault = localStorage.getItem('picarium-copy-default') || 'bitmap';
 let startHidden = false;
+let showStatusbar = true;
 let startView = 'all';
 let winW = 1040;
 let winH = 700;
@@ -305,6 +306,11 @@ function applyGridSize() {
   document.documentElement.style.setProperty('--card-min', GRID_SIZES[gridSize] || GRID_SIZES.normal);
 }
 
+function applyStatusbar() {
+  const bar = document.querySelector('footer.statusbar');
+  if (bar) bar.hidden = !showStatusbar;
+}
+
 function applyStarColor() {
   document.documentElement.style.setProperty('--star', starColor);
 }
@@ -546,6 +552,8 @@ async function syncSettings() {
   if (s.gridSize) gridSize = s.gridSize;
   if (s.copyDefault) copyDefault = s.copyDefault;
   if (typeof s.startHidden === 'boolean') startHidden = s.startHidden;
+  if (typeof s.showStatusbar === 'boolean') showStatusbar = s.showStatusbar;
+  applyStatusbar();
   if (typeof s.scrolloff === 'number') scrolloff = s.scrolloff;
   if (typeof s.cursorSpeed === 'number') cursorSpeed = s.cursorSpeed;
   if (typeof s.flashColor === 'string') flashColor = s.flashColor;
@@ -3737,6 +3745,8 @@ async function openSettings() {
   if (typeof s.panelWidth === 'number') panelW = s.panelWidth;
   if (typeof s.panelHeight === 'number') panelH = s.panelHeight;
   if (s.panelGridSize && GRID_SIZES[s.panelGridSize]) panelGridSize = s.panelGridSize;
+  if (typeof s.showStatusbar === 'boolean') showStatusbar = s.showStatusbar;
+  applyStatusbar();
   await loadThemes();
   fillThemeOptions();
   $('set-root').textContent = s.root;
@@ -3772,6 +3782,7 @@ async function openSettings() {
   $('set-start-view-name').hidden = !isCustomView;
   $('set-copy-default').value = copyDefault;
   $('set-start-hidden').value = startHidden ? 'hide' : 'show';
+  $('set-show-statusbar').checked = showStatusbar;
   $('e-copy-file').textContent = copyDefault === 'file' ? '复制静态图片' : '复制文件';
   $('set-star-color').value = starColor;
   $('set-hover-delay').value = hoverDelay;
@@ -4298,6 +4309,11 @@ const SETTING_TAB_BY_LABEL = {
   主题: 'appearance',
   界面字体: 'appearance',
   网格大小: 'appearance',
+  主界面尺寸: 'appearance',
+  显示底栏: 'appearance',
+  快贴面板尺寸: 'appearance',
+  快贴网格大小: 'appearance',
+  快贴排序: 'appearance',
   收藏标记: 'appearance',
   标记颜色: 'appearance',
   光标环速度: 'appearance',
@@ -4696,6 +4712,12 @@ $('set-copy-default').addEventListener('change', (e) => {
 $('set-start-hidden').addEventListener('change', (e) => {
   startHidden = e.target.value === 'hide';
   saveSettings({ startHidden });
+});
+
+$('set-show-statusbar').addEventListener('change', (e) => {
+  showStatusbar = e.target.checked;
+  applyStatusbar();
+  saveSettings({ showStatusbar });
 });
 
 $('set-glyph').addEventListener('change', async (e) => {

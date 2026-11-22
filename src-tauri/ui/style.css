@@ -4038,6 +4038,7 @@ footer.statusbar .last-action {
 .status-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .status-count { font-size: 11px; white-space: nowrap; color: var(--dim); }
 footer.statusbar #empty-trash { height: 24px; padding: 0 8px; font-size: 11px; }
+footer.statusbar[hidden] { display: none; }
 
 #whichkey.whichkey {
   position: static;

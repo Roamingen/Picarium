@@ -129,6 +129,38 @@
     white-space: nowrap;
   }
   .win-actions { display: flex; height: 100%; }
+  .mock-switch {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 4px;
+    color: #8d99ab;
+    font-size: 9.5px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .mock-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .mock-switch .track {
+    width: 26px; height: 15px;
+    border-radius: 999px;
+    background: #2a3340;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .06);
+    position: relative;
+    transition: background .15s;
+  }
+  .mock-switch .track::after {
+    content: "";
+    position: absolute;
+    left: 2px; top: 2px;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: #8793a5;
+    transition: transform .15s, background .15s;
+  }
+  .mock-switch input:checked + .track { background: rgba(110, 168, 254, .35); }
+  .mock-switch input:checked + .track::after { transform: translateX(11px); background: #cfe3ff; }
+  .mock-switch input:focus-visible + .track { outline: 2px solid rgba(110, 168, 254, .65); outline-offset: 2px; }
   .win-actions button {
     width: 44px;
     height: 100%;
@@ -808,6 +840,7 @@
   }
   .status-right .dot { width: 5px; height: 5px; border-radius: 50%; background: #4a5668; flex: none; }
   .status-right b { color: #aab6c7; font-weight: 500; }
+  .statusbar[hidden] { display: none; }
 
   /* ---------- 浮层：设置 ---------- */
   .popover {
@@ -1146,6 +1179,11 @@
         <span class="logo"><svg><use href="#i-sparkle"/></svg></span>
         <span class="wordmark">StickerBox</span>
         <span class="mock-pill">主界面重绘 · MOCK v4</span>
+        <label class="mock-switch" title="预览：设置 › 外观 › 显示底栏">
+          <input type="checkbox" id="demoStatusbar" checked />
+          <span class="track"></span>
+          <span>显示底栏</span>
+        </label>
       </div>
     </div>
     <div class="win-actions" aria-hidden="true">
@@ -1347,6 +1385,8 @@
     <span class="pop-text"><b>打开完整设置</b><small>外观、快捷键、剪贴板、库目录</small></span>
     <kbd>Ctrl ,</kbd>
   </button>
+  <div class="pop-sep"></div>
+  <div class="pop-note"><b>设置 › 外观 › 显示底栏。</b>预览开关在标题栏；关闭后底栏隐藏、网格铺到底。</div>
 </div>
 
 <div class="tip" id="tip" role="status"></div>
@@ -1363,6 +1403,13 @@
   const ctxMenu = document.getElementById("ctxMenu");
   const toastEl = document.getElementById("toast");
   const settingsPop = document.getElementById("settingsPop");
+  const demoStatusbar = document.getElementById("demoStatusbar");
+  const statusbar = document.querySelector(".statusbar");
+  function applyDemoStatusbar() {
+    statusbar.hidden = !demoStatusbar.checked;
+  }
+  demoStatusbar.addEventListener("change", applyDemoStatusbar);
+  applyDemoStatusbar();
   const settingsBtn = document.getElementById("settingsBtn");
   const viewTitle = document.getElementById("viewTitle");
   const viewSub = document.getElementById("viewSub");
