@@ -326,12 +326,8 @@ impl Library {
         if migrated {
             let _ = lib.save();
         }
-        // 打开时按保留天数清一次过期项（清不掉也不影响启动）
-        if let Ok(n) = lib.purge_expired_trash() {
-            if n > 0 {
-                eprintln!("[library] 回收站自动清理了 {n} 张过期图片");
-            }
-        }
+        // 过期项不在这里删：core 不知道 deleteMode，也调不了系统回收站。
+        // 桌面/安卓壳打开库后调用 `purge_expired_trash`，按设置处理。
         Ok(lib)
     }
 
@@ -796,8 +792,15 @@ impl Library {
         self.save()
     }
 
-    /// 删除回收站里超过保留天数的条目，返回清掉的数量
-    pub fn purge_expired_trash(&self) -> Result<usize> {
+    /// 删除回收站里超过保留天数的条目，返回清掉的数量。
+    ///
+    /// core 不自己删文件：`remove` 负责处理文件，返回是否已经处理掉
+    /// （真删了、或送进了系统回收站）。只有返回 `true` 才移除元数据；
+    /// 失败就留在回收站清单里，下一次启动再试。
+    pub fn purge_expired_trash<F>(&self, mut remove: F) -> Result<usize>
+    where
+        F: FnMut(&Path) -> bool,
+    {
         let items = self.read_trash();
         if items.is_empty() {
             return Ok(0);
@@ -813,13 +816,10 @@ impl Library {
                 let path = self
                     .trash_path()
                     .join(format!("{}.{}", item.asset.sha, item.asset.ext));
-                // 文件真删掉了（或本来就不在）才丢元数据；删不掉就留着，
+                // 文件早就不在（用户手动删了）也算处理完；否则交给调用方，
+                // 按 deleteMode 决定永久删还是送系统回收站。失败就留着，
                 // 免得又变成孤儿文件、界面显示 0 张。
-                let gone = if path.exists() {
-                    fs::remove_file(&path).is_ok()
-                } else {
-                    true
-                };
+                let gone = if path.exists() { remove(&path) } else { true };
                 if gone {
                     removed += 1;
                 } else {
@@ -2081,13 +2081,80 @@ mod tests {
         items[0].deleted_at = (Utc::now() - chrono::Duration::days(10)).to_rfc3339();
         lib.write_trash(&items).unwrap();
 
-        let n = lib.purge_expired_trash().unwrap();
+        let mut handled = Vec::new();
+        let n = lib
+            .purge_expired_trash(|p| {
+                handled.push(p.to_path_buf());
+                std::fs::remove_file(p).is_ok()
+            })
+            .unwrap();
         assert_eq!(n, 1);
+        assert_eq!(handled.len(), 1, "只处理过期的那一条");
+        assert!(!handled[0].exists());
         assert_eq!(lib.trash().len(), 1);
 
         lib.set_trash_days(30).unwrap();
         let mut lib = Library::open(base.join("lib")).unwrap();
         assert_eq!(lib.trash_days(), 30);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// 到期项的处理失败了（比如系统回收站拒绝）：文件和元数据都留着，下一轮再试。
+    #[test]
+    fn purge_expired_keeps_item_when_removal_fails() {
+        let base = std::env::temp_dir().join(format!("sb-purge-retry-{}", std::process::id()));
+        let src = base.join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([3, 2, 1, 255]))
+            .save(src.join("a.png"))
+            .unwrap();
+
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        lib.scan_folder(&src).unwrap();
+        let sha = lib.assets()[0].sha.clone();
+        lib.remove(&sha).unwrap();
+        let mut items = lib.trash();
+        items[0].deleted_at = (Utc::now() - chrono::Duration::days(10)).to_rfc3339();
+        lib.write_trash(&items).unwrap();
+        let path = lib.trash_file_path(&sha).unwrap();
+
+        assert_eq!(lib.purge_expired_trash(|_| false).unwrap(), 0);
+        assert_eq!(lib.trash().len(), 1);
+        assert!(path.exists(), "没处理掉的文件不能被删");
+
+        // 下一轮成功后才清条目
+        assert_eq!(
+            lib.purge_expired_trash(|p| std::fs::remove_file(p).is_ok())
+                .unwrap(),
+            1
+        );
+        assert!(lib.trash().is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// `Library::open` 只读元数据，不再自己删过期文件；删除策略由壳按 deleteMode 决定。
+    #[test]
+    fn open_does_not_purge_expired_trash() {
+        let base = std::env::temp_dir().join(format!("sb-open-nopurge-{}", std::process::id()));
+        let src = base.join("src");
+        std::fs::create_dir_all(&src).unwrap();
+        image::RgbaImage::from_pixel(2, 2, image::Rgba([8, 8, 8, 255]))
+            .save(src.join("a.png"))
+            .unwrap();
+
+        let mut lib = Library::open(base.join("lib")).unwrap();
+        lib.scan_folder(&src).unwrap();
+        let sha = lib.assets()[0].sha.clone();
+        lib.remove(&sha).unwrap();
+        let mut items = lib.trash();
+        items[0].deleted_at = (Utc::now() - chrono::Duration::days(10)).to_rfc3339();
+        lib.write_trash(&items).unwrap();
+        let path = lib.trash_file_path(&sha).unwrap();
+        drop(lib);
+
+        let lib = Library::open(base.join("lib")).unwrap();
+        assert_eq!(lib.trash().len(), 1, "打开库时不能偷偷永久删");
+        assert!(path.exists());
         let _ = std::fs::remove_dir_all(&base);
     }
 
@@ -2151,7 +2218,15 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(lib.purge_expired_trash().unwrap(), 2);
+        let mut calls = 0;
+        let n = lib
+            .purge_expired_trash(|p| {
+                calls += 1;
+                std::fs::remove_file(p).is_ok()
+            })
+            .unwrap();
+        assert_eq!(n, 2);
+        assert_eq!(calls, 1, "文件已不在的那条不再调删除回调");
         assert!(lib.trash().is_empty());
         let _ = std::fs::remove_dir_all(&base);
     }

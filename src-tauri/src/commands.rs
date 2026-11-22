@@ -964,6 +964,34 @@ pub fn trash_purge(
     Ok(done.len())
 }
 
+/// 启动时清理回收站里的过期项，行为跟单张删除/清空一致：
+/// `permanent=false`（默认 recycle）在 Windows 上送系统回收站，
+/// `true` 直接删；非 Windows 没有系统回收站，只能直接删。
+/// 单项失败时 core 会保留条目，下次启动再试。返回清掉的数量。
+pub fn purge_expired_trash(lib: &picarium_core::Library, permanent: bool) -> usize {
+    match lib.purge_expired_trash(|path| {
+        #[cfg(windows)]
+        {
+            if permanent {
+                std::fs::remove_file(path).is_ok()
+            } else {
+                crate::recycle::move_to_recycle_bin(&[path.to_path_buf()]).is_ok()
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            let _ = permanent;
+            std::fs::remove_file(path).is_ok()
+        }
+    }) {
+        Ok(n) => n,
+        Err(e) => {
+            eprintln!("[library] 回收站到期清理失败：{e:#}");
+            0
+        }
+    }
+}
+
 /// 删除一张图（移进回收站）
 #[tauri::command]
 pub fn delete_asset(state: State<'_, AppState>, sha: String) -> Result<(), String> {

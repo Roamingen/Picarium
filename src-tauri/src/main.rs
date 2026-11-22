@@ -1115,6 +1115,23 @@ fn main() {
         .ok()
         .and_then(|t| serde_json::from_str(&t).ok())
         .unwrap_or_else(|| serde_json::json!({}));
+    // 回收站到期清理跟随「删除方式」：recycle 送系统回收站，permanent 直接删。
+    // 失败项留在清单里，下次启动再试。
+    let delete_mode = boot_settings
+        .get("deleteMode")
+        .and_then(|v| v.as_str())
+        .unwrap_or("recycle");
+    let purged = picarium_lib::commands::purge_expired_trash(&lib, delete_mode == "permanent");
+    if purged > 0 {
+        eprintln!(
+            "[library] 回收站自动清理了 {purged} 张过期图片（{}）",
+            if delete_mode == "permanent" {
+                "彻底删除"
+            } else {
+                "送系统回收站"
+            }
+        );
+    }
     let blacklist_items: Vec<String> = boot_settings
         .get("clipboardBlacklist")
         .and_then(|v| v.as_array())

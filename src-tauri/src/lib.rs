@@ -56,6 +56,17 @@ pub fn run() {
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
             // 首次升级：旧布局的 settings/themes 是复制过来的，库里保留原文件。
             config::ensure_for_library(lib.root());
+            // 回收站到期清理跟随删除方式；安卓没有系统回收站，直接删。
+            let boot_settings = commands::read_settings_value(&config::settings_path());
+            let permanent = boot_settings
+                .get("deleteMode")
+                .and_then(|v| v.as_str())
+                .map(|m| m == "permanent")
+                .unwrap_or(false);
+            let purged = commands::purge_expired_trash(&lib, permanent);
+            if purged > 0 {
+                eprintln!("[library] 回收站自动清理了 {purged} 张过期图片");
+            }
             app.manage(state::AppState::new(lib));
             Ok(())
         })
